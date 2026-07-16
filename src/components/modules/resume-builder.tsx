@@ -355,7 +355,7 @@ export function ResumeBuilderModule() {
           const res = await fetch("/api/ai/parse-resume-chunked", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ section, text: processedText }),
+            body: JSON.stringify({ section, text: processedText.slice(0, 3500) }),
           });
           const raw = await res.text();
           let json: unknown;
@@ -379,7 +379,6 @@ export function ResumeBuilderModule() {
     };
 
     // Helper: split large text into ~2000 char chunks at paragraph boundaries
-    // (2000 = more reliable LLM parsing than 3000, fewer JSON parse failures)
     const chunkText = (text: string, maxLen = 2000): string[] => {
       if (text.length <= maxLen) return [text];
       const paragraphs = text.split(/\n\s*\n/);
@@ -398,8 +397,9 @@ export function ResumeBuilderModule() {
     };
 
     const uid = () => Math.random().toString(36).slice(2, 10);
-    // Working copy that we update incrementally
-    let working = { ...data };
+    // Get the LATEST data from the store (avoids stale closure issues)
+    const store = useResumeStore.getState();
+    let working = { ...store.data };
 
     // Step 0: Contact
     updateStep(0, "parsing");
@@ -524,6 +524,17 @@ export function ResumeBuilderModule() {
     if (working.interests.length) next.interests = true;
     if (working.references.length) next.references = true;
     setSections(next);
+
+    // Final force-update to ensure the preview re-renders with all imported data
+    console.log("[import] Final data:", {
+      name: working.name,
+      email: working.email,
+      experience: working.experience.length,
+      projects: working.projects.length,
+      skills: working.skills.length,
+      education: working.education.length,
+    });
+    setData({ ...working });
     setImportSteps([]);
   };
 

@@ -4,7 +4,11 @@ let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
 
 async function getZAI() {
   if (!zaiInstance) {
-    zaiInstance = await ZAI.create();
+    const apiKey = process.env.ZAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("ZAI_API_KEY is not set. Add it to your .env file.");
+    }
+    zaiInstance = await ZAI.create({ apiKey });
   }
   return zaiInstance;
 }

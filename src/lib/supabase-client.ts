@@ -58,6 +58,49 @@ export interface SupabaseUser {
   updatedAt: string;
 }
 
+export interface AuditLog {
+  id: string;
+  userId: string | null;
+  action: string;
+  metadata: unknown;
+  ip: string | null;
+  createdAt: string;
+}
+
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  enabled: boolean;
+  rollout: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Minimal resume data shape used by admin views (the full type lives in the
+// resume store, but the admin panel only needs a few summary fields).
+export interface ResumeData {
+  name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  summary?: string;
+  experience?: Array<{ id?: string; role?: string; company?: string; location?: string; start?: string; end?: string; bullets?: string[] }>;
+  skills?: string[];
+  skillLevels?: Record<string, number>;
+  projects?: Array<{ id?: string; name?: string; description?: string }>;
+  education?: Array<{ id?: string; degree?: string; school?: string; grade?: string; start?: string; end?: string }>;
+  certifications?: Array<{ id?: string; name?: string; issuer?: string; date?: string }>;
+  languages?: string[];
+  awards?: Array<{ id?: string; name?: string; date?: string }>;
+  publications?: Array<{ id?: string; name?: string; date?: string }>;
+  interests?: string[];
+  customSections?: Array<{ id?: string; title?: string; items?: unknown[] }>;
+  sectionOrder?: string[];
+  template?: string;
+  accent?: string;
+  [key: string]: unknown;
+}
+
 export async function findUserByEmail(email: string): Promise<SupabaseUser | null> {
   const rows = await supabaseRequest(
     "User",
@@ -268,6 +311,142 @@ export async function upsertResumeData(userId: string, data: unknown): Promise<v
     await supabaseRequest("ResumeData", "POST", {
       userId,
       data,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
+// ============================================================
+// AuditLog operations (for audit feed)
+// ============================================================
+
+export async function createAuditLog(data: {
+  userId?: string | null;
+  action: string;
+  metadata?: unknown;
+  ip?: string | null;
+}): Promise<void> {
+  await supabaseRequest("AuditLog", "POST", {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    userId: data.userId ?? null,
+    action: data.action,
+    metadata: data.metadata ?? null,
+    ip: data.ip ?? null,
+  });
+}
+
+// ============================================================
+// Admin operations (superadmin only)
+// ============================================================
+
+export async function adminGetAllUsers(): Promise<SupabaseUser[]> {
+  const rows = await supabaseRequest("User", "GET", undefined, "select=*&order=createdAt.desc");
+  return rows || [];
+}
+
+export async function adminGetUserDetail(
+  userId: string,
+): Promise<{ user: SupabaseUser | null; resumeData: ResumeData | null; auditLogs: AuditLog[] }> {
+  const [userRows, resumeRows, logRows] = await Promise.all([
+    supabaseRequest("User", "GET", undefined, `id=eq.${encodeURIComponent(userId)}&limit=1`),
+    supabaseRequest("ResumeData", "GET", undefined, `userId=eq.${encodeURIComponent(userId)}&limit=1`),
+    supabaseRequest(
+      "AuditLog",
+      "GET",
+      undefined,
+      `userId=eq.${encodeURIComponent(userId)}&order=createdAt.desc&limit=50`,
+    ),
+  ]);
+  return {
+    user: userRows?.[0] || null,
+    resumeData: resumeRows?.[0]?.data || null,
+    auditLogs: logRows || [],
+  };
+}
+
+export async function adminUpdateUserRole(userId: string, role: string): Promise<void> {
+  await updateUser(userId, { role });
+}
+
+export async function adminUpdateUserPlan(userId: string, plan: string): Promise<void> {
+  await updateUser(userId, { plan });
+}
+
+export async function adminGetAllAuditLogs(limit = 100): Promise<AuditLog[]> {
+  const rows = await supabaseRequest(
+    "AuditLog",
+    "GET",
+    undefined,
+    `select=*&order=createdAt.desc&limit=${limit}`,
+  );
+  return rows || [];
+}
+
+export async function adminGetAllFeatureFlags(): Promise<FeatureFlag[]> {
+  const rows = await supabaseRequest("FeatureFlag", "GET", undefined, "select=*&order=key.asc");
+  return rows || [];
+}
+
+export async function adminUpdateFeatureFlag(
+  key: string,
+  enabled: boolean,
+  rollout?: number,
+): Promise<void> {
+  await supabaseRequest(
+    "FeatureFlag",
+    "PATCH",
+    {
+      enabled,
+      ...(rollout !== undefined ? { rollout } : {}),
+      updatedAt: new Date().toISOString(),
+    },
+    `key=eq.${encodeURIComponent(key)}`,
+  );
+}
+
+export async function adminCreateFeatureFlag(key: string, enabled: boolean, rollout = 100): Promise<void> {
+  await supabaseRequest("FeatureFlag", "POST", {
+    id: `flag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    key,
+    enabled,
+    rollout,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+// Navigation visibility config (stored in FeatureFlag table with key prefix "nav.")
+export async function adminGetNavConfig(): Promise<Record<string, boolean>> {
+  const rows = await supabaseRequest(
+    "FeatureFlag",
+    "GET",
+    undefined,
+    "key=like.nav.*&order=key.asc",
+  );
+  const config: Record<string, boolean> = {};
+  for (const row of rows || []) {
+    const moduleId = String(row.key).replace("nav.", "");
+    config[moduleId] = Boolean(row.enabled);
+  }
+  return config;
+}
+
+export async function adminSetNavVisibility(moduleId: string, visible: boolean): Promise<void> {
+  const key = `nav.${moduleId}`;
+  // Check if exists
+  const existing = await supabaseRequest(
+    "FeatureFlag",
+    "GET",
+    undefined,
+    `key=eq.${encodeURIComponent(key)}&limit=1`,
+  );
+  if (existing && existing.length > 0) {
+    await adminUpdateFeatureFlag(key, visible);
+  } else {
+    await supabaseRequest("FeatureFlag", "POST", {
+      id: `flag-nav-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      key,
+      enabled: visible,
+      rollout: 100,
       updatedAt: new Date().toISOString(),
     });
   }

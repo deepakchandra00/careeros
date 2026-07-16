@@ -31,8 +31,13 @@ export const metadata: Metadata = {
   authors: [{ name: "AI CareerOS" }],
   manifest: "/manifest.json",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-    apple: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [
+      { url: "/favicon-512.png", sizes: "512x512" },
+    ],
   },
 };
 

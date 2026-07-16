@@ -254,7 +254,111 @@ export const DOCX_TEMPLATE_CONFIG: Record<string, DocxTemplateConfig> = {
 };
 
 export function getDocxConfig(templateId: string): DocxTemplateConfig {
-  return DOCX_TEMPLATE_CONFIG[templateId] ?? DOCX_TEMPLATE_CONFIG.modern;
+  const cfg = DOCX_TEMPLATE_CONFIG[templateId];
+  if (cfg) return cfg;
+
+  // Universal fallback: detect layout pattern from template ID and use accent color
+  // This ensures ALL templates (including pro/tech/luxury/designer) produce clean Word docs
+  return getUniversalConfig(templateId);
+}
+
+/**
+ * Generate a reasonable DOCX config for templates without an explicit config.
+ * Detects the layout pattern from the template ID and picks colors that match
+ * the template's visual style.
+ */
+function getUniversalConfig(templateId: string): DocxTemplateConfig {
+  // Templates with sidebar layouts (dark/colored sidebar)
+  const sidebarTemplates = [
+    "stanford", "harvard", "silicon-valley", "manhattan", "prague", "tokyo",
+    "oxford", "berlin", "miami", "seoul", "dubai", "singapore", "stockholm",
+    "mumbai", "toronto", "sydney",
+    "quantum", "nebula", "cyber", "voltage", "synthwave",
+    "vogue", "maison", "atelier", "riviera", "noir", "heritage",
+    "luxury-executive", "cyber-premium",
+    "silicon-valley-premium", "executive-elite",
+  ];
+
+  // Templates with header band layouts
+  const headerBandTemplates = [
+    "ai-dashboard", "creative-portfolio", "neo-brutalism",
+    "apple-linear", "premium-2026", "ultra-premium-luxury",
+    "premium-creative", "premium-2026-glass", "glassmorphism",
+    "editorial-magazine",
+  ];
+
+  // Templates with single-column layouts
+  const singleColumnTemplates = [
+    "swiss-minimalism", "hologram",
+  ];
+
+  // Accent colors per template (matches the catalog)
+  const accentColors: Record<string, { accent: string; bg: string; pattern: DocxPattern }> = {
+    "stanford": { accent: "0F766E", bg: "0F766E", pattern: "sidebar-left" },
+    "harvard": { accent: "B8860B", bg: "1A1A2E", pattern: "sidebar-left" },
+    "silicon-valley": { accent: "10B981", bg: "0F172A", pattern: "sidebar-left" },
+    "manhattan": { accent: "0F172A", bg: "0F172A", pattern: "header-band" },
+    "prague": { accent: "7C3AED", bg: "7C3AED", pattern: "sidebar-left" },
+    "tokyo": { accent: "E11D48", bg: "E11D48", pattern: "header-band" },
+    "oxford": { accent: "1E3A5F", bg: "1E3A5F", pattern: "sidebar-left" },
+    "berlin": { accent: "F59E0B", bg: "F59E0B", pattern: "header-band" },
+    "miami": { accent: "FB7185", bg: "FB7185", pattern: "sidebar-left" },
+    "seoul": { accent: "22C55E", bg: "0F172A", pattern: "header-band" },
+    "dubai": { accent: "C5A572", bg: "1A1A2E", pattern: "sidebar-left" },
+    "singapore": { accent: "0891B2", bg: "0891B2", pattern: "header-band" },
+    "stockholm": { accent: "475569", bg: "F8FAFC", pattern: "single-column" },
+    "mumbai": { accent: "EA580C", bg: "EA580C", pattern: "sidebar-left" },
+    "toronto": { accent: "1E40AF", bg: "1E40AF", pattern: "sidebar-left" },
+    "sydney": { accent: "14B8A6", bg: "14B8A6", pattern: "header-band" },
+    "quantum": { accent: "06B6D4", bg: "0A0E27", pattern: "sidebar-left" },
+    "nebula": { accent: "10B981", bg: "1A1A1A", pattern: "sidebar-left" },
+    "cyber": { accent: "3B82F6", bg: "0A0A0A", pattern: "sidebar-left" },
+    "voltage": { accent: "FB7185", bg: "0F172A", pattern: "header-band" },
+    "synthwave": { accent: "EC4899", bg: "1E1B4B", pattern: "sidebar-left" },
+    "hologram": { accent: "A78BFA", bg: "FAFBFF", pattern: "single-column" },
+    "vogue": { accent: "C5A572", bg: "FAF8F3", pattern: "single-column" },
+    "maison": { accent: "C5A572", bg: "0A0A0A", pattern: "sidebar-left" },
+    "atelier": { accent: "5B1A1A", bg: "5B1A1A", pattern: "sidebar-left" },
+    "riviera": { accent: "0F3460", bg: "0F3460", pattern: "sidebar-left" },
+    "noir": { accent: "10B981", bg: "000000", pattern: "sidebar-left" },
+    "heritage": { accent: "C5A572", bg: "4A0E0E", pattern: "sidebar-left" },
+    "glassmorphism": { accent: "6366F1", bg: "6366F1", pattern: "header-band" },
+    "editorial-magazine": { accent: "8B4513", bg: "FAF8F3", pattern: "single-column" },
+    "ai-dashboard": { accent: "6366F1", bg: "6366F1", pattern: "header-band" },
+    "luxury-executive": { accent: "C5A572", bg: "0A0A0A", pattern: "sidebar-left" },
+    "creative-portfolio": { accent: "FB7185", bg: "FB7185", pattern: "header-band" },
+    "neo-brutalism": { accent: "FACC15", bg: "000000", pattern: "header-band" },
+    "swiss-minimalism": { accent: "000000", bg: "FFFFFF", pattern: "single-column" },
+    "cyber-premium": { accent: "06B6D4", bg: "0A0A14", pattern: "sidebar-left" },
+    "apple-linear": { accent: "10B981", bg: "10B981", pattern: "header-band" },
+    "premium-2026": { accent: "8B5CF6", bg: "8B5CF6", pattern: "header-band" },
+    "ultra-premium-luxury": { accent: "C5A572", bg: "FAF8F3", pattern: "single-column" },
+    "silicon-valley-premium": { accent: "6366F1", bg: "6366F1", pattern: "sidebar-left" },
+    "executive-elite": { accent: "1E3A5F", bg: "1E3A5F", pattern: "sidebar-left" },
+    "premium-creative": { accent: "FB7185", bg: "FB7185", pattern: "header-band" },
+    "premium-2026-glass": { accent: "A78BFA", bg: "A78BFA", pattern: "header-band" },
+  };
+
+  const colors = accentColors[templateId] || { accent: "10B981", bg: "10B981", pattern: "sidebar-left" as DocxPattern };
+
+  // Determine if this is a dark sidebar template (white text on dark bg)
+  const darkSidebar = [
+    "harvard", "silicon-valley", "oxford", "dubai", "noir", "heritage",
+    "quantum", "nebula", "cyber", "synthwave", "maison", "atelier",
+    "riviera", "luxury-executive", "cyber-premium", "executive-elite",
+    "silicon-valley-premium",
+  ].includes(templateId);
+
+  return {
+    pattern: colors.pattern,
+    sidebarBg: colors.bg,
+    sidebarText: darkSidebar ? "FFFFFF" : "0F172A",
+    sidebarSections: ["contact", "skills", "languages", "certifications"],
+    headerColor: colors.accent,
+    fontFamily: "Helvetica",
+    marginCm: colors.pattern === "single-column" ? 1.4 : 0,
+    sidebarWidthPct: colors.pattern === "sidebar-left" || colors.pattern === "sidebar-right" ? 33 : 0,
+  };
 }
 
 /** Hex without # (for docx fill colors). */

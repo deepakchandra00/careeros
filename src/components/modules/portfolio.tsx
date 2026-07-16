@@ -80,6 +80,16 @@ export function PortfolioModule() {
   const [includeBlog, setIncludeBlog] = React.useState(false);
 
   const t = THEMES[theme];
+
+  // Generate dynamic portfolio URL based on current domain
+  const username = d.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const portfolioUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/u/${username}`
+    : `careeros.app/u/${username}`;
+  const portfolioDomain = typeof window !== "undefined"
+    ? window.location.hostname
+    : "careeros.app";
+
   const initials = d.name
     .split(" ")
     .map((p) => p[0])
@@ -102,7 +112,7 @@ export function PortfolioModule() {
       >
         <AIButton
           onClick={() =>
-            toast.success("Portfolio published to deepaksharma.careeros.app", {
+            toast.success(`Portfolio published to ${portfolioUrl}`, {
               description: "Your site is now live.",
             })
           }
@@ -123,7 +133,7 @@ export function PortfolioModule() {
             </div>
             <div className="ml-3 flex flex-1 items-center gap-2 rounded-md bg-background px-3 py-1 text-xs text-muted-foreground">
               <span className="size-3 rounded-full bg-primary/40" />
-              deepaksharma.dev
+              {portfolioDomain}
             </div>
             <ExternalLink className="size-3.5 text-muted-foreground" />
           </div>
@@ -531,14 +541,14 @@ export function PortfolioModule() {
               <p className="text-xs text-muted-foreground">
                 Your portfolio will be live at{" "}
                 <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
-                  deepaksharma.careeros.app
+                  {portfolioUrl}
                 </code>{" "}
                 with your selected theme &amp; accent.
               </p>
               <Button
                 className="w-full gap-1.5"
                 onClick={() =>
-                  toast.success("Portfolio published to deepaksharma.careeros.app", {
+                  toast.success(`Portfolio published to ${portfolioUrl}`, {
                     description: "Your site is now live.",
                   })
                 }
