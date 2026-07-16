@@ -1,0 +1,602 @@
+   800→    <path d="M 100 0 Q 130 300 80 600 T 150 1100" fill="none" stroke={LUX_GOLD} strokeWidth="0.25" opacity="0.35" />
+   801→    <path d="M 500 0 Q 480 400 530 700 T 480 1100" fill="none" stroke={LUX_GOLD} strokeWidth="0.25" opacity="0.3" />
+   802→  </svg>
+   803→);
+   804→
+   805→const LuxuryHeader = ({ label }: { label: string }) => (
+   806→  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+   807→    <span style={{ fontFamily: DM_SANS, fontSize: 9, color: LUX_GOLD, letterSpacing: 5, fontWeight: 600 }}>{label.toUpperCase()}</span>
+   808→    <div style={{ flex: 1, height: 0.5, background: `linear-gradient(90deg, ${LUX_GOLD}, transparent)` }} />
+   809→  </div>
+   810→);
+   811→
+   812→export function LuxuryExecutiveTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+   813→  const Embossed: React.CSSProperties = {
+   814→    background: "linear-gradient(180deg, #161616 0%, #0f0f0f 100%)",
+   815→    border: `0.5px solid ${LUX_GOLD}55`,
+   816→    borderRadius: 4,
+   817→    boxShadow: "0 1px 0 rgba(197,165,114,0.08), 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+   818→  };
+   819→
+   820→  return (
+   821→    <div className={PAPER} style={{ fontFamily: CORMORANT, background: LUX_BLACK, color: LUX_CREAM, position: "relative", overflow: "hidden" }}>
+   822→      <LuxuryMarbleVeins />
+   823→
+   824→      {/* Vertical EXECUTIVE rail */}
+   825→      <div style={{ position: "absolute", left: 16, top: 80, bottom: 80, width: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", pointerEvents: "none", zIndex: 1 }}>
+   826→        <div style={{ writingMode: "vertical-rl" as React.CSSProperties["writingMode"], transform: "rotate(180deg)", fontFamily: CORMORANT, fontSize: 18, color: LUX_GOLD, letterSpacing: 14, fontWeight: 600 }}>EXECUTIVE</div>
+   827→        <div style={{ writingMode: "vertical-rl" as React.CSSProperties["writingMode"], transform: "rotate(180deg)", fontFamily: DM_SANS, fontSize: 8, color: LUX_MUTED, letterSpacing: 4 }}>MMXXV</div>
+   828→      </div>
+   829→
+   830→      {/* Header */}
+   831→      <div style={{ position: "relative", padding: "50px 56px 36px 70px", borderBottom: `0.5px solid ${LUX_PLATINUM}30`, zIndex: 1 }}>
+   832→        <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+   833→          <div style={{ position: "relative", flexShrink: 0 }}>
+   834→            <div style={{ position: "absolute", inset: -8, borderRadius: "50%", border: `1px solid ${LUX_GOLD}` }} />
+   835→            <div style={{ position: "absolute", inset: -16, borderRadius: "50%", border: `0.5px solid ${LUX_GOLD}80` }} />
+   836→            <div style={{ position: "absolute", inset: -24, borderRadius: "50%", border: `0.5px solid ${LUX_GOLD}40` }} />
+   837→            <Avatar data={data} size={100} ring={LUX_GOLD} ringWidth={1} shape="circle" />
+   838→          </div>
+   839→          <div style={{ flex: 1 }}>
+   840→            <div style={{ fontFamily: DM_SANS, fontSize: 9, color: LUX_GOLD, letterSpacing: 5, marginBottom: 10, textTransform: "uppercase" }}>The Executive Profile</div>
+   841→            <h1 style={{ fontFamily: CORMORANT, fontSize: 44, fontWeight: 600, color: LUX_CREAM, margin: 0, lineHeight: 1.0, letterSpacing: 0.5 }}>{data.name}</h1>
+   842→            <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
+   843→              <div style={{ width: 32, height: 1, background: LUX_GOLD }} />
+   844→              <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 17, color: LUX_GOLD, margin: 0 }}>{data.title}</p>
+   845→            </div>
+   846→          </div>
+   847→        </div>
+   848→        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginTop: 22, fontFamily: DM_SANS, fontSize: 9, color: LUX_MUTED, letterSpacing: 0.4, paddingLeft: 132 }}>
+   849→          {[data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean).map((c, i) => (
+   850→            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+   851→              <span style={{ color: LUX_GOLD, fontSize: 7 }}>◆</span>{c}
+   852→            </span>
+   853→          ))}
+   854→        </div>
+   855→      </div>
+   856→
+   857→      {/* Body 2-column */}
+   858→      <div style={{ position: "relative", padding: "34px 56px 40px 70px", display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 28, zIndex: 1 }}>
+   859→        <div>
+   860→          {visible(sections, "summary") && data.summary && (
+   861→            <div style={{ marginBottom: 26 }}>
+   862→              <LuxuryHeader label="Manifesto" />
+   863→              <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 15, lineHeight: 1.8, color: "rgba(245,240,232,0.85)", margin: 0, borderLeft: `0.5px solid ${LUX_GOLD}80`, paddingLeft: 22 }}>{data.summary}</p>
+   864→            </div>
+   865→          )}
+   866→
+   867→          {visible(sections, "experience") && data.experience.length > 0 && (
+   868→            <div style={{ marginBottom: 26 }}>
+   869→              <LuxuryHeader label="Parcours" />
+   870→              <div>
+   871→                {data.experience.map(e => (
+   872→                  <div key={e.id} style={{ ...Embossed, padding: "18px 22px", marginBottom: 12, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   873→                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+   874→                      <span style={{ fontFamily: CORMORANT, fontSize: 18, fontWeight: 600, color: LUX_CREAM }}>{e.role}</span>
+   875→                      <span style={{ fontFamily: DM_SANS, fontSize: 8.5, color: LUX_GOLD, letterSpacing: 1.5, textTransform: "uppercase" }}>{range(e.start, e.end)}</span>
+   876→                    </div>
+   877→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 13, color: LUX_GOLD, marginBottom: 10 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+   878→                    <div style={{ width: 28, height: 0.5, background: `${LUX_GOLD}80`, marginBottom: 10 }} />
+   879→                    {e.bullets.filter(b => b?.trim()).map((b, i) => (
+   880→                      <div key={i} style={{ fontFamily: CORMORANT, fontSize: 12, lineHeight: 1.7, color: "rgba(245,240,232,0.82)", marginBottom: 3, paddingLeft: 14, position: "relative" }}>
+   881→                        <span style={{ position: "absolute", left: 0, color: LUX_GOLD, fontSize: 7, top: 8 }}>◆</span>{b}
+   882→                      </div>
+   883→                    ))}
+   884→                  </div>
+   885→                ))}
+   886→              </div>
+   887→            </div>
+   888→          )}
+   889→
+   890→          {visible(sections, "projects") && data.projects.length > 0 && (
+   891→            <div>
+   892→              <LuxuryHeader label="Œuvres" />
+   893→              {data.projects.map(p => (
+   894→                <div key={p.id} style={{ ...Embossed, padding: "16px 22px", marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   895→                  <div style={{ fontFamily: CORMORANT, fontSize: 15, fontWeight: 600, color: LUX_CREAM }}>{p.name}</div>
+   896→                  {p.description && <div style={{ fontFamily: CORMORANT, fontSize: 11.5, color: "rgba(245,240,232,0.75)", lineHeight: 1.6, marginTop: 3 }}>{p.description}</div>}
+   897→                  {p.tech.length > 0 && <div style={{ fontFamily: DM_SANS, fontSize: 8, color: LUX_GOLD, marginTop: 6, letterSpacing: 0.5 }}>{p.tech.join("   ·   ")}</div>}
+   898→                  {p.link && <div style={{ fontFamily: DM_SANS, fontSize: 8, color: LUX_PLATINUM, marginTop: 3, opacity: 0.7 }}>{p.link}</div>}
+   899→                </div>
+   900→              ))}
+   901→            </div>
+   902→          )}
+   903→        </div>
+   904→
+   905→        <div>
+   906→          {visible(sections, "skills") && data.skills.length > 0 && (
+   907→            <div style={{ ...Embossed, padding: "20px", marginBottom: 16 }}>
+   908→              <LuxuryHeader label="Savoir-Faire" />
+   909→              {data.skills.map((s, i) => (
+   910→                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7, paddingBottom: 7, borderBottom: `0.5px solid ${LUX_PLATINUM}15` }}>
+   911→                  <span style={{ color: LUX_GOLD, fontSize: 8 }}>◆</span>
+   912→                  <span style={{ fontFamily: CORMORANT, fontSize: 12.5, color: LUX_CREAM, flex: 1 }}>{s}</span>
+   913→                  {data.skillLevels[s] !== undefined && (
+   914→                    <div style={{ display: "flex", gap: 2 }}>
+   915→                      {[1, 2, 3, 4, 5].map(n => (
+   916→                        <span key={n} style={{ width: 4, height: 4, borderRadius: "50%", background: n <= Math.round((data.skillLevels[s] ?? 0) / 20) ? LUX_GOLD : `${LUX_PLATINUM}30` }} />
+   917→                      ))}
+   918→                    </div>
+   919→                  )}
+   920→                </div>
+   921→              ))}
+   922→            </div>
+   923→          )}
+   924→
+   925→          {visible(sections, "education") && data.education.length > 0 && (
+   926→            <div style={{ ...Embossed, padding: "20px", marginBottom: 16 }}>
+   927→              <LuxuryHeader label="Formation" />
+   928→              {data.education.map(ed => (
+   929→                <div key={ed.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   930→                  <div style={{ fontFamily: CORMORANT, fontSize: 13.5, fontWeight: 600, color: LUX_CREAM }}>{ed.degree}</div>
+   931→                  <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: LUX_GOLD }}>{ed.school}</div>
+   932→                  <div style={{ fontFamily: DM_SANS, fontSize: 8, color: LUX_MUTED, marginTop: 2, letterSpacing: 1 }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+   933→                </div>
+   934→              ))}
+   935→            </div>
+   936→          )}
+   937→
+   938→          {visible(sections, "languages") && data.languages.length > 0 && (
+   939→            <div style={{ ...Embossed, padding: "20px", marginBottom: 16 }}>
+   940→              <LuxuryHeader label="Langues" />
+   941→              {data.languages.map((l, i) => (
+   942→                <div key={i} style={{ fontFamily: CORMORANT, fontSize: 12.5, color: LUX_CREAM, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+   943→                  <span style={{ color: LUX_GOLD, fontSize: 7 }}>●</span>{l}
+   944→                </div>
+   945→              ))}
+   946→            </div>
+   947→          )}
+   948→
+   949→          {visible(sections, "certifications") && data.certifications.length > 0 && (
+   950→            <div style={{ ...Embossed, padding: "20px", marginBottom: 16 }}>
+   951→              <LuxuryHeader label="Certifications" />
+   952→              {data.certifications.map(c => (
+   953→                <div key={c.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   954→                  <div style={{ fontFamily: CORMORANT, fontSize: 12.5, fontWeight: 600, color: LUX_CREAM }}>{c.title}</div>
+   955→                  <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: LUX_GOLD }}>{c.subtitle}{c.date ? `  ·  ${c.date}` : ""}</div>
+   956→                </div>
+   957→              ))}
+   958→            </div>
+   959→          )}
+   960→
+   961→          {visible(sections, "awards") && data.awards.length > 0 && (
+   962→            <div style={{ ...Embossed, padding: "20px", marginBottom: 16 }}>
+   963→              <LuxuryHeader label="Distinctions" />
+   964→              {data.awards.map(aw => (
+   965→                <div key={aw.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   966→                  <div style={{ fontFamily: CORMORANT, fontSize: 12.5, fontWeight: 600, color: LUX_CREAM }}>{aw.title}</div>
+   967→                  <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: LUX_GOLD }}>{aw.subtitle}{aw.date ? `  ·  ${aw.date}` : ""}</div>
+   968→                </div>
+   969→              ))}
+   970→            </div>
+   971→          )}
+   972→
+   973→          {visible(sections, "interests") && data.interests.length > 0 && (
+   974→            <div style={{ ...Embossed, padding: "20px" }}>
+   975→              <LuxuryHeader label="Intérêts" />
+   976→              <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: LUX_CREAM, lineHeight: 1.8 }}>{data.interests.join("   ·   ")}</div>
+   977→            </div>
+   978→          )}
+   979→
+   980→          {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+   981→            <div key={cs.id} style={{ ...Embossed, padding: "20px", marginBottom: 16 }}>
+   982→              <LuxuryHeader label={cs.title} />
+   983→              {cs.items.map(item => (
+   984→                <div key={item.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   985→                  <div style={{ fontFamily: CORMORANT, fontSize: 12.5, fontWeight: 600, color: LUX_CREAM }}>{item.title}</div>
+   986→                  {item.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: LUX_GOLD }}>{item.subtitle}</div>}
+   987→                  {item.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: "rgba(245,240,232,0.8)", lineHeight: 1.55, marginTop: 2 }}>{item.description}</div>}
+   988→                </div>
+   989→              ))}
+   990→            </div>
+   991→          ))}
+   992→        </div>
+   993→      </div>
+   994→
+   995→      {/* Footer */}
+   996→      <div style={{ position: "relative", padding: "16px 70px 28px", borderTop: `0.5px solid ${LUX_PLATINUM}30`, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
+   997→        <span style={{ fontFamily: DM_SANS, fontSize: 8, color: LUX_MUTED, letterSpacing: 3 }}>EST. MMXXV</span>
+   998→        <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: LUX_GOLD }}>— Executive —</span>
+   999→        <span style={{ fontFamily: DM_SANS, fontSize: 8, color: LUX_MUTED, letterSpacing: 3 }}>{data.name.toUpperCase()}</span>
+  1000→      </div>
+  1001→    </div>
+  1002→  );
+  1003→}
+  1004→
+  1005→// =====================================================================
+  1006→// 5. CREATIVE PORTFOLIO — Highly creative with bold asymmetric layouts,
+  1007→//    overlapping rotated cards, large typography, colorful gradients
+  1008→//    (coral, teal, amber), abstract organic blob shapes, wave patterns,
+  1009→//    modern timelines, clip-path masks. Behance/Dribbble/Awwwards.
+  1010→//    Font: DM Sans.
+  1011→// =====================================================================
+  1012→
+  1013→const CRE_WHITE = "#ffffff";
+  1014→const CRE_INK = "#1a1a2e";
+  1015→const CRE_MUTED = "#64748b";
+  1016→const CRE_CORAL = "#ff6b6b";
+  1017→const CRE_TEAL = "#4ecdc4";
+  1018→const CRE_AMBER = "#ffd93d";
+  1019→const CRE_VIOLET = "#a78bfa";
+  1020→
+  1021→const CreativeBlob = ({ color, style }: { color: string; style?: React.CSSProperties }) => (
+  1022→  <svg width="240" height="240" viewBox="0 0 240 240" style={{ position: "absolute", ...style, pointerEvents: "none", zIndex: 0 }}>
+  1023→    <defs>
+  1024→      <linearGradient id={`blob-${color.replace("#", "")}`} x1="0%" y1="0%" x2="100%" y2="100%">
+  1025→        <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+  1026→        <stop offset="100%" stopColor={color} stopOpacity="0.1" />
+  1027→      </linearGradient>
+  1028→    </defs>
+  1029→    <path d="M 120 30 C 180 30 220 80 220 130 C 220 180 180 220 120 220 C 60 220 20 180 20 130 C 20 80 60 30 120 30 Z" fill={`url(#blob-${color.replace("#", "")})`} transform="translate(0 -10)" />
+  1030→  </svg>
+  1031→);
+  1032→
+  1033→const CreativeWave = () => (
+  1034→  <svg width="100%" height="40" viewBox="0 0 800 40" preserveAspectRatio="none" style={{ display: "block", opacity: 0.6 }}>
+  1035→    <path d="M 0 20 Q 100 5 200 20 T 400 20 T 600 20 T 800 20" fill="none" stroke={CRE_TEAL} strokeWidth="2" />
+  1036→    <path d="M 0 25 Q 100 15 200 25 T 400 25 T 600 25 T 800 25" fill="none" stroke={CRE_CORAL} strokeWidth="1.5" opacity="0.7" />
+  1037→  </svg>
+  1038→);
+  1039→
+  1040→const CreativeSectionBar = ({ label, color }: { label: string; color: string }) => (
+  1041→  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+  1042→    <div style={{ width: 24, height: 24, borderRadius: 8, background: `linear-gradient(135deg, ${color}, ${CRE_VIOLET})`, transform: "rotate(-8deg)", boxShadow: `0 4px 12px ${color}50` }} />
+  1043→    <span style={{ fontFamily: DM_SANS, fontSize: 14, fontWeight: 700, color: CRE_INK, letterSpacing: -0.3, textTransform: "uppercase" }}>{label}</span>
+  1044→    <div style={{ flex: 1, height: 2, background: `linear-gradient(90deg, ${color}, transparent)`, borderRadius: 999 }} />
+  1045→  </div>
+  1046→);
+  1047→
+  1048→export function CreativePortfolioTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  1049→  return (
+  1050→    <div className={PAPER} style={{ fontFamily: DM_SANS, background: CRE_WHITE, color: CRE_INK, position: "relative", overflow: "hidden" }}>
+  1051→      <CreativeBlob color={CRE_CORAL} style={{ top: -60, right: -40, opacity: 0.6 }} />
+  1052→      <CreativeBlob color={CRE_TEAL} style={{ top: 280, left: -80, opacity: 0.5 }} />
+  1053→      <CreativeBlob color={CRE_AMBER} style={{ bottom: -80, right: 100, opacity: 0.4 }} />
+  1054→
+  1055→      {/* Header — overlapping rotated cards */}
+  1056→      <div style={{ position: "relative", padding: "44px 40px 28px", zIndex: 1 }}>
+  1057→        <div style={{ display: "flex", alignItems: "center", gap: 28, position: "relative" }}>
+  1058→          {/* Avatar with clip-path hexagonal-ish shape */}
+  1059→          <div style={{ position: "relative", flexShrink: 0, transform: "rotate(-3deg)" }}>
+  1060→            <div style={{ position: "absolute", inset: -8, background: `linear-gradient(135deg, ${CRE_CORAL}, ${CRE_AMBER})`, borderRadius: 24, transform: "rotate(6deg)", filter: "blur(8px)", opacity: 0.5 }} />
+  1061→            <div style={{ position: "relative", clipPath: "polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)" }}>
+  1062→              <Avatar data={data} size={110} shape="square" ring="transparent" ringWidth={0} />
+  1063→            </div>
+  1064→          </div>
+  1065→          <div style={{ flex: 1, transform: "rotate(0.5deg)" }}>
+  1066→            <div style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, background: `linear-gradient(90deg, ${CRE_CORAL}, ${CRE_AMBER})`, color: "white", fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 10, boxShadow: `0 4px 12px ${CRE_CORAL}40` }}>Creative Portfolio</div>
+  1067→            <h1 style={{ fontFamily: DM_SANS, fontSize: 42, fontWeight: 800, color: CRE_INK, margin: 0, lineHeight: 1.0, letterSpacing: -1.5 }}>
+  1068→              <span style={{ background: `linear-gradient(135deg, ${CRE_CORAL} 0%, ${CRE_VIOLET} 50%, ${CRE_TEAL} 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" as React.CSSProperties["color"] }}>{data.name}</span>
+  1069→            </h1>
+  1070→            <p style={{ fontSize: 14, fontWeight: 500, color: CRE_MUTED, margin: "4px 0 0", letterSpacing: 0.2 }}>{data.title}</p>
+  1071→            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 16px", marginTop: 12, fontSize: 9.5, color: CRE_MUTED, fontWeight: 500 }}>
+  1072→              {[data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean).map((c, i) => (
+  1073→                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, background: "#f1f5f9" }}>
+  1074→                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: [CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4] }} />{c}
+  1075→                </span>
+  1076→              ))}
+  1077→            </div>
+  1078→          </div>
+  1079→        </div>
+  1080→      </div>
+  1081→
+  1082→      <div style={{ position: "relative", padding: "0 40px 36px", zIndex: 1 }}>
+  1083→        {visible(sections, "summary") && data.summary && (
+  1084→          <div style={{ marginBottom: 22, padding: "18px 22px", borderRadius: 16, background: `linear-gradient(135deg, ${CRE_AMBER}15, ${CRE_CORAL}10)`, border: `1px solid ${CRE_AMBER}30`, transform: "rotate(-0.3deg)", breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1085→            <CreativeSectionBar label="Profile" color={CRE_CORAL} />
+  1086→            <p style={{ fontSize: 12, lineHeight: 1.7, color: CRE_INK, margin: 0, fontWeight: 500 }}>{data.summary}</p>
+  1087→          </div>
+  1088→        )}
+  1089→
+  1090→        {visible(sections, "experience") && data.experience.length > 0 && (
+  1091→          <div style={{ marginBottom: 22 }}>
+  1092→            <CreativeSectionBar label="Experience" color={CRE_TEAL} />
+  1093→            <div style={{ position: "relative", paddingLeft: 26 }}>
+  1094→              {/* Timeline vertical gradient line */}
+  1095→              <div style={{ position: "absolute", left: 6, top: 8, bottom: 8, width: 3, borderRadius: 999, background: `linear-gradient(180deg, ${CRE_CORAL}, ${CRE_TEAL}, ${CRE_AMBER})` }} />
+  1096→              {data.experience.map((e, i) => (
+  1097→                <div key={e.id} style={{ marginBottom: 16, breakInside: "avoid" as React.CSSProperties["breakInside"], position: "relative", padding: "14px 18px", borderRadius: 14, background: "white", border: `1px solid #e2e8f0`, boxShadow: "0 4px 14px rgba(15,23,42,0.06)", transform: `rotate(${i % 2 === 0 ? -0.3 : 0.3}deg)` }}>
+  1098→                  <div style={{ position: "absolute", left: -23, top: 18, width: 14, height: 14, borderRadius: "50%", background: `linear-gradient(135deg, ${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}, white)`, border: `3px solid ${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}`, boxShadow: `0 0 0 3px white` }} />
+  1099→                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+  1100→                    <span style={{ fontSize: 14, fontWeight: 700, color: CRE_INK }}>{e.role}</span>
+  1101→                    <span style={{ fontSize: 9, fontWeight: 700, color: "white", padding: "3px 10px", borderRadius: 999, background: `linear-gradient(135deg, ${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}, ${CRE_VIOLET})`, whiteSpace: "nowrap" }}>{range(e.start, e.end)}</span>
+  1102→                  </div>
+  1103→                  <div style={{ fontSize: 11, fontWeight: 600, color: [CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4], marginTop: 2 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+  1104→                  <div style={{ marginTop: 6 }}>
+  1105→                    {e.bullets.filter(b => b?.trim()).map((b, j) => (
+  1106→                      <div key={j} style={{ fontSize: 10.5, lineHeight: 1.6, color: "#475569", marginBottom: 2, paddingLeft: 14, position: "relative" }}>
+  1107→                        <span style={{ position: "absolute", left: 0, top: 5, color: [CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4], fontWeight: 700 }}>▸</span>{b}
+  1108→                      </div>
+  1109→                    ))}
+  1110→                  </div>
+  1111→                </div>
+  1112→              ))}
+  1113→            </div>
+  1114→          </div>
+  1115→        )}
+  1116→
+  1117→        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 22 }}>
+  1118→          <div>
+  1119→            {visible(sections, "projects") && data.projects.length > 0 && (
+  1120→              <div style={{ marginBottom: 22 }}>
+  1121→                <CreativeSectionBar label="Projects" color={CRE_VIOLET} />
+  1122→                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+  1123→                  {data.projects.map((p, i) => (
+  1124→                    <div key={p.id} style={{ padding: 14, borderRadius: 14, background: "white", border: `1px solid #e2e8f0`, boxShadow: "0 4px 12px rgba(15,23,42,0.05)", breakInside: "avoid" as React.CSSProperties["breakInside"], position: "relative", overflow: "hidden", transform: `rotate(${i % 2 === 0 ? 0.5 : -0.5}deg)` }}>
+  1125→                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}, ${CRE_VIOLET})` }} />
+  1126→                      <div style={{ fontSize: 13, fontWeight: 700, color: CRE_INK, marginTop: 4 }}>{p.name}</div>
+  1127→                      {p.description && <div style={{ fontSize: 10, lineHeight: 1.5, color: "#475569", marginTop: 3 }}>{p.description}</div>}
+  1128→                      {p.tech.length > 0 && (
+  1129→                        <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 6 }}>
+  1130→                          {p.tech.map((t, j) => (
+  1131→                            <span key={j} style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 6, background: `${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}20`, color: [CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4] }}>{t}</span>
+  1132→                          ))}
+  1133→                        </div>
+  1134→                      )}
+  1135→                    </div>
+  1136→                  ))}
+  1137→                </div>
+  1138→              </div>
+  1139→            )}
+  1140→
+  1141→            {visible(sections, "education") && data.education.length > 0 && (
+  1142→              <div>
+  1143→                <CreativeSectionBar label="Education" color={CRE_AMBER} />
+  1144→                {data.education.map(ed => (
+  1145→                  <div key={ed.id} style={{ padding: 14, borderRadius: 14, background: `linear-gradient(135deg, ${CRE_AMBER}15, white)`, border: `1px solid ${CRE_AMBER}30`, marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1146→                    <div style={{ fontSize: 13, fontWeight: 700, color: CRE_INK }}>{ed.degree}</div>
+  1147→                    <div style={{ fontSize: 11, fontWeight: 600, color: CRE_CORAL, marginTop: 2 }}>{ed.school}</div>
+  1148→                    <div style={{ fontSize: 9.5, color: CRE_MUTED, marginTop: 2 }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+  1149→                  </div>
+  1150→                ))}
+  1151→              </div>
+  1152→            )}
+  1153→          </div>
+  1154→
+  1155→          <div>
+  1156→            {visible(sections, "skills") && data.skills.length > 0 && (
+  1157→              <div style={{ marginBottom: 22 }}>
+  1158→                <CreativeSectionBar label="Skills" color={CRE_CORAL} />
+  1159→                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+  1160→                  {data.skills.map((s, i) => (
+  1161→                    <span key={i} style={{ fontSize: 10, fontWeight: 700, padding: "5px 11px", borderRadius: 10, color: "white", background: `linear-gradient(135deg, ${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}, ${CRE_VIOLET})`, boxShadow: `0 4px 10px ${[CRE_CORAL, CRE_TEAL, CRE_AMBER, CRE_VIOLET][i % 4]}40` }}>{s}</span>
+  1162→                  ))}
+  1163→                </div>
+  1164→              </div>
+  1165→            )}
+  1166→
+  1167→            {visible(sections, "languages") && data.languages.length > 0 && (
+  1168→              <div style={{ marginBottom: 22 }}>
+  1169→                <CreativeSectionBar label="Languages" color={CRE_TEAL} />
+  1170→                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+  1171→                  {data.languages.map((l, i) => (
+  1172→                    <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: `${CRE_TEAL}15`, color: CRE_INK, border: `1px solid ${CRE_TEAL}40` }}>{l}</span>
+  1173→                  ))}
+  1174→                </div>
+  1175→              </div>
+  1176→            )}
+  1177→
+  1178→            {visible(sections, "certifications") && data.certifications.length > 0 && (
+  1179→              <div style={{ marginBottom: 22 }}>
+  1180→                <CreativeSectionBar label="Certs" color={CRE_AMBER} />
+  1181→                {data.certifications.map(c => (
+  1182→                  <div key={c.id} style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 10, background: `${CRE_AMBER}12`, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1183→                    <div style={{ fontSize: 11, fontWeight: 700, color: CRE_INK }}>{c.title}</div>
+  1184→                    <div style={{ fontSize: 9, color: CRE_MUTED, marginTop: 1 }}>{c.subtitle}{c.date ? `  ·  ${c.date}` : ""}</div>
+  1185→                  </div>
+  1186→                ))}
+  1187→              </div>
+  1188→            )}
+  1189→
+  1190→            {visible(sections, "awards") && data.awards.length > 0 && (
+  1191→              <div style={{ marginBottom: 22 }}>
+  1192→                <CreativeSectionBar label="Awards" color={CRE_VIOLET} />
+  1193→                {data.awards.map(aw => (
+  1194→                  <div key={aw.id} style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 10, background: `${CRE_VIOLET}12`, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1195→                    <div style={{ fontSize: 11, fontWeight: 700, color: CRE_INK }}>{aw.title}</div>
+  1196→                    <div style={{ fontSize: 9, color: CRE_MUTED, marginTop: 1 }}>{aw.subtitle}{aw.date ? `  ·  ${aw.date}` : ""}</div>
+  1197→                  </div>
+  1198→                ))}
+  1199→              </div>
+  1200→            )}
+  1201→
+  1202→            {visible(sections, "interests") && data.interests.length > 0 && (
+  1203→              <div>
+  1204→                <CreativeSectionBar label="Interests" color={CRE_CORAL} />
+  1205→                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+  1206→                  {data.interests.map((it, i) => (
+  1207→                    <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 8, background: "#f1f5f9", color: CRE_INK }}>· {it}</span>
+  1208→                  ))}
+  1209→                </div>
+  1210→              </div>
+  1211→            )}
+  1212→
+  1213→            {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+  1214→              <div key={cs.id} style={{ marginTop: 22 }}>
+  1215→                <CreativeSectionBar label={cs.title} color={CRE_TEAL} />
+  1216→                {cs.items.map(item => (
+  1217→                  <div key={item.id} style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 10, background: `${CRE_TEAL}12`, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1218→                    <div style={{ fontSize: 11, fontWeight: 700, color: CRE_INK }}>{item.title}</div>
+  1219→                    {item.subtitle && <div style={{ fontSize: 9, color: CRE_TEAL, marginTop: 1, fontWeight: 600 }}>{item.subtitle}</div>}
+  1220→                    {item.description && <div style={{ fontSize: 9.5, color: "#475569", marginTop: 2, lineHeight: 1.5 }}>{item.description}</div>}
+  1221→                  </div>
+  1222→                ))}
+  1223→              </div>
+  1224→            ))}
+  1225→          </div>
+  1226→        </div>
+  1227→
+  1228→        {/* Wave divider footer */}
+  1229→        <div style={{ marginTop: 24 }}>
+  1230→          <CreativeWave />
+  1231→          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 4px" }}>
+  1232→            <span style={{ fontSize: 9, color: CRE_MUTED, fontWeight: 600 }}>© {data.name}</span>
+  1233→            <span style={{ fontSize: 9, color: CRE_CORAL, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Creative Portfolio</span>
+  1234→          </div>
+  1235→        </div>
+  1236→      </div>
+  1237→    </div>
+  1238→  );
+  1239→}
+  1240→
+  1241→// =====================================================================
+  1242→// 6. NEO-BRUTALISM — Bold Neo-Brutalist with oversized typography
+  1243→//    (name 36-44px, bold 900), thick 3-4px black borders, vibrant color
+  1244→//    blocks (yellow, pink, blue, green), playful geometric shapes,
+  1245→//    sharp 8px 8px 0 #000 box-shadow, contrasting layouts.
+  1246→//    Figma + Gumroad + contemporary startup branding.
+  1247→//    Font: Space Grotesk.
+  1248→// =====================================================================
+  1249→
+  1250→const NEO_WHITE = "#fefefe";
+  1251→const NEO_INK = "#0a0a0a";
+  1252→const NEO_YELLOW = "#ffe600";
+  1253→const NEO_PINK = "#ff80ab";
+  1254→const NEO_BLUE = "#82b1ff";
+  1255→const NEO_GREEN = "#b2ff59";
+  1256→
+  1257→const NeoBrutalCard: React.CSSProperties = {
+  1258→  background: NEO_WHITE,
+  1259→  border: `3px solid ${NEO_INK}`,
+  1260→  borderRadius: 4,
+  1261→  boxShadow: `6px 6px 0 ${NEO_INK}`,
+  1262→};
+  1263→
+  1264→const NeoBrutalHeader = ({ label, bg }: { label: string; bg: string }) => (
+  1265→  <div style={{ display: "inline-block", padding: "6px 14px", background: bg, border: `3px solid ${NEO_INK}`, boxShadow: `4px 4px 0 ${NEO_INK}`, marginBottom: 14, transform: "rotate(-1deg)" }}>
+  1266→    <span style={{ fontFamily: SPACE_GROTESK, fontSize: 13, fontWeight: 900, color: NEO_INK, letterSpacing: 0.5, textTransform: "uppercase" }}>{label}</span>
+  1267→  </div>
+  1268→);
+  1269→
+  1270→export function NeoBrutalismTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  1271→  return (
+  1272→    <div className={PAPER} style={{ fontFamily: SPACE_GROTESK, background: NEO_WHITE, color: NEO_INK, position: "relative", overflow: "hidden" }}>
+  1273→      {/* Decorative geometric shapes */}
+  1274→      <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, background: NEO_YELLOW, border: `3px solid ${NEO_INK}`, transform: "rotate(15deg)", zIndex: 0 }} />
+  1275→      <div style={{ position: "absolute", top: 200, right: 30, width: 24, height: 24, background: NEO_PINK, border: `3px solid ${NEO_INK}`, borderRadius: "50%", zIndex: 0 }} />
+  1276→      <div style={{ position: "absolute", bottom: 100, left: -10, width: 50, height: 50, background: NEO_GREEN, border: `3px solid ${NEO_INK}`, transform: "rotate(45deg)", zIndex: 0 }} />
+  1277→
+  1278→      {/* Header — bold blocky layout */}
+  1279→      <div style={{ position: "relative", padding: "36px 40px 26px", borderBottom: `4px solid ${NEO_INK}`, background: `${NEO_YELLOW}40`, zIndex: 1 }}>
+  1280→        <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
+  1281→          <div style={{ flexShrink: 0, padding: 4, background: NEO_WHITE, border: `3px solid ${NEO_INK}`, boxShadow: `6px 6px 0 ${NEO_INK}` }}>
+  1282→            <Avatar data={data} size={96} shape="square" ring="transparent" ringWidth={0} />
+  1283→          </div>
+  1284→          <div style={{ flex: 1, paddingTop: 6 }}>
+  1285→            <div style={{ display: "inline-block", padding: "3px 10px", background: NEO_PINK, border: `3px solid ${NEO_INK}`, marginBottom: 8, transform: "rotate(-2deg)" }}>
+  1286→              <span style={{ fontSize: 9, fontWeight: 900, color: NEO_INK, letterSpacing: 2, textTransform: "uppercase" }}>Portfolio · 2025</span>
+  1287→            </div>
+  1288→            <h1 style={{ fontFamily: SPACE_GROTESK, fontSize: 42, fontWeight: 900, color: NEO_INK, margin: 0, lineHeight: 0.95, letterSpacing: -2 }}>{data.name}</h1>
+  1289→            <p style={{ fontSize: 16, fontWeight: 700, color: NEO_INK, margin: "6px 0 0", padding: "3px 10px", display: "inline-block", background: NEO_BLUE, border: `3px solid ${NEO_INK}`, transform: "rotate(0.5deg)" }}>{data.title}</p>
+  1290→            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px", marginTop: 14, fontSize: 9.5, fontWeight: 700, color: NEO_INK }}>
+  1291→              {[data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean).map((c, i) => {
+  1292→                const colors = [NEO_YELLOW, NEO_PINK, NEO_BLUE, NEO_GREEN];
+  1293→                return (
+  1294→                  <span key={i} style={{ display: "inline-flex", alignItems: "center", padding: "3px 8px", background: colors[i % 4], border: `2px solid ${NEO_INK}` }}>{c}</span>
+  1295→                );
+  1296→              })}
+  1297→            </div>
+  1298→          </div>
+  1299→        </div>
+  1300→      </div>
+  1301→
+  1302→      {/* Body 2-column */}
+  1303→      <div style={{ position: "relative", padding: "26px 40px 32px", display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 22, zIndex: 1 }}>
+  1304→        <div>
+  1305→          {visible(sections, "summary") && data.summary && (
+  1306→            <div style={{ ...NeoBrutalCard, padding: "18px 20px", marginBottom: 16, background: NEO_WHITE }}>
+  1307→              <NeoBrutalHeader label="Profile" bg={NEO_GREEN} />
+  1308→              <p style={{ fontSize: 12, lineHeight: 1.65, color: NEO_INK, margin: 0, fontWeight: 500 }}>{data.summary}</p>
+  1309→            </div>
+  1310→          )}
+  1311→
+  1312→          {visible(sections, "experience") && data.experience.length > 0 && (
+  1313→            <div style={{ ...NeoBrutalCard, padding: "18px 20px", marginBottom: 16 }}>
+  1314→              <NeoBrutalHeader label="Experience" bg={NEO_YELLOW} />
+  1315→              {data.experience.map((e, i) => (
+  1316→                <div key={e.id} style={{ marginBottom: 14, breakInside: "avoid" as React.CSSProperties["breakInside"], paddingBottom: 14, borderBottom: i < data.experience.length - 1 ? `2px solid ${NEO_INK}` : "none" }}>
+  1317→                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+  1318→                    <span style={{ fontSize: 14, fontWeight: 900, color: NEO_INK }}>{e.role}</span>
+  1319→                    <span style={{ fontSize: 9, fontWeight: 900, padding: "3px 8px", background: i % 2 === 0 ? NEO_PINK : NEO_BLUE, border: `2px solid ${NEO_INK}`, whiteSpace: "nowrap" }}>{range(e.start, e.end)}</span>
+  1320→                  </div>
+  1321→                  <div style={{ fontSize: 11, fontWeight: 700, color: NEO_INK, marginTop: 3 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+  1322→                  <div style={{ marginTop: 6 }}>
+  1323→                    {e.bullets.filter(b => b?.trim()).map((b, j) => (
+  1324→                      <div key={j} style={{ fontSize: 10.5, lineHeight: 1.6, color: NEO_INK, marginBottom: 3, paddingLeft: 18, position: "relative", fontWeight: 500 }}>
+  1325→                        <span style={{ position: "absolute", left: 0, top: 1, display: "inline-block", width: 12, height: 12, background: [NEO_YELLOW, NEO_PINK, NEO_BLUE, NEO_GREEN][j % 4], border: `2px solid ${NEO_INK}` }} />{b}
+  1326→                      </div>
+  1327→                    ))}
+  1328→                  </div>
+  1329→                </div>
+  1330→              ))}
+  1331→            </div>
+  1332→          )}
+  1333→
+  1334→          {visible(sections, "projects") && data.projects.length > 0 && (
+  1335→            <div style={{ ...NeoBrutalCard, padding: "18px 20px" }}>
+  1336→              <NeoBrutalHeader label="Projects" bg={NEO_BLUE} />
+  1337→              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+  1338→                {data.projects.map((p, i) => (
+  1339→                  <div key={p.id} style={{ padding: 12, border: `2px solid ${NEO_INK}`, background: i % 2 === 0 ? `${NEO_GREEN}30` : `${NEO_PINK}30`, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1340→                    <div style={{ fontSize: 12, fontWeight: 900, color: NEO_INK }}>{p.name}</div>
+  1341→                    {p.description && <div style={{ fontSize: 9.5, lineHeight: 1.5, color: NEO_INK, marginTop: 4, fontWeight: 500 }}>{p.description}</div>}
+  1342→                    {p.tech.length > 0 && (
+  1343→                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 6 }}>
+  1344→                        {p.tech.map((t, j) => (
+  1345→                          <span key={j} style={{ fontSize: 8, fontWeight: 900, padding: "2px 5px", background: NEO_WHITE, border: `1.5px solid ${NEO_INK}`, color: NEO_INK }}>{t}</span>
+  1346→                        ))}
+  1347→                      </div>
+  1348→                    )}
+  1349→                  </div>
+  1350→                ))}
+  1351→              </div>
+  1352→            </div>
+  1353→          )}
+  1354→        </div>
+  1355→
+  1356→        <div>
+  1357→          {visible(sections, "skills") && data.skills.length > 0 && (
+  1358→            <div style={{ ...NeoBrutalCard, padding: "16px 18px", marginBottom: 16, background: NEO_YELLOW }}>
+  1359→              <NeoBrutalHeader label="Skills" bg={NEO_WHITE} />
+  1360→              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+  1361→                {data.skills.map((s, i) => {
+  1362→                  const colors = [NEO_PINK, NEO_BLUE, NEO_GREEN, NEO_WHITE];
+  1363→                  return (
+  1364→                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 9px", background: colors[i % 4], border: `2px solid ${NEO_INK}` }}>
+  1365→                      <span style={{ width: 12, height: 12, background: NEO_INK }} />
+  1366→                      <span style={{ fontSize: 11, fontWeight: 900, color: NEO_INK, flex: 1 }}>{s}</span>
+  1367→                      {data.skillLevels[s] !== undefined && (
+  1368→                        <div style={{ display: "flex", gap: 2 }}>
+  1369→                          {[1, 2, 3, 4, 5].map(n => (
+  1370→                            <span key={n} style={{ width: 8, height: 8, background: n <= Math.round((data.skillLevels[s] ?? 0) / 20) ? NEO_INK : "transparent", border: `1.5px solid ${NEO_INK}` }} />
+  1371→                          ))}
+  1372→                        </div>
+  1373→                      )}
+  1374→                    </div>
+  1375→                  );
+  1376→                })}
+  1377→              </div>
+  1378→            </div>
+  1379→          )}
+  1380→
+  1381→          {visible(sections, "education") && data.education.length > 0 && (
+  1382→            <div style={{ ...NeoBrutalCard, padding: "16px 18px", marginBottom: 16 }}>
+  1383→              <NeoBrutalHeader label="Education" bg={NEO_PINK} />
+  1384→              {data.education.map(ed => (
+  1385→                <div key={ed.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"], padding: 8, border: `2px solid ${NEO_INK}`, background: `${NEO_BLUE}30` }}>
+  1386→                  <div style={{ fontSize: 12, fontWeight: 900, color: NEO_INK }}>{ed.degree}</div>
+  1387→                  <div style={{ fontSize: 10, fontWeight: 700, color: NEO_INK, marginTop: 2 }}>{ed.school}</div>
+  1388→                  <div style={{ fontSize: 8.5, fontWeight: 700, color: NEO_INK, marginTop: 2, padding: "2px 6px", background: NEO_YELLOW, display: "inline-block", border: `1.5px solid ${NEO_INK}` }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+  1389→                </div>
+  1390→              ))}
+  1391→            </div>
+  1392→          )}
+  1393→
+  1394→          {visible(sections, "certifications") && data.certifications.length > 0 && (
+  1395→            <div style={{ ...NeoBrutalCard, padding: "16px 18px", marginBottom: 16, background: NEO_GREEN }}>
+  1396→              <NeoBrutalHeader label="Certs" bg={NEO_WHITE} />
+  1397→              {data.certifications.map((c, i) => (
+  1398→                <div key={c.id} style={{ marginBottom: 6, breakInside: "avoid" as React.CSSProperties["breakInside"], padding: "5px 8px", border: `2px solid ${NEO_INK}`, background: NEO_WHITE }}>
+  1399→                  <div style={{ fontSize: 10.5, fontWeight: 900, color: NEO_INK }}>{c.title}</div>
+
+[showing lines 800-1399 of 1963; use offset=1400 with limit to continue reading]

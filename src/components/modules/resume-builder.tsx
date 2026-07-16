@@ -927,7 +927,7 @@ export function ResumeBuilderModule() {
               className="h-9"
             />
             <div className="flex flex-wrap gap-1.5">
-              {["All", "Premium", "Pro", "Tech", "Luxury", "Featured", "Modern", "ATS", "Executive", "Minimal", "Creative", "Engineer"].map((cat) => (
+              {["All", "Premium", "Pro", "Tech", "Luxury", "Designer", "Featured", "Modern", "ATS", "Executive", "Minimal", "Creative", "Engineer"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setTemplateCategory(cat)}
@@ -942,6 +942,7 @@ export function ResumeBuilderModule() {
                   {cat === "Pro" && "🎨 "}
                   {cat === "Tech" && "⚡ "}
                   {cat === "Luxury" && "💎 "}
+                  {cat === "Designer" && "🏆 "}
                   {cat}
                 </button>
               ))}
@@ -955,7 +956,7 @@ export function ResumeBuilderModule() {
               {PREMIUM_TEMPLATES
                 .filter((p) => {
                   if (templateCategory === "All") return true;
-                  if (["Premium", "Pro", "Tech", "Luxury"].includes(templateCategory)) {
+                  if (["Premium", "Pro", "Tech", "Luxury", "Designer"].includes(templateCategory)) {
                     return p.category === templateCategory.toLowerCase();
                   }
                   return false; // standard categories handled below
@@ -994,12 +995,14 @@ export function ResumeBuilderModule() {
                     </div>
                     <span className={cn(
                       "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white shadow",
+                      preset.category === "designer" ? "bg-emerald-600" :
                       preset.category === "luxury" ? "bg-rose-600" :
                       preset.category === "tech" ? "bg-violet-600" :
                       preset.category === "pro" ? "bg-sky-600" :
                       "bg-amber-500"
                     )}>
                       {preset.category === "luxury" ? "LUXURY" :
+                       preset.category === "designer" ? "DESIGNER" :
                        preset.category === "tech" ? "TECH" :
                        preset.category === "pro" ? "PRO" :
                        "PREMIUM"}
@@ -1008,7 +1011,7 @@ export function ResumeBuilderModule() {
                 ))}
 
               {/* Standard templates with CSS mini-preview */}
-              {(templateCategory === "All" || (templateCategory !== "Premium" && templateCategory !== "Pro" && templateCategory !== "Tech" && templateCategory !== "Luxury" && templateCategory !== "Featured")) &&
+              {(templateCategory === "All" || (templateCategory !== "Premium" && templateCategory !== "Pro" && templateCategory !== "Tech" && templateCategory !== "Luxury" && templateCategory !== "Designer" && templateCategory !== "Featured")) &&
                 TEMPLATE_PRESETS
                   .filter((p) => {
                     if (templateCategory === "All" || templateCategory === "Featured") {
@@ -1141,7 +1144,7 @@ export function ResumeBuilderModule() {
               {PREMIUM_TEMPLATES
                 .filter((p) => {
                   if (templateCategory === "All") return true;
-                  if (["Premium", "Pro", "Tech", "Luxury"].includes(templateCategory)) {
+                  if (["Premium", "Pro", "Tech", "Luxury", "Designer"].includes(templateCategory)) {
                     return p.category === templateCategory.toLowerCase();
                   }
                   return false;
@@ -1151,10 +1154,10 @@ export function ResumeBuilderModule() {
                   <button key={preset.id} onClick={() => { setStyle({ template: preset.base, accent: preset.accent, font: preset.font }); setTemplatePickerOpen(false); setTemplateSearch(""); }} className={cn("group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md", style.template === preset.base && style.accent === preset.accent && style.font === preset.font && "border-primary ring-2 ring-primary")}>
                     <div className="aspect-[3/4] overflow-hidden bg-muted"><img src={preset.thumbnail} alt={preset.name} className="h-full w-full object-cover object-top transition-transform group-hover:scale-105" /></div>
                     <div className="p-2"><p className="truncate text-xs font-medium">{preset.name}</p><p className="truncate text-[10px] text-muted-foreground">{preset.description}</p></div>
-                    <span className={cn("absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white shadow", preset.category === "luxury" ? "bg-rose-600" : preset.category === "tech" ? "bg-violet-600" : preset.category === "pro" ? "bg-sky-600" : "bg-amber-500")}>{preset.category === "luxury" ? "LUXURY" : preset.category === "tech" ? "TECH" : preset.category === "pro" ? "PRO" : "PREMIUM"}</span>
+                    <span className={cn("absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white shadow", preset.category === "designer" ? "bg-emerald-600" : preset.category === "luxury" ? "bg-rose-600" : preset.category === "tech" ? "bg-violet-600" : preset.category === "pro" ? "bg-sky-600" : "bg-amber-500")}>{preset.category === "designer" ? "DESIGNER" : preset.category === "luxury" ? "LUXURY" : preset.category === "tech" ? "TECH" : preset.category === "pro" ? "PRO" : "PREMIUM"}</span>
                   </button>
                 ))}
-              {(templateCategory === "All" || (templateCategory !== "Premium" && templateCategory !== "Pro" && templateCategory !== "Tech" && templateCategory !== "Luxury" && templateCategory !== "Featured")) &&
+              {(templateCategory === "All" || (templateCategory !== "Premium" && templateCategory !== "Pro" && templateCategory !== "Tech" && templateCategory !== "Luxury" && templateCategory !== "Designer" && templateCategory !== "Featured")) &&
                 TEMPLATE_PRESETS.filter((p) => templateCategory === "All" ? true : templateCategory === "Featured" ? p.category === "Featured" : p.category === templateCategory).filter((p) => !templateSearch.trim() || p.name.toLowerCase().includes(templateSearch.toLowerCase()) || p.description.toLowerCase().includes(templateSearch.toLowerCase())).slice(0, 60).map((preset) => (
                   <button key={preset.id} onClick={() => { setStyle({ template: preset.base, accent: preset.accent, font: preset.font }); setTemplatePickerOpen(false); setTemplateSearch(""); }} className={cn("group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md", style.template === preset.base && style.accent === preset.accent && style.font === preset.font && "border-primary ring-2 ring-primary")}>
                     <div className="aspect-[3/4] bg-white p-1.5"><TemplateMiniPreview preset={preset} /></div>

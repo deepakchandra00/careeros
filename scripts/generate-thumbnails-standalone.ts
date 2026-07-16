@@ -259,6 +259,37 @@ async function loadTemplateComponent(templateId: string): Promise<React.Componen
     return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[luxuryMap[templateId]];
   }
 
+  // Designer templates (8)
+  const designerMap: Record<string, string> = {
+    "glassmorphism": "GlassmorphismTemplate",
+    "editorial-magazine": "EditorialMagazineTemplate",
+    "ai-dashboard": "AIDashboardTemplate",
+    "luxury-executive": "LuxuryExecutiveTemplate",
+    "creative-portfolio": "CreativePortfolioTemplate",
+    "neo-brutalism": "NeoBrutalismTemplate",
+    "swiss-minimalism": "SwissMinimalismTemplate",
+    "cyber-premium": "CyberPremiumTemplate",
+  };
+  if (designerMap[templateId]) {
+    const mod = await import("../src/components/modules/premium-designer-templates");
+    return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[designerMap[templateId]];
+  }
+
+  // SaaS templates (7)
+  const saasMap: Record<string, string> = {
+    "apple-linear": "AppleLinearTemplate",
+    "premium-2026": "Premium2026Template",
+    "ultra-premium-luxury": "UltraPremiumLuxuryTemplate",
+    "silicon-valley-premium": "SiliconValleyPremiumTemplate",
+    "executive-elite": "ExecutiveEliteTemplate",
+    "premium-creative": "PremiumCreativeTemplate",
+    "premium-2026-glass": "Premium2026GlassTemplate",
+  };
+  if (saasMap[templateId]) {
+    const mod = await import("../src/components/modules/premium-saas-templates");
+    return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[saasMap[templateId]];
+  }
+
   return null;
 }
 
@@ -339,6 +370,23 @@ const TEMPLATES: ThumbSpec[] = [
   { id: "riviera", accent: "#0f3460", font: "serif" },
   { id: "noir", accent: "#10b981", font: "serif" },
   { id: "heritage", accent: "#c5a572", font: "serif" },
+  // Designer templates (8)
+  { id: "glassmorphism", accent: "#6366f1", font: "sans" },
+  { id: "editorial-magazine", accent: "#8b4513", font: "serif" },
+  { id: "ai-dashboard", accent: "#6366f1", font: "sans" },
+  { id: "luxury-executive", accent: "#c5a572", font: "serif" },
+  { id: "creative-portfolio", accent: "#fb7185", font: "sans" },
+  { id: "neo-brutalism", accent: "#facc15", font: "sans" },
+  { id: "swiss-minimalism", accent: "#000000", font: "sans" },
+  { id: "cyber-premium", accent: "#06b6d4", font: "sans" },
+  // SaaS templates (7)
+  { id: "apple-linear", accent: "#10b981", font: "sans" },
+  { id: "premium-2026", accent: "#8b5cf6", font: "sans" },
+  { id: "ultra-premium-luxury", accent: "#c5a572", font: "serif" },
+  { id: "silicon-valley-premium", accent: "#6366f1", font: "sans" },
+  { id: "executive-elite", accent: "#1e3a5f", font: "serif" },
+  { id: "premium-creative", accent: "#fb7185", font: "sans" },
+  { id: "premium-2026-glass", accent: "#a78bfa", font: "sans" },
 ];
 
 // =====================================================================

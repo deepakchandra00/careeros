@@ -81,6 +81,25 @@ import {
   CombinedBlueTemplate,
   NavyYellowProTemplate,
 } from "@/components/modules/premium-templates-v2";
+import {
+  GlassmorphismTemplate,
+  EditorialMagazineTemplate,
+  AIDashboardTemplate,
+  LuxuryExecutiveTemplate,
+  CreativePortfolioTemplate,
+  NeoBrutalismTemplate,
+  SwissMinimalismTemplate,
+  CyberPremiumTemplate,
+} from "@/components/modules/premium-designer-templates";
+import {
+  AppleLinearTemplate,
+  Premium2026Template,
+  UltraPremiumLuxuryTemplate,
+  SiliconValleyPremiumTemplate,
+  ExecutiveEliteTemplate,
+  PremiumCreativeTemplate,
+  Premium2026GlassTemplate,
+} from "@/components/modules/premium-saas-templates";
 
 /* ============================================================
  * Catalog exports — template / font / accent option tables
@@ -403,6 +422,36 @@ export function ResumePreview({
     body = <NoirTemplate data={data} sections={sections} accent={accent} />;
   } else if (template === "heritage") {
     body = <HeritageTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "glassmorphism") {
+    body = <GlassmorphismTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "editorial-magazine") {
+    body = <EditorialMagazineTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "ai-dashboard") {
+    body = <AIDashboardTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "luxury-executive") {
+    body = <LuxuryExecutiveTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "creative-portfolio") {
+    body = <CreativePortfolioTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "neo-brutalism") {
+    body = <NeoBrutalismTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "swiss-minimalism") {
+    body = <SwissMinimalismTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "cyber-premium") {
+    body = <CyberPremiumTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "apple-linear") {
+    body = <AppleLinearTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "premium-2026") {
+    body = <Premium2026Template data={data} sections={sections} accent={accent} />;
+  } else if (template === "ultra-premium-luxury") {
+    body = <UltraPremiumLuxuryTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "silicon-valley-premium") {
+    body = <SiliconValleyPremiumTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "executive-elite") {
+    body = <ExecutiveEliteTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "premium-creative") {
+    body = <PremiumCreativeTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "premium-2026-glass") {
+    body = <Premium2026GlassTemplate data={data} sections={sections} accent={accent} />;
   } else {
     body = <ModernTemplate data={data} sections={sections} accent={accent} />;
   }

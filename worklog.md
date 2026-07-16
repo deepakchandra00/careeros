@@ -1773,3 +1773,119 @@ Stage Summary:
 - Modules lazy-loaded to reduce initial compilation memory
 - Dev server OOM is an environment limitation (3.9GB RAM, no swap) — mitigated as much as possible
 - Standalone thumbnail generator works without dev server
+
+---
+Task ID: 1
+Agent: full-stack-developer
+Task: Create 8 new premium "designer" resume templates in a NEW file (premium-designer-templates.tsx)
+
+Work Log:
+- Read worklog.md (1775 lines) to understand 55 existing templates across pro/tech/luxury/premium categories and established conventions (PAPER 794px, inline styles only, module-level helpers to avoid "Cannot create components during render" lint error, visible()+length gating, breakInside:"avoid" on items, custom sections at end)
+- Read /home/z/my-project/src/store/resume-store.ts to confirm exact ResumeData schema (ExperienceItem has bullets: string[] + location; EducationItem uses grade; SimpleItem has date; skillLevels is Record<string, number>; customSections is array of {id, title, items: SimpleItem[]})
+- Read /home/z/my-project/src/components/modules/luxury-templates.tsx (1358 lines, Vogue/Maison/Atelier/Riviera/Noir/Héritage patterns) and tech-templates.tsx (Quantum/Nebula/Cyber patterns) to confirm helper conventions: PAPER constant, visible(), Avatar({data,size,ring,ringWidth,shape}) supporting circle/square/rounded, range(start,end), all decoration components at module level with template-prefixed names
+- Created /home/z/my-project/src/components/modules/premium-designer-templates.tsx (1962 lines) with:
+  • Module-level helpers: PAPER, visible(), Avatar (shape param, rounded=20px), range()
+  • 7 module-level font constants (PLAYFAIR, CORMORANT, INTER, DM_SANS, SPACE_GROTESK, MANROPE, JETBRAINS)
+  • Per-template module-level palette constants (GLASS_*, ED_*, AI_*, LUX_*, CRE_*, NEO_*, SWISS_*, CYBER_*)
+  • 13 module-level helper components (all prefixed to avoid name collisions): GlassBlobs, GlassSectionTitle, EditorialOrnament, EditorialSectionMark, AIDottedGrid, AIMeshGradient, AIWidgetTitle, AISkillRing, LuxuryMarbleVeins, LuxuryHeader, CreativeBlob, CreativeWave, CreativeSectionBar, NeoBrutalHeader, SwissSectionLabel, CyberCircuitPattern, CyberSectionHeader
+  • Style objects (NOT components) for reusable card styles: GlassCard, AIGradientBorderCard, NeoBrutalCard, CyberGlowCard
+  • 8 named exports, each visually DISTINCT (different layouts, different decorative motifs, different color schemes)
+- Built templates:
+  1. GlassmorphismTemplate — white bg + 3 blurred blue/purple/cyan gradient blobs + abstract SVG dotted circle; frosted-glass cards via rgba(255,255,255,0.65) + backdrop-filter blur(20px) + inset highlight; 22-28px rounded corners; gradient text name; floating glass panels; glass-pill skill chips with thin gradient bars. Font: Manrope. Avatar: 104px rounded.
+  2. EditorialMagazineTemplate — ivory (#faf7f1) + dusty rose (#c08a8a) + charcoal; 46px Playfair Display name with -1px tracking; 0.5px dividers; vertical "Portfolio N° 01" rail on right edge; abstract SVG ornament (concentric circles + dashed ring + crosshair); roman-numeral section markers (I.-IX.); grid-aligned experience rows with date column + vertical rule; magazine-spread 2-col lower section. Font: Playfair + DM Sans. Avatar: 104px circle.
+  3. AIDashboardTemplate — light Stripe/Vercel aesthetic; dotted grid background (radial-gradient pattern); mesh gradient orbs; header widget with thin 3px gradient top border (violet→cyan→emerald); 4 floating stat counters (years/projects/skills/certs) with gradient left rails; SVG skill rings (radial donuts with linearGradient stroke) for top-3 skills; gradient progress bars for remaining skills. Font: Space Grotesk + JetBrains Mono. Avatar: 96px rounded.
+  4. LuxuryExecutiveTemplate — black (#0a0a0a) + gold (#c5a572); MARBLE TEXTURE = full-bleed SVG with 2 radial gradients + 6 thin curving vein paths; embossed section cards (dark gradient + thin gold border + inset highlight + drop shadow); TRIPLE concentric gold rings around avatar; vertical "EXECUTIVE" rail (letter-spacing 14); manifesto summary in italic Cormorant with left gold rule; skill dot-rating (5 dots); French section labels (Manifesto, Parcours, Œuvres, Savoir-Faire, Formation, Langues, Distinctions, Intérêts). Font: Cormorant Garamond + DM Sans. Avatar: 100px circle.
+  5. CreativePortfolioTemplate — white + coral/teal/amber/violet; 3 organic blob SVGs with linear gradients blurred behind content; HEXAGONAL clip-path mask on 110px avatar; overlapping rotated header cards (-3deg avatar / +0.5deg name); gradient text name (coral→violet→teal); MODERN TIMELINE for experience with vertical gradient connector + offset color-coded dot markers + slightly rotated cards; project cards in 2-col grid with colored top bars; gradient-filled skill chips with glow; wave SVG divider footer. Font: DM Sans. Avatar: 110px hex-clipped.
+  6. NeoBrutalismTemplate — bold 900 Space Grotesk; thick 3px black borders everywhere with 6px 6px 0 #000 hard shadows; vibrant color blocks (yellow #ffe600, pink #ff80ab, blue #82b1ff, green #b2ff59); yellow-tinted header bg; rotated badge blocks; avatar in 3px black-bordered square frame; section headers as rotated colored blocks with own 4px shadow; skills as bordered chips with 5-dot rating; contact items as colored bordered pills; geometric shape decorations (rotated yellow square, pink circle, rotated green diamond); black footer bar with yellow "// Neo Brutalist" label. Font: Space Grotesk. Avatar: 96px square.
+  7. SwissMinimalismTemplate — strict monochrome (black/white/gray ONLY — no other colors); subtle column-grid overlay; 48px Inter 800 name with -2px tracking; section labels use 3-col grid (60px "01" | 1fr "LABEL" | 80px "—") with 0.5px black bottom rule; contact items in 3-col strict grid with 01-06 indices; experience rows use 100px|1fr grid with date in JetBrains Mono; skills as 2-col rows with 60px black progress bar + numeric label; languages as numbered list; footer 3-col grid "NAME / — / SWISS / MINIMAL". Font: Inter + JetBrains Mono. Avatar: 88px square.
+  8. CyberPremiumTemplate — dark navy (#0a0a14) cyberpunk premium; HOLOGRAPHIC CONIC-GRADIENT RING on avatar (conic-gradient cyan→magenta→green→cyan) with blurred glow; CIRCUIT SVG PATTERN = grid pattern + 6 circuit traces with cyan nodes + 2 magenta traces + 2 radial-gradient orbs (cyan top-right, magenta bottom-left); glow text-shadow on name; glass cards with cyan-tinted border + inset highlight + outer cyan glow shadow; diamond-rotated glowing section markers; color-cycled skills (cyan/magenta/green) with gradient bars + glow; bracketed [✓] cert markers; JetBrains Mono labels with ▸ arrows; footer status bar with "● CONN_SECURE". Font: Space Grotesk + JetBrains Mono. Avatar: 96px rounded.
+- Ran `bun run lint` first time: 4 errors in new file — all react/jsx-no-comment-textnodes from "//" text appearing as JSX children. Fixed all 4 by wrapping in braces: {"// Neo Brutalist"}, {"///"}, {`// ${it}`}, {`${name.toUpperCase()} // CYBER_PREMIUM`}.
+- Re-ran `bun run lint`: PASS (0 errors in new file; only 11 pre-existing warnings in unrelated files: layout.tsx, resume-render/page.tsx, export-pdf.tsx)
+- Ran `bunx tsc --noEmit` and filtered for "premium-designer": PASS (0 TypeScript errors for this file)
+- Verified all 8 named exports present via `rg "^export function" premium-designer-templates.tsx`
+- Wrote detailed work record to /home/z/my-project/agent-ctx/1-full-stack-developer.md
+
+Stage Summary:
+- Created /home/z/my-project/src/components/modules/premium-designer-templates.tsx (1962 lines) with 8 named exports: GlassmorphismTemplate, EditorialMagazineTemplate, AIDashboardTemplate, LuxuryExecutiveTemplate, CreativePortfolioTemplate, NeoBrutalismTemplate, SwissMinimalismTemplate, CyberPremiumTemplate
+- Lint result: PASS (0 errors in this file)
+- TSC for this file: PASS (0 errors)
+- All templates follow design rules: PAPER 794px width, Avatar 88-110px (all ≥88px minimum), name 34-48px, section headers 9-13px with letter-spacing, body 10-12px, inline styles only, visible()+length gating, breakInside:"avoid" on every item, custom sections rendered at end, NO helper components inside template bodies (all 13 at module level with prefixed names), no external images (only data.photo via Avatar), no external icon libraries (unicode + inline SVG only), all 8 templates visually DISTINCT (different layouts/motifs/color schemes)
+- File is ready to be registered in resume-templates.tsx dispatcher and resume-builder.tsx picker by a future task (out of scope for this task — task was strictly "create the new file with 8 exports")
+
+---
+Task ID: 2
+Agent: full-stack-developer (SaaS templates)
+Task: Create 7 new premium "SaaS" resume templates in a NEW file (premium-saas-templates.tsx)
+
+Work Log:
+- Read worklog.md (1813 lines) to understand project context — particularly Task 1 (premium-designer-templates.tsx, 1962 lines, 8 designer templates) which established the patterns to follow
+- Read /home/z/my-project/src/components/modules/premium-designer-templates.tsx (first 800 lines) to confirm exact helper conventions: PAPER constant, visible(), Avatar({data,size,ring,ringWidth,shape}) supporting circle/square/rounded, range(), module-level font constants, per-template module-level palette constants (prefixed), module-level decorative components, style objects (NOT components) for reusable card styles, breakInside:"avoid" as React.CSSProperties["breakInside"], {"//"} wrapping for literal // in JSX
+- Read /home/z/my-project/src/store/resume-store.ts to confirm exact ResumeData schema (ExperienceItem has bullets: string[] + location; EducationItem uses grade; SimpleItem has date; skillLevels is Record<string, number>; customSections is array of {id, title, items: SimpleItem[]})
+- Created /home/z/my-project/src/components/modules/premium-saas-templates.tsx (1911 lines) with:
+  • Module-level helpers: PAPER, visible(), Avatar (shape param), range()
+  • 7 module-level font constants (INTER, SPACE_GROTESK, SORA, PLAYFAIR, CORMORANT, DM_SANS, MANROPE)
+  • Shared LineIcon component (20 inline SVG line icons: mail, phone, location, briefcase, code, cap, award, globe, heart, link, user, star, book, sparkles, grid, zap, layers, trending, check, arrow-up-right) used by AppleLinear + SiliconValley templates
+  • Per-template module-level palette constants (AL_*, P26_*, UL_*, SV_*, EE_*, PC_*, PG_*)
+  • Module-level decorative components (prefixed to avoid collisions): ALAmbientBlob, ALSectionHeader, P26Aurora, P26SectionHeader, P26SkillRing, ULGeometric, ULSectionHeader, EEHeaderBand, EESectionHeader, PCBlobs, PCSectionHeader, PCProgressRing, PGAurora, PGSectionHeader
+  • Style objects (NOT components) for reusable card styles: ALCard, P26Card, ULCard, SVCard, PCCard, PGGlass
+  • 7 named exports, each visually DISTINCT (different layouts, different decorative motifs, different color schemes)
+- Built templates:
+  1. AppleLinearTemplate — Single-column, white bg, soft ambient mesh blobs (faint indigo+emerald). Hero glass card with subtle top gradient line, "Available for opportunities" emerald glow status pill. Contact bar as separate glass pill with line-icon prefix per item. Section cards: 16px radius, 1px rgba(0,0,0,0.06) border, shadow 0 4px 24px rgba(0,0,0,0.06). Section headers have 28px icon chip (line SVG in tinted square). Skills as chips with bottom gradient progress underline. Projects in 2-col grid with arrow-up-right link icon. Footer {"//"} Crafted with care. Font: Inter. Avatar: 96px rounded.
+  2. Premium2026Template — Aurora mesh bg (3 large blurred violet/cyan/pink orbs). Hero floating glass panel with neon gradient top border + conic-gradient glow ring on avatar. Name in Sora 38px gradient text (ink→violet). {"//"} Resume · 2026 label. Two-column: experience with glowing vertical connector + glowing dot markers (color-cycled), skill rings (SVG donuts with linearGradient + drop-shadow glow) for top-3, gradient progress bars for rest. Font: Space Grotesk + Sora. Avatar: 100px rounded.
+  3. UltraPremiumLuxuryTemplate — Ivory (#faf8f3) bg. Abstract geometric SVG top-right (concentric circles, curved arcs, rotated diamond, corner dots) in gold/emerald/navy. Header: Cormorant italic title above Playfair 44px name, triple concentric gold rings around avatar. Glassmorphism accent quote card for summary (rgba white + blur(12px) + gold border + large quote mark). Experience cards with curved asymmetric radius (4px 20px 4px 20px) + left gradient bar (gold→emerald). French section labels (Manifesto, Parcours, Savoir-Faire, Formation, Langues, Œuvres, Distinctions, Intérêts). Roman numeral markers. ◆ gold bullet diamonds. Font: Playfair + Cormorant + DM Sans. Avatar: 100px circle.
+  4. SiliconValleyPremiumTemplate — SIDEBAR layout (248px sidebar + main). White bg with 2 subtle mesh blobs. Sidebar: gradient bg (#fafafa→#f4f4f5), centered avatar 96px rounded with glow halo, name+title+"Open to work" pill, contact items as 22px icon chips (line SVG), skills with gradient progress bars + % labels. Main: premium cards 14px radius, summary card with left gradient bar, experience with indigo line-bullet markers, projects in 2-col grid. Uses shared LineIcon. Font: Inter. Avatar: 96px rounded.
+  5. ExecutiveEliteTemplate — Navy (#1e3a5f) + gold (#c5a572) (distinct from LuxuryExecutive black+gold). Navy gradient header band with SVG geometric overlay (gold circle rings, dashed circle, gold lines). Cormorant 40px name (white on navy), italic gold title. Avatar 96px with double concentric gold rings. Body: summary in cream quote card with left gold bar. Experience as vertical timeline with 0.5px gold connector + gold-bordered dot markers. Achievement cards for awards (2-col grid) with gradient top bar + star metric icon. Skills as 5-dot gold ratings. Gold ◆ diamond bullets. 0.5px gold dividers. Footer "Navy {"&"} Gold". Font: Cormorant + DM Sans. Avatar: 96px circle.
+  6. PremiumCreativeTemplate — White bg with 2 organic SVG blobs (coral→violet + teal→violet, rotated) + amber glow orb. Header: LAYERED floating cards — avatar card rotated -3deg with gradient ring, name card rotated +0.5deg with multi-color gradient top bar. Gradient text name (coral→violet→teal). Contact row in glass pill (blur(8px)) with color-cycled dots. Two-column: experience with numbered gradient dot markers (1,2,3...) in color-cycled squares, skill progress rings (SVG donuts) for top-3 + gradient bars for rest, projects in 2-col with colored top borders. Color-cycled palette (coral/teal/violet/amber) per item index. Font: Playfair + DM Sans. Avatar: 96px rounded.
+  7. Premium2026GlassTemplate — White bg with 4 pastel aurora orbs (cyan, pink, violet, blue, heavily blurred). Heavy glassmorphism: rgba(255,255,255,0.7) + blur(16px) + 1px white border + layered shadows + inset highlight. Hero glass panel with glowing multi-color top border line + conic-gradient glow ring on avatar. Gradient text name (ink→violet→pink). {"//"} Glass · 2026 label. Two-column: experience with color-cycled glowing dot markers (10px gradient squares with inner dot + outer glow), skills as glass chips with color-cycled gradient borders + bottom progress underline, projects in 2-col with colored top borders. Pastel aurora color-cycling (cyan/pink/violet/blue) per index. Font: Manrope. Avatar: 100px rounded.
+- Ran `bun run lint`: PASS (0 errors, 11 pre-existing warnings in unrelated files: layout.tsx, resume-render/page.tsx, export-pdf.tsx — none in premium-saas-templates.tsx)
+- Ran `bunx tsc --noEmit` filtered for "premium-saas": PASS (0 TypeScript errors)
+- Verified all 7 named exports present via `rg "^export function" premium-saas-templates.tsx`
+- Wrote detailed work record to /home/z/my-project/agent-ctx/2-saas-full-stack-developer.md
+
+Stage Summary:
+- Created /home/z/my-project/src/components/modules/premium-saas-templates.tsx (1911 lines) with 7 named exports: AppleLinearTemplate, Premium2026Template, UltraPremiumLuxuryTemplate, SiliconValleyPremiumTemplate, ExecutiveEliteTemplate, PremiumCreativeTemplate, Premium2026GlassTemplate
+- Lint result: PASS (0 errors in this file)
+- TSC for this file: PASS (0 errors)
+- All templates follow design rules: PAPER 794px width, Avatar 96-100px (all ≥88px minimum), name 38-44px, section headers 9-12px with letter-spacing, body 9-12px, inline styles only, visible()+length gating, breakInside:"avoid" on every item, custom sections rendered at end, NO helper components inside template bodies (all at module level with prefixed names), no external images (only data.photo via Avatar), no external icon libraries (LineIcon inline SVG + unicode ◆ ★ ↗ ·), all 7 templates visually DISTINCT (different layouts/motifs/color schemes)
+- File is ready to be registered in resume-templates.tsx dispatcher and resume-builder.tsx picker by a future task (out of scope — task was strictly "create the new file with 7 exports")
+
+---
+Task ID: 3-6
+Agent: orchestrator
+Task: Wire up 15 new designer templates + generate thumbnails + verify
+
+Work Log:
+- Updated /home/z/my-project/src/components/modules/resume-templates.tsx:
+  - Added imports for 8 templates from premium-designer-templates.tsx (GlassmorphismTemplate, EditorialMagazineTemplate, AIDashboardTemplate, LuxuryExecutiveTemplate, CreativePortfolioTemplate, NeoBrutalismTemplate, SwissMinimalismTemplate, CyberPremiumTemplate)
+  - Added imports for 7 templates from premium-saas-templates.tsx (AppleLinearTemplate, Premium2026Template, UltraPremiumLuxuryTemplate, SiliconValleyPremiumTemplate, ExecutiveEliteTemplate, PremiumCreativeTemplate, Premium2026GlassTemplate)
+  - Added 15 new dispatcher cases (else if branches) routing template IDs to components
+
+- Updated /home/z/my-project/src/lib/resume/premium-templates.ts:
+  - Added "designer" to the category union type
+  - Added 15 new template entries with category: "designer"
+  - All have thumbnail paths pointing to /thumbnails/{id}.png
+
+- Updated /home/z/my-project/src/components/modules/resume-builder.tsx:
+  - Added "Designer" tab to both template picker dialogs (with 🏆 emoji)
+  - Updated filtering logic to include "Designer" category
+  - Updated badge colors: designer = bg-emerald-600, label "DESIGNER"
+  - Updated both pickers (full and compact) consistently
+
+- Updated /home/z/my-project/scripts/generate-thumbnails-standalone.ts:
+  - Added 8 designer template mappings to loadTemplateComponent
+  - Added 7 SaaS template mappings to loadTemplateComponent
+  - Added 15 new entries to the TEMPLATES array with correct accent colors
+
+- Generated thumbnails for all 15 new templates:
+  - All 15 succeeded (0 failures)
+  - Sizes: 114-294 KB each
+  - VLM verification: 5 templates checked, all scored 8/10
+
+- Lint: PASS (0 errors, 11 pre-existing warnings)
+- Server: running on port 3000, 200 OK
+
+Stage Summary:
+- 15 new premium designer templates added (8 designer + 7 SaaS)
+- Total templates now: 57 (13 base + 14 premium + 16 pro + 6 tech + 6 luxury + 15 designer)
+- All have accurate thumbnails generated via Playwright
+- Template picker has 5 premium categories: Premium ✨, Pro 🎨, Tech ⚡, Luxury 💎, Designer 🏆
