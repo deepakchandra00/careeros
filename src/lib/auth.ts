@@ -1,18 +1,81 @@
 import type { NextAuthOptions } from "next-auth";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import {
+  findUserByEmail,
+  findUserById,
+  findAccountByProvider,
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  findSessionByToken,
+  createSession,
+  updateSession,
+  deleteSession,
+  type SupabaseUser,
+} from "@/lib/supabase-client";
 
 /**
  * NextAuth configuration for CareerOS.
- * - Google OAuth + email/password credentials
- * - JWT session strategy (works for both provider types)
- * - Role/plan/onboarded carried in the token and exposed on session.user
+ * Uses Supabase REST API (PostgREST) instead of Prisma for database access.
+ * This works from any network (no direct PostgreSQL connection needed).
  */
+
+// Custom adapter using Supabase REST API
+const supabaseAdapter = {
+  async getUserByEmail(email: string) {
+    return findUserByEmail(email);
+  },
+  async getUserById(id: string) {
+    return findUserById(id);
+  },
+  async getUserByAccount({ provider, providerAccountId }: { provider: string; providerAccountId: string }) {
+    const account = await findAccountByProvider(provider, providerAccountId);
+    if (!account) return null;
+    return findUserById(account.userId);
+  },
+  async createUser(user: Partial<SupabaseUser>) {
+    // Handled by signup route
+    return user as SupabaseUser;
+  },
+  async updateUser(user: Partial<SupabaseUser> & { id: string }) {
+    // Updates handled by specific routes
+    return user as SupabaseUser;
+  },
+  async linkAccount(account: Partial<SupabaseUser>) {
+    await createAccount(account);
+    return account;
+  },
+  async unlinkAccount({ providerAccountId, provider }: { providerAccountId: string; provider: string }) {
+    const account = await findAccountByProvider(provider, providerAccountId);
+    if (account) await deleteAccount(account.id);
+  },
+  async createSession(session: { sessionToken: string; userId: string; expires: Date }) {
+    await createSession(session);
+    return session;
+  },
+  async getSession(sessionToken: string) {
+    return findSessionByToken(sessionToken);
+  },
+  async updateSession(session: { sessionToken: string; expires: Date }) {
+    await updateSession(session.sessionToken, { expires: session.expires.toISOString() });
+    return session;
+  },
+  async deleteSession(sessionToken: string) {
+    await deleteSession(sessionToken);
+  },
+  async createVerificationToken(data: { identifier: string; token: string; expires: Date }) {
+    // Implemented in supabase-client if needed
+    return data;
+  },
+  async useVerificationToken({ identifier, token }: { identifier: string; token: string }) {
+    return null;
+  },
+};
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db),
+  adapter: supabaseAdapter as never,
   session: { strategy: "jwt" },
   providers: [
     GoogleProvider({
@@ -27,9 +90,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const user = await db.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
-        });
+        const user = await findUserByEmail(credentials.email.toLowerCase());
         if (!user || !user.password) return null;
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;
@@ -47,7 +108,6 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user, trigger }) {
-      // On first sign-in `user` is present — persist role/plan/onboarded
       if (user) {
         const u = user as { role?: string; plan?: string; onboarded?: boolean; title?: string };
         token.role = u.role ?? "JOBSEEKER";
@@ -55,14 +115,13 @@ export const authOptions: NextAuthOptions = {
         token.onboarded = u.onboarded ?? false;
         token.title = u.title;
       }
-      // Refresh onboarded state on session update
       if (trigger === "update") {
-        const dbUser = await db.user.findUnique({ where: { id: token.sub! } });
+        const dbUser = await findUserById(token.sub!);
         if (dbUser) {
           token.onboarded = dbUser.onboarded;
           token.role = dbUser.role;
           token.plan = dbUser.plan;
-          token.title = dbUser.title;
+          token.title = (dbUser as { title?: string }).title;
         }
       }
       return token;

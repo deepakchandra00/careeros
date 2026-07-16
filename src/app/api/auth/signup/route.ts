@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { findUserByEmail, createUser } from "@/lib/supabase-client";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       );
     }
     const normalized = email.toLowerCase().trim();
-    const existing = await db.user.findUnique({ where: { email: normalized } });
+    const existing = await findUserByEmail(normalized);
     if (existing) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
@@ -33,14 +33,12 @@ export async function POST(req: Request) {
       );
     }
     const hashed = await bcrypt.hash(password, 10);
-    const user = await db.user.create({
-      data: {
-        name: name?.trim() || null,
-        email: normalized,
-        password: hashed,
-        role: "JOBSEEKER",
-        plan: "FREE",
-      },
+    const user = await createUser({
+      name: name?.trim() || null,
+      email: normalized,
+      password: hashed,
+      role: "JOBSEEKER",
+      plan: "FREE",
     });
     return NextResponse.json({
       id: user.id,

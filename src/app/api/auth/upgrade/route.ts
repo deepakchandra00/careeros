@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { updateUser } from "@/lib/supabase-client";
 
 export const runtime = "nodejs";
 
@@ -19,12 +19,8 @@ export async function PATCH(req: Request) {
     if (!["FREE", "PRO", "TEAMS"].includes(plan)) {
       return Response.json({ error: "Invalid plan" }, { status: 400 });
     }
-    const user = await db.user.update({
-      where: { id: session.user.id },
-      data: { plan },
-      select: { id: true, plan: true },
-    });
-    return Response.json({ plan: user.plan });
+    await updateUser(session.user.id, { plan });
+    return Response.json({ plan });
   } catch (e) {
     return Response.json(
       { error: e instanceof Error ? e.message : "Upgrade failed" },
