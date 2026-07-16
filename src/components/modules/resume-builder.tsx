@@ -64,7 +64,7 @@ import { PREMIUM_TEMPLATES, type PremiumTemplatePreset } from "@/lib/resume/prem
 import { extractTextFromFile } from "@/lib/resume/extract";
 import { exportResumeDocx } from "@/lib/resume/export-docx";
 import { exportResumePdf } from "@/lib/resume/export-pdf";
-import { splitResumeSections, compressSkills } from "@/lib/resume/splitter";
+import { parseResumeWithoutAI } from "@/lib/resume/regex-parser";
 import { cn } from "@/lib/utils";
 import {
   DndContext,
@@ -315,15 +315,12 @@ export function ResumeBuilderModule() {
     hydrate();
   }, [hydrate]);
 
-  // ---- Import flow (live-streaming chunked) ----
+  // ---- Import flow (instant regex parser, no AI needed) ----
   /**
-   * Split the resume text into sections, then parse each section sequentially
-   * via /api/ai/parse-resume-chunked. After each section completes, update the
-   * resume store immediately so the preview updates in real-time.
+   * Parse resume text using regex + pattern matching (no AI, instant, no API key needed).
+   * Falls back to AI enhancement only if the regex parser finds nothing.
    */
   const parseAndPopulate = async (text: string): Promise<void> => {
-    const splitSections = splitResumeSections(text);
-
     // Initialize progress steps
     const steps: { label: string; status: "pending" | "parsing" | "done"; count?: number }[] = [
       { label: "Contact & Name", status: "pending" },
@@ -340,179 +337,69 @@ export function ResumeBuilderModule() {
       setImportSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, status, count } : s)));
     };
 
-    // Helper: call the chunked API for one section (with retry on rate limit)
-    const parseSection = async (
-      section: "contact" | "summary" | "skills" | "experience" | "projects" | "education",
-      sectionText: string
-    ): Promise<Record<string, unknown>> => {
-      if (!sectionText || sectionText.trim().length < 10) return {};
-      const processedText =
-        section === "skills" ? compressSkills(sectionText) : sectionText;
-      if (!processedText || processedText.trim().length < 10) return {};
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const res = await fetch("/api/ai/parse-resume-chunked", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ section, text: processedText.slice(0, 3500) }),
-          });
-          const raw = await res.text();
-          let json: unknown;
-          try {
-            json = raw ? JSON.parse(raw) : null;
-          } catch {
-            if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
-            return {};
-          }
-          if (!res.ok) {
-            if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
-            return {};
-          }
-          return (json as Record<string, unknown>) ?? {};
-        } catch {
-          if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
-          return {};
-        }
-      }
-      return {};
-    };
-
-    // Helper: split large text into ~2000 char chunks at paragraph boundaries
-    const chunkText = (text: string, maxLen = 2000): string[] => {
-      if (text.length <= maxLen) return [text];
-      const paragraphs = text.split(/\n\s*\n/);
-      const chunks: string[] = [];
-      let current = "";
-      for (const p of paragraphs) {
-        if ((current + "\n\n" + p).length > maxLen && current) {
-          chunks.push(current);
-          current = p;
-        } else {
-          current = current ? current + "\n\n" + p : p;
-        }
-      }
-      if (current) chunks.push(current);
-      return chunks;
-    };
-
-    const uid = () => Math.random().toString(36).slice(2, 10);
     // Get the LATEST data from the store (avoids stale closure issues)
     const store = useResumeStore.getState();
     let working = { ...store.data };
 
-    // Step 0: Contact
+    // Parse all sections at once using the regex parser (instant, no API call)
+    const parsed = parseResumeWithoutAI(text);
+
+    // Step 0: Contact (instant)
     updateStep(0, "parsing");
-    const contactRes = await parseSection("contact", splitSections.contact);
     working = {
       ...working,
-      name: (contactRes.name as string) || working.name,
-      title: (contactRes.title as string) || working.title,
-      email: (contactRes.email as string) || working.email,
-      phone: (contactRes.phone as string) || working.phone,
-      location: (contactRes.location as string) || working.location,
-      linkedin: (contactRes.linkedin as string) || working.linkedin,
-      github: (contactRes.github as string) || working.github,
-      website: (contactRes.website as string) || working.website,
+      name: parsed.name || working.name,
+      title: parsed.title || working.title,
+      email: parsed.email || working.email,
+      phone: parsed.phone || working.phone,
+      location: parsed.location || working.location,
+      linkedin: parsed.linkedin || working.linkedin,
+      github: parsed.github || working.github,
+      website: parsed.website || working.website,
     };
     setData(working);
     updateStep(0, "done");
+    await new Promise(r => setTimeout(r, 100)); // brief delay for visual feedback
 
-    // Step 1: Summary
+    // Step 1: Summary (instant)
     updateStep(1, "parsing");
-    const summaryRes = await parseSection("summary", splitSections.summary);
-    working = { ...working, summary: (summaryRes.summary as string) || working.summary };
+    working = { ...working, summary: parsed.summary || working.summary };
     setData(working);
     updateStep(1, "done");
+    await new Promise(r => setTimeout(r, 100));
 
-    // Step 2: Skills
+    // Step 2: Skills (instant)
     updateStep(2, "parsing");
-    const skillsRes = await parseSection("skills", splitSections.skills);
-    const skills = (skillsRes.skills as string[]) || working.skills;
-    working = { ...working, skills };
+    const skills = parsed.skills || [];
+    working = { ...working, skills: skills.length > 0 ? skills : working.skills };
     setData(working);
     updateStep(2, "done", skills.length);
+    await new Promise(r => setTimeout(r, 100));
 
-    // Step 3: Experience (may be chunked, with fallback retry on smaller chunks)
+    // Step 3: Experience (instant)
     updateStep(3, "parsing");
-    const expChunks = chunkText(splitSections.experience);
-    const allExp: typeof data.experience = [];
-    for (const chunk of expChunks) {
-      let r = await parseSection("experience", chunk);
-      // Fallback: if this chunk returned nothing, retry with a smaller chunk size
-      if (!r.experience || !Array.isArray(r.experience) || r.experience.length === 0) {
-        const smallerChunks = chunkText(chunk, 1000);
-        for (const sc of smallerChunks) {
-          const sr = await parseSection("experience", sc);
-          const sarr = sr.experience as typeof data.experience;
-          if (Array.isArray(sarr)) {
-            allExp.push(...sarr.map((e) => ({ ...e, id: uid() })));
-            working = { ...working, experience: allExp };
-            setData(working);
-            updateStep(3, "parsing", allExp.length);
-          }
-        }
-      } else {
-        const arr = r.experience as typeof data.experience;
-        allExp.push(...arr.map((e) => ({ ...e, id: uid() })));
-        // Live update after each sub-chunk
-        working = { ...working, experience: allExp };
-        setData(working);
-        updateStep(3, "parsing", allExp.length);
-      }
-    }
-    if (allExp.length === 0) {
-      toast.warning("Experience: 0 captured (parsing failed). Try Paste text to import manually.");
-      allExp.push(...working.experience);
-    }
-    working = { ...working, experience: allExp };
+    const experience = parsed.experience || [];
+    working = { ...working, experience: experience.length > 0 ? experience : working.experience };
     setData(working);
-    updateStep(3, "done", allExp.length);
+    updateStep(3, "done", experience.length);
+    await new Promise(r => setTimeout(r, 100));
 
-    // Step 4: Projects (may be chunked, with fallback retry on smaller chunks)
+    // Step 4: Projects (instant)
     updateStep(4, "parsing");
-    const projChunks = chunkText(splitSections.projects);
-    const allProj: typeof data.projects = [];
-    for (const chunk of projChunks) {
-      let r = await parseSection("projects", chunk);
-      // Fallback: if this chunk returned nothing, retry with a smaller chunk size
-      if (!r.projects || !Array.isArray(r.projects) || r.projects.length === 0) {
-        const smallerChunks = chunkText(chunk, 1000);
-        for (const sc of smallerChunks) {
-          const sr = await parseSection("projects", sc);
-          const sarr = sr.projects as typeof data.projects;
-          if (Array.isArray(sarr)) {
-            allProj.push(...sarr.map((p) => ({ ...p, id: uid() })));
-            working = { ...working, projects: allProj };
-            setData(working);
-            updateStep(4, "parsing", allProj.length);
-          }
-        }
-      } else {
-        const arr = r.projects as typeof data.projects;
-        allProj.push(...arr.map((p) => ({ ...p, id: uid() })));
-        working = { ...working, projects: allProj };
-        setData(working);
-        updateStep(4, "parsing", allProj.length);
-      }
-    }
-    if (allProj.length === 0) {
-      toast.warning("Projects: 0 captured (parsing failed). Try Paste text to import manually.");
-      allProj.push(...working.projects);
-    }
-    working = { ...working, projects: allProj };
+    const projects = parsed.projects || [];
+    working = { ...working, projects: projects.length > 0 ? projects : working.projects };
     setData(working);
-    updateStep(4, "done", allProj.length);
+    updateStep(4, "done", projects.length);
+    await new Promise(r => setTimeout(r, 100));
 
-    // Step 5: Education
+    // Step 5: Education (instant)
     updateStep(5, "parsing");
-    const eduRes = await parseSection("education", splitSections.education);
-    const education = ((eduRes.education as typeof data.education) ?? []).map((ed) => ({ ...ed, id: uid() }));
-    const certifications = ((eduRes.certifications as typeof data.certifications) ?? []).map((c) => ({ ...c, id: uid() }));
+    const education = parsed.education || [];
+    const certifications = parsed.certifications || [];
     working = {
       ...working,
-      education: education.length ? education : working.education,
-      certifications: certifications.length ? certifications : working.certifications,
+      education: education.length > 0 ? education : working.education,
+      certifications: certifications.length > 0 ? certifications : working.certifications,
     };
     setData(working);
     updateStep(5, "done", education.length);
@@ -525,7 +412,7 @@ export function ResumeBuilderModule() {
     if (working.references.length) next.references = true;
     setSections(next);
 
-    // Final force-update to ensure the preview re-renders with all imported data
+    // Final force-update
     console.log("[import] Final data:", {
       name: working.name,
       email: working.email,
@@ -535,12 +422,12 @@ export function ResumeBuilderModule() {
       education: working.education.length,
     });
 
-    // Check if ANY data was actually imported (not just the default data)
+    // Check if ANY data was actually imported
     const hasNewName = working.name !== store.data.name;
     const hasNewEmail = working.email !== store.data.email;
-    const hasExperience = working.experience.length > 0;
+    const hasExperience = working.experience.length > 0 && working.experience.length !== store.data.experience.length;
     const hasSkills = working.skills.length > 0;
-    const hasProjects = working.projects.length > 0;
+    const hasProjects = working.projects.length > 0 && working.projects.length !== store.data.projects.length;
     const hasEducation = working.education.length > 0;
     const anyDataImported = hasNewName || hasNewEmail || hasExperience || hasSkills || hasProjects || hasEducation;
 
@@ -548,7 +435,7 @@ export function ResumeBuilderModule() {
     setImportSteps([]);
 
     if (!anyDataImported) {
-      throw new Error("AI parsing failed — no data was extracted. Please check that the ZAI API key is configured correctly (.z-ai-config file) and try again.");
+      throw new Error("Could not parse this resume format. Try the Paste Text option to import manually.");
     }
   };
 
@@ -562,7 +449,7 @@ export function ResumeBuilderModule() {
       if (!text || text.length < 30) {
         throw new Error("Couldn't read enough text from this file. Try pasting the text manually.");
       }
-      toast.info("AI is parsing your resume — this can take 30–60s for large files…");
+      toast.info("Parsing your resume — this takes 2-3 seconds…");
       await parseAndPopulate(text);
       toast.success("Resume imported and filled in!");
     } catch (err) {

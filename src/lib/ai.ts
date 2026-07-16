@@ -1,12 +1,22 @@
 import ZAI from "z-ai-web-dev-sdk";
 
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+let zaiInstance: ZAI | null = null;
 
-async function getZAI() {
+async function getZAI(): Promise<ZAI> {
   if (!zaiInstance) {
-    // The ZAI SDK reads .z-ai-config from the project root automatically.
-    // See: https://www.npmjs.com/package/z-ai-web-dev-sdk
-    zaiInstance = await ZAI.create();
+    // Read API key from env var (works on both local dev and Vercel)
+    const apiKey = process.env.ZAI_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "ZAI_API_KEY is not set. Add it to your .env file (local) or Vercel environment variables."
+      );
+    }
+    // Instantiate directly — bypasses .z-ai-config file lookup
+    // (which doesn't work on Vercel since the file is in .gitignore)
+    zaiInstance = new ZAI({
+      baseUrl: "https://api.z.ai/api/paas/v4",
+      apiKey,
+    });
   }
   return zaiInstance;
 }
@@ -32,12 +42,17 @@ export async function complete(
         " You MUST respond with ONLY valid minified JSON. No markdown fences, no commentary.",
     };
   }
-  const completion = await zai.chat.completions.create({
-    model: "glm-4.6",
-    messages,
-    thinking: { type: "disabled" },
-  });
-  return completion.choices[0]?.message?.content ?? "";
+  try {
+    const completion = await zai.chat.completions.create({
+      model: "glm-4.6",
+      messages,
+      thinking: { type: "disabled" },
+    });
+    return completion.choices?.[0]?.message?.content ?? "";
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`AI request failed: ${msg}`);
+  }
 }
 
 /** Multi-turn chat completion. */
@@ -57,12 +72,17 @@ export async function chat(
       ...history.slice(1),
     ];
   }
-  const completion = await zai.chat.completions.create({
-    model: "glm-4.6",
-    messages: history,
-    thinking: { type: "disabled" },
-  });
-  return completion.choices[0]?.message?.content ?? "";
+  try {
+    const completion = await zai.chat.completions.create({
+      model: "glm-4.6",
+      messages: history,
+      thinking: { type: "disabled" },
+    });
+    return completion.choices?.[0]?.message?.content ?? "";
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`AI request failed: ${msg}`);
+  }
 }
 
 /** Safely extract a JSON object/array from a possibly noisy LLM string. */
