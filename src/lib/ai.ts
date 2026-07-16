@@ -4,11 +4,9 @@ let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
 
 async function getZAI() {
   if (!zaiInstance) {
-    const apiKey = process.env.ZAI_API_KEY;
-    if (!apiKey) {
-      throw new Error("ZAI_API_KEY is not set. Add it to your .env file.");
-    }
-    zaiInstance = await ZAI.create({ apiKey });
+    // The ZAI SDK reads .z-ai-config from the project root automatically.
+    // See: https://www.npmjs.com/package/z-ai-web-dev-sdk
+    zaiInstance = await ZAI.create();
   }
   return zaiInstance;
 }
@@ -35,6 +33,7 @@ export async function complete(
     };
   }
   const completion = await zai.chat.completions.create({
+    model: "glm-4.6",
     messages,
     thinking: { type: "disabled" },
   });
@@ -59,6 +58,7 @@ export async function chat(
     ];
   }
   const completion = await zai.chat.completions.create({
+    model: "glm-4.6",
     messages: history,
     thinking: { type: "disabled" },
   });

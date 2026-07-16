@@ -125,7 +125,9 @@ export async function createUser(data: {
   id?: string;
   name: string | null;
   email: string;
-  password: string;
+  password?: string;
+  emailVerified?: Date | string | null;
+  image?: string | null;
   role?: string;
   plan?: string;
   onboarded?: boolean;
@@ -133,11 +135,16 @@ export async function createUser(data: {
   const now = new Date().toISOString();
   // Generate a cuid-like ID if not provided
   const id = data.id || `user-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const emailVerified = data.emailVerified instanceof Date
+    ? data.emailVerified.toISOString()
+    : data.emailVerified || null;
   const rows = await supabaseRequest("User", "POST", {
     id,
     name: data.name,
     email: data.email,
-    password: data.password,
+    password: data.password || null,
+    emailVerified,
+    image: data.image || null,
     role: data.role || "JOBSEEKER",
     plan: data.plan || "FREE",
     onboarded: data.onboarded ?? false,
@@ -191,7 +198,22 @@ export async function findAccountByProvider(
 }
 
 export async function createAccount(data: Partial<SupabaseAccount>): Promise<void> {
-  await supabaseRequest("Account", "POST", data);
+  // Generate an ID if not provided (Account table requires id NOT NULL)
+  const accountData = {
+    id: data.id || `acct-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    userId: data.userId!,
+    type: data.type || "oauth",
+    provider: data.provider!,
+    providerAccountId: data.providerAccountId!,
+    refresh_token: data.refresh_token || null,
+    access_token: data.access_token || null,
+    expires_at: data.expires_at || null,
+    token_type: data.token_type || null,
+    scope: data.scope || null,
+    id_token: data.id_token || null,
+    session_state: data.session_state || null,
+  };
+  await supabaseRequest("Account", "POST", accountData);
 }
 
 export async function updateAccount(

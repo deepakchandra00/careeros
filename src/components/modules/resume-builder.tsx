@@ -534,8 +534,22 @@ export function ResumeBuilderModule() {
       skills: working.skills.length,
       education: working.education.length,
     });
+
+    // Check if ANY data was actually imported (not just the default data)
+    const hasNewName = working.name !== store.data.name;
+    const hasNewEmail = working.email !== store.data.email;
+    const hasExperience = working.experience.length > 0;
+    const hasSkills = working.skills.length > 0;
+    const hasProjects = working.projects.length > 0;
+    const hasEducation = working.education.length > 0;
+    const anyDataImported = hasNewName || hasNewEmail || hasExperience || hasSkills || hasProjects || hasEducation;
+
     setData({ ...working });
     setImportSteps([]);
+
+    if (!anyDataImported) {
+      throw new Error("AI parsing failed — no data was extracted. Please check that the ZAI API key is configured correctly (.z-ai-config file) and try again.");
+    }
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

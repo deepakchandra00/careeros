@@ -7,6 +7,7 @@ import {
   findUserById,
   findAccountByProvider,
   createAccount,
+  createUser,
   updateAccount,
   deleteAccount,
   findSessionByToken,
@@ -35,16 +36,48 @@ const supabaseAdapter = {
     if (!account) return null;
     return findUserById(account.userId);
   },
-  async createUser(user: Partial<SupabaseUser>) {
-    // Handled by signup route
-    return user as SupabaseUser;
+  async createUser(user: { name?: string | null; email: string; emailVerified?: Date | null; image?: string | null }) {
+    // Actually create the user in Supabase (for Google OAuth first-time sign-in)
+    const created = await createUser({
+      name: user.name || null,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      image: user.image || null,
+      role: "JOBSEEKER",
+      plan: "FREE",
+      onboarded: false,
+    });
+    return created;
   },
   async updateUser(user: Partial<SupabaseUser> & { id: string }) {
-    // Updates handled by specific routes
     return user as SupabaseUser;
   },
-  async linkAccount(account: Partial<SupabaseUser>) {
-    await createAccount(account);
+  async linkAccount(account: {
+    userId: string;
+    type: string;
+    provider: string;
+    providerAccountId: string;
+    refresh_token?: string;
+    access_token?: string;
+    expires_at?: number;
+    token_type?: string;
+    scope?: string;
+    id_token?: string;
+    session_state?: string;
+  }) {
+    await createAccount({
+      userId: account.userId,
+      type: account.type,
+      provider: account.provider,
+      providerAccountId: account.providerAccountId,
+      refresh_token: account.refresh_token,
+      access_token: account.access_token,
+      expires_at: account.expires_at,
+      token_type: account.token_type,
+      scope: account.scope,
+      id_token: account.id_token,
+      session_state: account.session_state,
+    });
     return account;
   },
   async unlinkAccount({ providerAccountId, provider }: { providerAccountId: string; provider: string }) {
@@ -66,7 +99,6 @@ const supabaseAdapter = {
     await deleteSession(sessionToken);
   },
   async createVerificationToken(data: { identifier: string; token: string; expires: Date }) {
-    // Implemented in supabase-client if needed
     return data;
   },
   async useVerificationToken({ identifier, token }: { identifier: string; token: string }) {
