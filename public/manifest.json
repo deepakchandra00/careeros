@@ -1,0 +1,19 @@
+{
+  "name": "CareerOS — AI Career Platform",
+  "short_name": "CareerOS",
+  "description": "The Operating System for Your Career. Build resumes, ace interviews, track applications, and grow your career with AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "business", "education"]
+}

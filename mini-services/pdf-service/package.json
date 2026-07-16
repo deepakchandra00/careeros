@@ -1,0 +1,10 @@
+{
+  "name": "careeros-pdf-service",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts"
+  },
+  "dependencies": {
+    "playwright-core": "*"
+  }
+}
