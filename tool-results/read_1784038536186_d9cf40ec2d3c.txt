@@ -1,0 +1,1166 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  User,
+     6→  FileText,
+     7→  Briefcase,
+     8→  Sparkles,
+     9→  FolderGit2,
+    10→  GraduationCap,
+    11→  Award,
+    12→  Globe,
+    13→  Trophy,
+    14→  BookOpen,
+    15→  Heart,
+    16→  Users,
+    17→  Plus,
+    18→  Trash2,
+    19→  Copy,
+    20→  ChevronDown,
+    21→  Minimize2,
+    22→  Maximize2,
+    23→  Wand2,
+    24→  Loader2,
+    25→  X,
+    26→  Upload,
+    27→} from "lucide-react";
+    28→import { toast } from "sonner";
+    29→import {
+    30→  Collapsible,
+    31→  CollapsibleTrigger,
+    32→  CollapsibleContent,
+    33→} from "@/components/ui/collapsible";
+    34→import { Input } from "@/components/ui/input";
+    35→import { Textarea } from "@/components/ui/textarea";
+    36→import { Button } from "@/components/ui/button";
+    37→import { Label } from "@/components/ui/label";
+    38→import { Separator } from "@/components/ui/separator";
+    39→import {
+    40→  useResumeStore,
+    41→  type ResumeData,
+    42→  type ExperienceItem,
+    43→  type ProjectItem,
+    44→  type EducationItem,
+    45→  type SimpleItem,
+    46→  type ReferenceItem,
+    47→  type SectionId,
+    48→} from "@/store/resume-store";
+    49→import { cn } from "@/lib/utils";
+    50→
+    51→type IconType = React.ComponentType<{ className?: string }>;
+    52→type RewriteAction = "improve" | "shorten" | "expand" | "rewrite";
+    53→type SimpleKey = "certifications" | "awards" | "publications";
+    54→type TagKey = "languages" | "interests";
+    55→
+    56→const AI_ACTIONS: { key: RewriteAction; icon: IconType; label: string }[] = [
+    57→  { key: "improve", icon: Sparkles, label: "Improve" },
+    58→  { key: "shorten", icon: Minimize2, label: "Shorten" },
+    59→  { key: "expand", icon: Maximize2, label: "Expand" },
+    60→  { key: "rewrite", icon: Wand2, label: "Rewrite" },
+    61→];
+    62→
+    63→// ---------- Reusable helpers ----------
+    64→
+    65→function SectionCard({
+    66→  id,
+    67→  icon: Icon,
+    68→  title,
+    69→  count,
+    70→  defaultOpen = false,
+    71→  children,
+    72→}: {
+    73→  id: SectionId;
+    74→  icon: IconType;
+    75→  title: string;
+    76→  count?: number;
+    77→  defaultOpen?: boolean;
+    78→  children: React.ReactNode;
+    79→}) {
+    80→  return (
+    81→    <Collapsible
+    82→      data-section={id}
+    83→      defaultOpen={defaultOpen}
+    84→      className="group rounded-xl border bg-card"
+    85→    >
+    86→      <CollapsibleTrigger asChild>
+    87→        <button
+    88→          type="button"
+    89→          className="flex w-full items-center gap-2.5 rounded-xl p-3 text-left transition-colors hover:bg-accent/40"
+    90→        >
+    91→          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+    92→            <Icon className="size-4" />
+    93→          </span>
+    94→          <span className="flex-1 text-sm font-semibold">{title}</span>
+    95→          {typeof count === "number" && count > 0 && (
+    96→            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold tabular-nums text-primary">
+    97→              {count}
+    98→            </span>
+    99→          )}
+   100→          <ChevronDown
+   101→            className={cn(
+   102→              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+   103→              "group-data-[state=open]:rotate-180"
+   104→            )}
+   105→          />
+   106→        </button>
+   107→      </CollapsibleTrigger>
+   108→      <CollapsibleContent>
+   109→        <Separator />
+   110→        <div className="space-y-3 p-3">{children}</div>
+   111→      </CollapsibleContent>
+   112→    </Collapsible>
+   113→  );
+   114→}
+   115→
+   116→function Field({
+   117→  label,
+   118→  children,
+   119→  className,
+   120→}: {
+   121→  label: string;
+   122→  children: React.ReactNode;
+   123→  className?: string;
+   124→}) {
+   125→  return (
+   126→    <div className={cn("space-y-1", className)}>
+   127→      <Label className="text-xs font-medium text-muted-foreground">
+   128→        {label}
+   129→      </Label>
+   130→      {children}
+   131→    </div>
+   132→  );
+   133→}
+   134→
+   135→function TagInput({
+   136→  values,
+   137→  onChange,
+   138→  placeholder,
+   139→}: {
+   140→  values: string[];
+   141→  onChange: (next: string[]) => void;
+   142→  placeholder?: string;
+   143→}) {
+   144→  const [input, setInput] = React.useState("");
+   145→
+   146→  const commit = React.useCallback(
+   147→    (raw: string) => {
+   148→      const parts = raw
+   149→        .split(",")
+   150→        .map((s) => s.trim())
+   151→        .filter(Boolean);
+   152→      if (parts.length === 0) return;
+   153→      const seen = new Set(values.map((v) => v.toLowerCase()));
+   154→      const next = [...values];
+   155→      for (const p of parts) {
+   156→        if (!seen.has(p.toLowerCase())) {
+   157→          next.push(p);
+   158→          seen.add(p.toLowerCase());
+   159→        }
+   160→      }
+   161→      onChange(next);
+   162→      setInput("");
+   163→    },
+   164→    [values, onChange]
+   165→  );
+   166→
+   167→  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+   168→    if (e.key === "Enter" || e.key === ",") {
+   169→      e.preventDefault();
+   170→      commit(input);
+   171→    } else if (e.key === "Backspace" && input === "" && values.length > 0) {
+   172→      onChange(values.slice(0, -1));
+   173→    }
+   174→  };
+   175→
+   176→  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+   177→    const text = e.clipboardData.getData("text");
+   178→    if (text.includes(",")) {
+   179→      e.preventDefault();
+   180→      commit(text);
+   181→    }
+   182→  };
+   183→
+   184→  return (
+   185→    <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-background px-1.5 py-1.5">
+   186→      {values.map((v, i) => (
+   187→        <span
+   188→          key={`${v}-${i}`}
+   189→          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
+   190→        >
+   191→          {v}
+   192→          <button
+   193→            type="button"
+   194→            onClick={() => onChange(values.filter((_, idx) => idx !== i))}
+   195→            className="text-primary/60 transition-colors hover:text-primary"
+   196→            aria-label={`Remove ${v}`}
+   197→          >
+   198→            <X className="size-3" />
+   199→          </button>
+   200→        </span>
+   201→      ))}
+   202→      <input
+   203→        value={input}
+   204→        onChange={(e) => setInput(e.target.value)}
+   205→        onKeyDown={handleKeyDown}
+   206→        onPaste={handlePaste}
+   207→        onBlur={() => {
+   208→          if (input.trim()) commit(input);
+   209→        }}
+   210→        placeholder={values.length === 0 ? placeholder : "Add…"}
+   211→        className="min-w-[80px] flex-1 border-0 bg-transparent p-1 text-xs outline-none placeholder:text-muted-foreground"
+   212→      />
+   213→    </div>
+   214→  );
+   215→}
+   216→
+   217→function AIActionButtons({
+   218→  text,
+   219→  context,
+   220→  onResult,
+   221→  onMultiResult,
+   222→}: {
+   223→  text: string;
+   224→  context?: string;
+   225→  onResult: (result: string) => void;
+   226→  onMultiResult?: (lines: string[]) => void;
+   227→}) {
+   228→  const [loading, setLoading] = React.useState<RewriteAction | null>(null);
+   229→
+   230→  const run = async (action: RewriteAction) => {
+   231→    if (loading) return;
+   232→    if (!text.trim()) {
+   233→      toast.error("Nothing to rewrite");
+   234→      return;
+   235→    }
+   236→    setLoading(action);
+   237→    try {
+   238→      const res = await fetch("/api/ai/rewrite", {
+   239→        method: "POST",
+   240→        headers: { "Content-Type": "application/json" },
+   241→        body: JSON.stringify({ text, action, context }),
+   242→      });
+   243→      const json = (await res.json()) as { result?: string; error?: string };
+   244→      if (!res.ok) throw new Error(json.error || "AI request failed");
+   245→      const result = (json.result ?? "").trim();
+   246→      if (!result) {
+   247→        toast.error("AI returned empty content");
+   248→        return;
+   249→      }
+   250→      if (action === "expand" && onMultiResult) {
+   251→        const lines = result
+   252→          .split(/\r?\n/)
+   253→          .map((l) => l.trim())
+   254→          .filter(Boolean);
+   255→        if (lines.length === 0) {
+   256→          toast.error("AI returned no content");
+   257→          return;
+   258→        }
+   259→        onMultiResult(lines);
+   260→      } else {
+   261→        onResult(result);
+   262→      }
+   263→      toast.success(`${action[0].toUpperCase()}${action.slice(1)}d`);
+   264→    } catch (e) {
+   265→      toast.error(e instanceof Error ? e.message : "AI rewrite failed");
+   266→    } finally {
+   267→      setLoading(null);
+   268→    }
+   269→  };
+   270→
+   271→  return (
+   272→    <div className="flex items-center gap-0.5">
+   273→      <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+   274→        AI
+   275→      </span>
+   276→      {AI_ACTIONS.map(({ key, icon: Icon, label }) => (
+   277→        <Button
+   278→          key={key}
+   279→          type="button"
+   280→          variant="ghost"
+   281→          size="icon"
+   282→          className="size-7 text-primary hover:bg-primary/10"
+   283→          onClick={() => run(key)}
+   284→          disabled={!!loading}
+   285→          aria-label={label}
+   286→          title={label}
+   287→        >
+   288→          {loading === key ? (
+   289→            <Loader2 className="size-3.5 animate-spin" />
+   290→          ) : (
+   291→            <Icon className="size-3.5" />
+   292→          )}
+   293→        </Button>
+   294→      ))}
+   295→    </div>
+   296→  );
+   297→}
+   298→
+   299→function IconButtonRow({
+   300→  onDuplicate,
+   301→  onDelete,
+   302→  duplicateLabel = "Duplicate",
+   303→  deleteLabel = "Delete",
+   304→}: {
+   305→  onDuplicate?: () => void;
+   306→  onDelete: () => void;
+   307→  duplicateLabel?: string;
+   308→  deleteLabel?: string;
+   309→}) {
+   310→  return (
+   311→    <div className="flex items-center gap-1">
+   312→      {onDuplicate && (
+   313→        <Button
+   314→          type="button"
+   315→          variant="ghost"
+   316→          size="sm"
+   317→          className="gap-1 text-muted-foreground hover:bg-accent"
+   318→          onClick={onDuplicate}
+   319→        >
+   320→          <Copy className="size-3.5" /> {duplicateLabel}
+   321→        </Button>
+   322→      )}
+   323→      <Button
+   324→        type="button"
+   325→        variant="ghost"
+   326→        size="sm"
+   327→        className="gap-1 text-destructive hover:bg-destructive/10"
+   328→        onClick={onDelete}
+   329→      >
+   330→        <Trash2 className="size-3.5" /> {deleteLabel}
+   331→      </Button>
+   332→    </div>
+   333→  );
+   334→}
+   335→
+   336→function AddButton({
+   337→  onClick,
+   338→  label,
+   339→}: {
+   340→  onClick: () => void;
+   341→  label: string;
+   342→}) {
+   343→  return (
+   344→    <Button
+   345→      variant="outline"
+   346→      size="sm"
+   347→      className="w-full gap-1.5 border-dashed"
+   348→      onClick={onClick}
+   349→    >
+   350→      <Plus className="size-3.5" /> {label}
+   351→    </Button>
+   352→  );
+   353→}
+   354→
+   355→// ---------- Entry cards ----------
+   356→
+   357→function ExperienceEntryCard({ exp }: { exp: ExperienceItem }) {
+   358→  const updateBullet = useResumeStore((s) => s.updateBullet);
+   359→  const addBullet = useResumeStore((s) => s.addBullet);
+   360→  const removeBullet = useResumeStore((s) => s.removeBullet);
+   361→  const updateExperience = useResumeStore((s) => s.updateExperience);
+   362→  const removeExperience = useResumeStore((s) => s.removeExperience);
+   363→  const duplicateExperience = useResumeStore((s) => s.duplicateExperience);
+   364→
+   365→  const handleMultiBullet = (idx: number, lines: string[]) => {
+   366→    const next = [...exp.bullets];
+   367→    next.splice(idx, 1, ...lines);
+   368→    updateExperience(exp.id, { bullets: next });
+   369→  };
+   370→
+   371→  return (
+   372→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   373→      <div className="grid grid-cols-2 gap-2">
+   374→        <Field label="Role">
+   375→          <Input
+   376→            className="h-9 text-sm"
+   377→            value={exp.role}
+   378→            onChange={(e) => updateExperience(exp.id, { role: e.target.value })}
+   379→            placeholder="Senior Engineer"
+   380→          />
+   381→        </Field>
+   382→        <Field label="Company">
+   383→          <Input
+   384→            className="h-9 text-sm"
+   385→            value={exp.company}
+   386→            onChange={(e) =>
+   387→              updateExperience(exp.id, { company: e.target.value })
+   388→            }
+   389→            placeholder="Acme Inc."
+   390→          />
+   391→        </Field>
+   392→      </div>
+   393→      <div className="grid grid-cols-3 gap-2">
+   394→        <Field label="Location">
+   395→          <Input
+   396→            className="h-9 text-sm"
+   397→            value={exp.location}
+   398→            onChange={(e) =>
+   399→              updateExperience(exp.id, { location: e.target.value })
+   400→            }
+   401→            placeholder="Bengaluru"
+   402→          />
+   403→        </Field>
+   404→        <Field label="Start">
+   405→          <Input
+   406→            className="h-9 text-sm"
+   407→            value={exp.start}
+   408→            onChange={(e) =>
+   409→              updateExperience(exp.id, { start: e.target.value })
+   410→            }
+   411→            placeholder="2022"
+   412→          />
+   413→        </Field>
+   414→        <Field label="End">
+   415→          <Input
+   416→            className="h-9 text-sm"
+   417→            value={exp.end}
+   418→            onChange={(e) => updateExperience(exp.id, { end: e.target.value })}
+   419→            placeholder="Present"
+   420→          />
+   421→        </Field>
+   422→      </div>
+   423→
+   424→      <div className="space-y-1.5">
+   425→        <Label className="text-xs font-medium text-muted-foreground">
+   426→          Bullets
+   427→        </Label>
+   428→        <div className="space-y-2">
+   429→          {exp.bullets.length === 0 && (
+   430→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+   431→              No bullets yet — add your first achievement.
+   432→            </p>
+   433→          )}
+   434→          {exp.bullets.map((b, idx) => (
+   435→            <div
+   436→              key={`${exp.id}-b-${idx}`}
+   437→              className="space-y-1.5 rounded-md border bg-card p-2"
+   438→            >
+   439→              <Textarea
+   440→                rows={2}
+   441→                value={b}
+   442→                onChange={(e) => updateBullet(exp.id, idx, e.target.value)}
+   443→                className="min-h-[52px] resize-none text-sm"
+   444→                placeholder="What did you achieve?"
+   445→              />
+   446→              <div className="flex items-center justify-between">
+   447→                <AIActionButtons
+   448→                  text={b}
+   449→                  context={`${exp.role} at ${exp.company}`}
+   450→                  onResult={(r) => updateBullet(exp.id, idx, r)}
+   451→                  onMultiResult={(lines) => handleMultiBullet(idx, lines)}
+   452→                />
+   453→                <Button
+   454→                  type="button"
+   455→                  variant="ghost"
+   456→                  size="icon"
+   457→                  className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+   458→                  onClick={() => removeBullet(exp.id, idx)}
+   459→                  aria-label="Remove bullet"
+   460→                >
+   461→                  <Trash2 className="size-3.5" />
+   462→                </Button>
+   463→              </div>
+   464→            </div>
+   465→          ))}
+   466→        </div>
+   467→      </div>
+   468→
+   469→      <div className="flex items-center justify-between pt-0.5">
+   470→        <Button
+   471→          type="button"
+   472→          variant="ghost"
+   473→          size="sm"
+   474→          className="gap-1 text-primary hover:bg-primary/10"
+   475→          onClick={() => addBullet(exp.id)}
+   476→        >
+   477→          <Plus className="size-3.5" /> Add bullet
+   478→        </Button>
+   479→        <IconButtonRow
+   480→          onDuplicate={() => duplicateExperience(exp.id)}
+   481→          onDelete={() => removeExperience(exp.id)}
+   482→        />
+   483→      </div>
+   484→    </div>
+   485→  );
+   486→}
+   487→
+   488→function ProjectEntryCard({ project }: { project: ProjectItem }) {
+   489→  const updateProject = useResumeStore((s) => s.updateProject);
+   490→  const removeProject = useResumeStore((s) => s.removeProject);
+   491→  const update = useResumeStore((s) => s.update);
+   492→  const projects = useResumeStore((s) => s.data.projects);
+   493→
+   494→  const duplicate = () => {
+   495→    const idx = projects.findIndex((p) => p.id === project.id);
+   496→    if (idx === -1) return;
+   497→    const copy: ProjectItem = {
+   498→      ...project,
+   499→      id: Math.random().toString(36).slice(2, 10),
+   500→      tech: [...project.tech],
+   501→    };
+   502→    const next = [...projects];
+   503→    next.splice(idx + 1, 0, copy);
+   504→    update({ projects: next });
+   505→    toast.success("Project duplicated");
+   506→  };
+   507→
+   508→  return (
+   509→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   510→      <div className="grid grid-cols-2 gap-2">
+   511→        <Field label="Project name">
+   512→          <Input
+   513→            className="h-9 text-sm"
+   514→            value={project.name}
+   515→            onChange={(e) =>
+   516→              updateProject(project.id, { name: e.target.value })
+   517→            }
+   518→            placeholder="DevMetrics"
+   519→          />
+   520→        </Field>
+   521→        <Field label="Link">
+   522→          <Input
+   523→            className="h-9 text-sm"
+   524→            value={project.link}
+   525→            onChange={(e) =>
+   526→              updateProject(project.id, { link: e.target.value })
+   527→            }
+   528→            placeholder="github.com/…"
+   529→          />
+   530→        </Field>
+   531→      </div>
+   532→      <Field label="Description">
+   533→        <Textarea
+   534→          rows={2}
+   535→          value={project.description}
+   536→          onChange={(e) =>
+   537→            updateProject(project.id, { description: e.target.value })
+   538→          }
+   539→          className="min-h-[52px] resize-none text-sm"
+   540→          placeholder="What it does and your impact."
+   541→        />
+   542→        <AIActionButtons
+   543→          text={project.description}
+   544→          onResult={(r) => updateProject(project.id, { description: r })}
+   545→          onMultiResult={(lines) =>
+   546→            updateProject(project.id, { description: lines.join("\n") })
+   547→          }
+   548→        />
+   549→      </Field>
+   550→      <Field label="Tech stack">
+   551→        <TagInput
+   552→          values={project.tech}
+   553→          onChange={(t) => updateProject(project.id, { tech: t })}
+   554→          placeholder="React, Next.js…"
+   555→        />
+   556→      </Field>
+   557→      <div className="flex justify-end pt-0.5">
+   558→        <IconButtonRow
+   559→          onDuplicate={duplicate}
+   560→          onDelete={() => removeProject(project.id)}
+   561→        />
+   562→      </div>
+   563→    </div>
+   564→  );
+   565→}
+   566→
+   567→function EducationEntryCard({ edu }: { edu: EducationItem }) {
+   568→  const updateEducation = useResumeStore((s) => s.updateEducation);
+   569→  const removeEducation = useResumeStore((s) => s.removeEducation);
+   570→
+   571→  return (
+   572→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   573→      <div className="grid grid-cols-2 gap-2">
+   574→        <Field label="Degree" className="col-span-2">
+   575→          <Input
+   576→            className="h-9 text-sm"
+   577→            value={edu.degree}
+   578→            onChange={(e) => updateEducation(edu.id, { degree: e.target.value })}
+   579→            placeholder="B.Tech, Computer Science"
+   580→          />
+   581→        </Field>
+   582→        <Field label="School">
+   583→          <Input
+   584→            className="h-9 text-sm"
+   585→            value={edu.school}
+   586→            onChange={(e) =>
+   587→              updateEducation(edu.id, { school: e.target.value })
+   588→            }
+   589→            placeholder="BITS Pilani"
+   590→          />
+   591→        </Field>
+   592→        <Field label="Location">
+   593→          <Input
+   594→            className="h-9 text-sm"
+   595→            value={edu.location}
+   596→            onChange={(e) =>
+   597→              updateEducation(edu.id, { location: e.target.value })
+   598→            }
+   599→            placeholder="Pilani"
+   600→          />
+   601→        </Field>
+   602→        <Field label="Start">
+   603→          <Input
+   604→            className="h-9 text-sm"
+   605→            value={edu.start}
+   606→            onChange={(e) => updateEducation(edu.id, { start: e.target.value })}
+   607→            placeholder="2015"
+   608→          />
+   609→        </Field>
+   610→        <Field label="End">
+   611→          <Input
+   612→            className="h-9 text-sm"
+   613→            value={edu.end}
+   614→            onChange={(e) => updateEducation(edu.id, { end: e.target.value })}
+   615→            placeholder="2019"
+   616→          />
+   617→        </Field>
+   618→        <Field label="Grade" className="col-span-2">
+   619→          <Input
+   620→            className="h-9 text-sm"
+   621→            value={edu.grade}
+   622→            onChange={(e) => updateEducation(edu.id, { grade: e.target.value })}
+   623→            placeholder="8.7 CGPA"
+   624→          />
+   625→        </Field>
+   626→      </div>
+   627→      <div className="flex justify-end pt-0.5">
+   628→        <IconButtonRow onDelete={() => removeEducation(edu.id)} />
+   629→      </div>
+   630→    </div>
+   631→  );
+   632→}
+   633→
+   634→function SimpleEntryCard({
+   635→  item,
+   636→  keyName,
+   637→  subtitleLabel,
+   638→}: {
+   639→  item: SimpleItem;
+   640→  keyName: SimpleKey;
+   641→  subtitleLabel: string;
+   642→}) {
+   643→  const updateSimple = useResumeStore((s) => s.updateSimple);
+   644→  const removeSimple = useResumeStore((s) => s.removeSimple);
+   645→
+   646→  return (
+   647→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   648→      <div className="grid grid-cols-2 gap-2">
+   649→        <Field label="Title">
+   650→          <Input
+   651→            className="h-9 text-sm"
+   652→            value={item.title}
+   653→            onChange={(e) =>
+   654→              updateSimple(keyName, item.id, { title: e.target.value })
+   655→            }
+   656→            placeholder="Title"
+   657→          />
+   658→        </Field>
+   659→        <Field label={subtitleLabel}>
+   660→          <Input
+   661→            className="h-9 text-sm"
+   662→            value={item.subtitle}
+   663→            onChange={(e) =>
+   664→              updateSimple(keyName, item.id, { subtitle: e.target.value })
+   665→            }
+   666→            placeholder={subtitleLabel}
+   667→          />
+   668→        </Field>
+   669→      </div>
+   670→      <Field label="Date">
+   671→        <Input
+   672→          className="h-9 text-sm"
+   673→          value={item.date}
+   674→          onChange={(e) =>
+   675→            updateSimple(keyName, item.id, { date: e.target.value })
+   676→          }
+   677→          placeholder="2024"
+   678→        />
+   679→      </Field>
+   680→      <Field label="Description">
+   681→        <Textarea
+   682→          rows={2}
+   683→          value={item.description}
+   684→          onChange={(e) =>
+   685→            updateSimple(keyName, item.id, { description: e.target.value })
+   686→          }
+   687→          className="min-h-[52px] resize-none text-sm"
+   688→          placeholder="Optional description."
+   689→        />
+   690→      </Field>
+   691→      <div className="flex justify-end pt-0.5">
+   692→        <IconButtonRow onDelete={() => removeSimple(keyName, item.id)} />
+   693→      </div>
+   694→    </div>
+   695→  );
+   696→}
+   697→
+   698→function ReferenceEntryCard({
+   699→  reference,
+   700→}: {
+   701→  reference: ReferenceItem;
+   702→}) {
+   703→  const updateReference = useResumeStore((s) => s.updateReference);
+   704→  const removeReference = useResumeStore((s) => s.removeReference);
+   705→
+   706→  return (
+   707→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   708→      <div className="grid grid-cols-2 gap-2">
+   709→        <Field label="Name">
+   710→          <Input
+   711→            className="h-9 text-sm"
+   712→            value={reference.name}
+   713→            onChange={(e) =>
+   714→              updateReference(reference.id, { name: e.target.value })
+   715→            }
+   716→            placeholder="Jane Doe"
+   717→          />
+   718→        </Field>
+   719→        <Field label="Role">
+   720→          <Input
+   721→            className="h-9 text-sm"
+   722→            value={reference.role}
+   723→            onChange={(e) =>
+   724→              updateReference(reference.id, { role: e.target.value })
+   725→            }
+   726→            placeholder="Engineering Manager"
+   727→          />
+   728→        </Field>
+   729→        <Field label="Company">
+   730→          <Input
+   731→            className="h-9 text-sm"
+   732→            value={reference.company}
+   733→            onChange={(e) =>
+   734→              updateReference(reference.id, { company: e.target.value })
+   735→            }
+   736→            placeholder="Acme Inc."
+   737→          />
+   738→        </Field>
+   739→        <Field label="Contact">
+   740→          <Input
+   741→            className="h-9 text-sm"
+   742→            value={reference.contact}
+   743→            onChange={(e) =>
+   744→              updateReference(reference.id, { contact: e.target.value })
+   745→            }
+   746→            placeholder="email / phone"
+   747→          />
+   748→        </Field>
+   749→      </div>
+   750→      <div className="flex justify-end pt-0.5">
+   751→        <IconButtonRow onDelete={() => removeReference(reference.id)} />
+   752→      </div>
+   753→    </div>
+   754→  );
+   755→}
+   756→
+   757→// ---------- Main ----------
+   758→
+   759→export function ResumeEditor() {
+   760→  const data: ResumeData = useResumeStore((s) => s.data);
+   761→  const update = useResumeStore((s) => s.update);
+   762→  const updateSummary = useResumeStore((s) => s.updateSummary);
+   763→  const addExperience = useResumeStore((s) => s.addExperience);
+   764→  const addProject = useResumeStore((s) => s.addProject);
+   765→  const addEducation = useResumeStore((s) => s.addEducation);
+   766→  const addSimple = useResumeStore((s) => s.addSimple);
+   767→  const setSkills = useResumeStore((s) => s.setSkills);
+   768→  const setTagList = useResumeStore((s) => s.setTagList);
+   769→  const addReference = useResumeStore((s) => s.addReference);
+   770→  const setPhoto = useResumeStore((s) => s.setPhoto);
+   771→  const setSkillLevel = useResumeStore((s) => s.setSkillLevel);
+   772→  const photoInputRef = React.useRef<HTMLInputElement>(null);
+   773→
+   774→  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+   775→    const file = e.target.files?.[0];
+   776→    if (!file) return;
+   777→    if (file.size > 2 * 1024 * 1024) {
+   778→      toast.error("Photo must be under 2MB.");
+   779→      return;
+   780→    }
+   781→    const reader = new FileReader();
+   782→    reader.onload = () => setPhoto(reader.result as string);
+   783→    reader.readAsDataURL(file);
+   784→  };
+   785→
+   786→  return (
+   787→    <div className="space-y-3">
+   788→      {/* 1. Personal Info */}
+   789→      <SectionCard
+   790→        id="personal"
+   791→        icon={User}
+   792→        title="Personal Info"
+   793→        defaultOpen
+   794→      >
+   795→        {/* Photo upload */}
+   796→        <div className="mb-3 flex items-center gap-3">
+   797→          <input
+   798→            ref={photoInputRef}
+   799→            type="file"
+   800→            accept="image/*"
+   801→            onChange={handlePhotoUpload}
+   802→            className="hidden"
+   803→          />
+   804→          {data.photo ? (
+   805→            <img
+   806→              src={data.photo}
+   807→              alt="Profile"
+   808→              className="size-16 rounded-full object-cover ring-2 ring-border"
+   809→            />
+   810→          ) : (
+   811→            <div className="grid size-16 place-items-center rounded-full bg-muted text-muted-foreground">
+   812→              <User className="size-6" />
+   813→            </div>
+   814→          )}
+   815→          <div className="flex flex-col gap-1.5">
+   816→            <Button
+   817→              type="button"
+   818→              variant="outline"
+   819→              size="sm"
+   820→              className="h-7 gap-1.5 text-xs"
+   821→              onClick={() => photoInputRef.current?.click()}
+   822→            >
+   823→              <Upload className="size-3" />
+   824→              {data.photo ? "Change photo" : "Upload photo"}
+   825→            </Button>
+   826→            {data.photo && (
+   827→              <Button
+   828→                type="button"
+   829→                variant="ghost"
+   830→                size="sm"
+   831→                className="h-7 gap-1.5 text-xs text-destructive"
+   832→                onClick={() => setPhoto("")}
+   833→              >
+   834→                <Trash2 className="size-3" /> Remove
+   835→              </Button>
+   836→            )}
+   837→            <p className="text-[10px] text-muted-foreground">
+   838→              For photo templates (Engineer, UX, etc.)
+   839→            </p>
+   840→          </div>
+   841→        </div>
+   842→        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+   843→          <Field label="Full name">
+   844→            <Input
+   845→              className="h-9 text-sm"
+   846→              value={data.name}
+   847→              onChange={(e) => update({ name: e.target.value })}
+   848→              placeholder="Deepak Sharma"
+   849→            />
+   850→          </Field>
+   851→          <Field label="Title">
+   852→            <Input
+   853→              className="h-9 text-sm"
+   854→              value={data.title}
+   855→              onChange={(e) => update({ title: e.target.value })}
+   856→              placeholder="Senior Frontend Engineer"
+   857→            />
+   858→          </Field>
+   859→          <Field label="Email">
+   860→            <Input
+   861→              type="email"
+   862→              className="h-9 text-sm"
+   863→              value={data.email}
+   864→              onChange={(e) => update({ email: e.target.value })}
+   865→              placeholder="you@email.com"
+   866→            />
+   867→          </Field>
+   868→          <Field label="Phone">
+   869→            <Input
+   870→              className="h-9 text-sm"
+   871→              value={data.phone}
+   872→              onChange={(e) => update({ phone: e.target.value })}
+   873→              placeholder="+91 98765 43210"
+   874→            />
+   875→          </Field>
+   876→          <Field label="Location">
+   877→            <Input
+   878→              className="h-9 text-sm"
+   879→              value={data.location}
+   880→              onChange={(e) => update({ location: e.target.value })}
+   881→              placeholder="Bengaluru, India"
+   882→            />
+   883→          </Field>
+   884→          <Field label="LinkedIn">
+   885→            <Input
+   886→              className="h-9 text-sm"
+   887→              value={data.linkedin}
+   888→              onChange={(e) => update({ linkedin: e.target.value })}
+   889→              placeholder="linkedin.com/in/…"
+   890→            />
+   891→          </Field>
+   892→          <Field label="GitHub">
+   893→            <Input
+   894→              className="h-9 text-sm"
+   895→              value={data.github}
+   896→              onChange={(e) => update({ github: e.target.value })}
+   897→              placeholder="github.com/…"
+   898→            />
+   899→          </Field>
+   900→          <Field label="Website">
+   901→            <Input
+   902→              className="h-9 text-sm"
+   903→              value={data.website}
+   904→              onChange={(e) => update({ website: e.target.value })}
+   905→              placeholder="yourname.dev"
+   906→            />
+   907→          </Field>
+   908→        </div>
+   909→      </SectionCard>
+   910→
+   911→      {/* 2. Summary */}
+   912→      <SectionCard id="summary" icon={FileText} title="Summary" defaultOpen>
+   913→        <Field label="Professional summary">
+   914→          <Textarea
+   915→            rows={4}
+   916→            value={data.summary}
+   917→            onChange={(e) => updateSummary(e.target.value)}
+   918→            className="resize-none text-sm"
+   919→            placeholder="A short pitch that captures your impact and skills."
+   920→          />
+   921→        </Field>
+   922→        <AIActionButtons
+   923→          text={data.summary}
+   924→          onResult={(r) => updateSummary(r)}
+   925→          onMultiResult={(lines) => updateSummary(lines.join("\n"))}
+   926→        />
+   927→      </SectionCard>
+   928→
+   929→      {/* 3. Experience */}
+   930→      <SectionCard
+   931→        id="experience"
+   932→        icon={Briefcase}
+   933→        title="Experience"
+   934→        count={data.experience.length}
+   935→        defaultOpen
+   936→      >
+   937→        <div className="space-y-3">
+   938→          {data.experience.map((exp) => (
+   939→            <ExperienceEntryCard key={exp.id} exp={exp} />
+   940→          ))}
+   941→          {data.experience.length === 0 && (
+   942→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+   943→              No experience entries yet.
+   944→            </p>
+   945→          )}
+   946→          <AddButton onClick={addExperience} label="Add experience" />
+   947→        </div>
+   948→      </SectionCard>
+   949→
+   950→      {/* 4. Skills */}
+   951→      <SectionCard
+   952→        id="skills"
+   953→        icon={Sparkles}
+   954→        title="Skills"
+   955→        count={data.skills.length}
+   956→      >
+   957→        <Field label="Skills">
+   958→          <TagInput
+   959→            values={data.skills}
+   960→            onChange={setSkills}
+   961→            placeholder="Add a skill (Enter or comma)"
+   962→          />
+   963→        </Field>
+   964→        {data.skills.length > 0 && (
+   965→          <div className="mt-3 space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+   966→            <p className="text-xs font-medium text-muted-foreground">
+   967→              Skill levels (for bar templates)
+   968→            </p>
+   969→            {data.skills.map((sk) => (
+   970→              <div key={sk} className="flex items-center gap-2">
+   971→                <span className="w-28 shrink-0 truncate text-xs">{sk}</span>
+   972→                <input
+   973→                  type="range"
+   974→                  min={0}
+   975→                  max={100}
+   976→                  value={data.skillLevels[sk] ?? 80}
+   977→                  onChange={(e) =>
+   978→                    setSkillLevel(sk, parseInt(e.target.value))
+   979→                  }
+   980→                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+   981→                />
+   982→                <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+   983→                  {data.skillLevels[sk] ?? 80}%
+   984→                </span>
+   985→              </div>
+   986→            ))}
+   987→          </div>
+   988→        )}
+   989→      </SectionCard>
+   990→
+   991→      {/* 5. Projects */}
+   992→      <SectionCard
+   993→        id="projects"
+   994→        icon={FolderGit2}
+   995→        title="Projects"
+   996→        count={data.projects.length}
+   997→      >
+   998→        <div className="space-y-3">
+   999→          {data.projects.map((p) => (
+  1000→            <ProjectEntryCard key={p.id} project={p} />
+  1001→          ))}
+  1002→          {data.projects.length === 0 && (
+  1003→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1004→              No projects yet.
+  1005→            </p>
+  1006→          )}
+  1007→          <AddButton onClick={addProject} label="Add project" />
+  1008→        </div>
+  1009→      </SectionCard>
+  1010→
+  1011→      {/* 6. Education */}
+  1012→      <SectionCard
+  1013→        id="education"
+  1014→        icon={GraduationCap}
+  1015→        title="Education"
+  1016→        count={data.education.length}
+  1017→      >
+  1018→        <div className="space-y-3">
+  1019→          {data.education.map((ed) => (
+  1020→            <EducationEntryCard key={ed.id} edu={ed} />
+  1021→          ))}
+  1022→          {data.education.length === 0 && (
+  1023→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1024→              No education entries yet.
+  1025→            </p>
+  1026→          )}
+  1027→          <AddButton onClick={addEducation} label="Add education" />
+  1028→        </div>
+  1029→      </SectionCard>
+  1030→
+  1031→      {/* 7. Certifications */}
+  1032→      <SectionCard
+  1033→        id="certifications"
+  1034→        icon={Award}
+  1035→        title="Certifications"
+  1036→        count={data.certifications.length}
+  1037→      >
+  1038→        <div className="space-y-3">
+  1039→          {data.certifications.map((c) => (
+  1040→            <SimpleEntryCard
+  1041→              key={c.id}
+  1042→              item={c}
+  1043→              keyName="certifications"
+  1044→              subtitleLabel="Issuer"
+  1045→            />
+  1046→          ))}
+  1047→          {data.certifications.length === 0 && (
+  1048→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1049→              No certifications yet.
+  1050→            </p>
+  1051→          )}
+  1052→          <AddButton
+  1053→            onClick={() => addSimple("certifications")}
+  1054→            label="Add certification"
+  1055→          />
+  1056→        </div>
+  1057→      </SectionCard>
+  1058→
+  1059→      {/* 8. Languages */}
+  1060→      <SectionCard
+  1061→        id="languages"
+  1062→        icon={Globe}
+  1063→        title="Languages"
+  1064→        count={data.languages.length}
+  1065→      >
+  1066→        <Field label="Languages">
+  1067→          <TagInput
+  1068→            values={data.languages}
+  1069→            onChange={(v) => setTagList("languages", v)}
+  1070→            placeholder="English, Hindi…"
+  1071→          />
+  1072→        </Field>
+  1073→      </SectionCard>
+  1074→
+  1075→      {/* 9. Awards */}
+  1076→      <SectionCard
+  1077→        id="awards"
+  1078→        icon={Trophy}
+  1079→        title="Awards"
+  1080→        count={data.awards.length}
+  1081→      >
+  1082→        <div className="space-y-3">
+  1083→          {data.awards.map((a) => (
+  1084→            <SimpleEntryCard
+  1085→              key={a.id}
+  1086→              item={a}
+  1087→              keyName="awards"
+  1088→              subtitleLabel="Organization"
+  1089→            />
+  1090→          ))}
+  1091→          {data.awards.length === 0 && (
+  1092→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1093→              No awards yet.
+  1094→            </p>
+  1095→          )}
+  1096→          <AddButton onClick={() => addSimple("awards")} label="Add award" />
+  1097→        </div>
+  1098→      </SectionCard>
+  1099→
+  1100→      {/* 10. Publications */}
+  1101→      <SectionCard
+  1102→        id="publications"
+  1103→        icon={BookOpen}
+  1104→        title="Publications"
+  1105→        count={data.publications.length}
+  1106→      >
+  1107→        <div className="space-y-3">
+  1108→          {data.publications.map((p) => (
+  1109→            <SimpleEntryCard
+  1110→              key={p.id}
+  1111→              item={p}
+  1112→              keyName="publications"
+  1113→              subtitleLabel="Publisher"
+  1114→            />
+  1115→          ))}
+  1116→          {data.publications.length === 0 && (
+  1117→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1118→              No publications yet.
+  1119→            </p>
+  1120→          )}
+  1121→          <AddButton
+  1122→            onClick={() => addSimple("publications")}
+  1123→            label="Add publication"
+  1124→          />
+  1125→        </div>
+  1126→      </SectionCard>
+  1127→
+  1128→      {/* 11. Interests */}
+  1129→      <SectionCard
+  1130→        id="interests"
+  1131→        icon={Heart}
+  1132→        title="Interests"
+  1133→        count={data.interests.length}
+  1134→      >
+  1135→        <Field label="Interests">
+  1136→          <TagInput
+  1137→            values={data.interests}
+  1138→            onChange={(v) => setTagList("interests", v)}
+  1139→            placeholder="Open Source, Chess…"
+  1140→          />
+  1141→        </Field>
+  1142→      </SectionCard>
+  1143→
+  1144→      {/* 12. References */}
+  1145→      <SectionCard
+  1146→        id="references"
+  1147→        icon={Users}
+  1148→        title="References"
+  1149→        count={data.references.length}
+  1150→      >
+  1151→        <div className="space-y-3">
+  1152→          {data.references.map((r) => (
+  1153→            <ReferenceEntryCard key={r.id} reference={r} />
+  1154→          ))}
+  1155→          {data.references.length === 0 && (
+  1156→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1157→              No references yet.
+  1158→            </p>
+  1159→          )}
+  1160→          <AddButton onClick={addReference} label="Add reference" />
+  1161→        </div>
+  1162→      </SectionCard>
+  1163→    </div>
+  1164→  );
+  1165→}
+  1166→

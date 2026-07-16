@@ -1,0 +1,1371 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  Linkedin,
+     6→  Copy,
+     7→  Check,
+     8→  Search,
+     9→  Lightbulb,
+    10→  Star,
+    11→  Sparkles,
+    12→  BadgeCheck,
+    13→  Image as ImageIcon,
+    14→  Briefcase,
+    15→  Upload,
+    16→  FileText,
+    17→  Users,
+    18→  MessageSquare,
+    19→  Activity,
+    20→  TrendingUp,
+    21→  AlertTriangle,
+    22→  CheckCircle,
+    23→} from "lucide-react";
+    24→import { toast } from "sonner";
+    25→import {
+    26→  Card,
+    27→  CardContent,
+    28→  CardHeader,
+    29→  CardTitle,
+    30→  CardDescription,
+    31→} from "@/components/ui/card";
+    32→import { Button } from "@/components/ui/button";
+    33→import { Badge } from "@/components/ui/badge";
+    34→import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+    35→import { Textarea } from "@/components/ui/textarea";
+    36→import { Progress } from "@/components/ui/progress";
+    37→import {
+    38→  ModuleHeader,
+    39→  AIButton,
+    40→  ScoreRing,
+    41→  Pill,
+    42→  AIEmptyState,
+    43→  TypingDots,
+    44→} from "@/components/shared/blocks";
+    45→import { useAI } from "@/components/shared/utils";
+    46→import { useResumeStore } from "@/store/resume-store";
+    47→import { useCareerStore } from "@/store/career-store";
+    48→import { extractTextFromFile } from "@/lib/resume/extract";
+    49→import { cn } from "@/lib/utils";
+    50→
+    51→/* -------------------------------------------------------------------------- */
+    52→/*  Types                                                                      */
+    53→/* -------------------------------------------------------------------------- */
+    54→
+    55→interface HeadlineAnalysis {
+    56→  current: string;
+    57→  score: number;
+    58→  issues: string[];
+    59→  suggested: string;
+    60→}
+    61→interface AboutCheck {
+    62→  label: string;
+    63→  pass: boolean;
+    64→}
+    65→interface AboutAnalysis {
+    66→  current: string;
+    67→  score: number;
+    68→  checks: AboutCheck[];
+    69→  suggested: string;
+    70→}
+    71→interface ExperienceRewrite {
+    72→  company: string;
+    73→  role: string;
+    74→  currentBullets: string[];
+    75→  rewrittenBullets: string[];
+    76→}
+    77→interface SkillsGap {
+    78→  resume: string[];
+    79→  linkedin: string[];
+    80→  market: string[];
+    81→  missing: string[];
+    82→}
+    83→interface KeywordCoverage {
+    84→  keyword: string;
+    85→  present: boolean;
+    86→}
+    87→interface ProfileHealth {
+    88→  strength: number;
+    89→  activity: string;
+    90→  postsNeeded: number;
+    91→  recommendationsNeeded: number;
+    92→  skillsMissing: number;
+    93→  headlineStatus: string;
+    94→}
+    95→interface BannerIdea {
+    96→  text: string;
+    97→  layout: string;
+    98→}
+    99→interface LinkedinAnalysis {
+   100→  headline: HeadlineAnalysis;
+   101→  about: AboutAnalysis;
+   102→  experience: ExperienceRewrite[];
+   103→  skillsGap: SkillsGap;
+   104→  featured: string[];
+   105→  seoScore: number;
+   106→  keywordCoverage: KeywordCoverage[];
+   107→  recruiterKeywords: string[];
+   108→  profileHealth: ProfileHealth;
+   109→  bannerIdea: BannerIdea;
+   110→}
+   111→
+   112→interface NetworkingMessages {
+   113→  connectionRequest: string;
+   114→  recruiterMessage: string;
+   115→  thankYou: string;
+   116→  referralRequest: string;
+   117→}
+   118→
+   119→type ImportMethod = "upload" | "paste" | "resume" | null;
+   120→
+   121→/* -------------------------------------------------------------------------- */
+   122→/*  CopyButton                                                                 */
+   123→/* -------------------------------------------------------------------------- */
+   124→
+   125→function CopyButton({
+   126→  text,
+   127→  label,
+   128→}: {
+   129→  text: string;
+   130→  label?: string;
+   131→}) {
+   132→  const [copied, setCopied] = React.useState(false);
+   133→  return (
+   134→    <Button
+   135→      variant="ghost"
+   136→      size="sm"
+   137→      className="h-7 gap-1 px-2 text-xs"
+   138→      onClick={() => {
+   139→        navigator.clipboard.writeText(text).then(() => {
+   140→          toast.success(label ? `${label} copied` : "Copied to clipboard");
+   141→          setCopied(true);
+   142→          setTimeout(() => setCopied(false), 1500);
+   143→        });
+   144→      }}
+   145→    >
+   146→      {copied ? (
+   147→        <Check className="size-3.5 text-primary" />
+   148→      ) : (
+   149→        <Copy className="size-3.5" />
+   150→      )}
+   151→      {copied ? "Copied" : "Copy"}
+   152→    </Button>
+   153→  );
+   154→}
+   155→
+   156→/* -------------------------------------------------------------------------- */
+   157→/*  Section header helper                                                      */
+   158→/* -------------------------------------------------------------------------- */
+   159→
+   160→function SectionTitle({
+   161→  icon: Icon,
+   162→  children,
+   163→  right,
+   164→}: {
+   165→  icon: React.ComponentType<{ className?: string }>;
+   166→  children: React.ReactNode;
+   167→  right?: React.ReactNode;
+   168→}) {
+   169→  return (
+   170→    <div className="flex items-center justify-between gap-2">
+   171→      <CardTitle className="flex items-center gap-2 text-base">
+   172→        <Icon className="size-4 text-primary" />
+   173→        {children}
+   174→      </CardTitle>
+   175→      {right}
+   176→    </div>
+   177→  );
+   178→}
+   179→
+   180→/* -------------------------------------------------------------------------- */
+   181→/*  Main module                                                                */
+   182→/* -------------------------------------------------------------------------- */
+   183→
+   184→export function LinkedinModule() {
+   185→  const d = useResumeStore((s) => s.data);
+   186→
+   187→  const [tab, setTab] = React.useState("import");
+   188→
+   189→  // Import state
+   190→  const [importMethod, setImportMethod] = React.useState<ImportMethod>(null);
+   191→  const [linkedinText, setLinkedinText] = React.useState("");
+   192→  const [parsedSummary, setParsedSummary] = React.useState<{
+   193→    name: string;
+   194→    title: string;
+   195→    sections: string[];
+   196→  } | null>(null);
+   197→  const [parsing, setParsing] = React.useState(false);
+   198→  const fileInputRef = React.useRef<HTMLInputElement>(null);
+   199→
+   200→  // Analysis state
+   201→  const {
+   202→    data: analysis,
+   203→    loading: analyzing,
+   204→    error: analyzeError,
+   205→    run: runAnalyze,
+   206→  } = useAI<LinkedinAnalysis>();
+   207→
+   208→  // Networking state
+   209→  const {
+   210→    data: messages,
+   211→    loading: messaging,
+   212→    error: messageError,
+   213→    run: runNetworking,
+   214→  } = useAI<NetworkingMessages>();
+   215→
+   216→  /* --------------------------- Resume text helper ------------------------- */
+   217→
+   218→  const resumeText = React.useMemo(() => {
+   219→    return `${d.name}\n${d.title}\n\nSUMMARY\n${d.summary}\n\nEXPERIENCE\n${d.experience
+   220→      .map(
+   221→        (e) =>
+   222→          `${e.role} @ ${e.company} (${e.start}-${e.end})\n${e.bullets
+   223→            .map((b) => "- " + b)
+   224→            .join("\n")}`
+   225→      )
+   226→      .join("\n\n")}\n\nSKILLS\n${d.skills.join(", ")}\n\nPROJECTS\n${d.projects
+   227→      .map((p) => `${p.name}: ${p.description} [${p.tech.join(", ")}]`)
+   228→      .join("\n")}`;
+   229→  }, [d]);
+   230→
+   231→  /* ------------------------- Parsed summary builder ----------------------- */
+   232→
+   233→  const detectSections = (text: string): string[] => {
+   234→    const found: string[] = [];
+   235→    const lower = text.toLowerCase();
+   236→    const map: [string, RegExp][] = [
+   237→      ["Headline", /\b(headline|title)\b/],
+   238→      ["About", /\b(about|summary|profile)\b/],
+   239→      ["Experience", /\b(experience|work history|employment)\b/],
+   240→      ["Education", /\b(education)\b/],
+   241→      ["Skills", /\b(skills|competencies|expertise)\b/],
+   242→      ["Projects", /\b(projects|publications)\b/],
+   243→      ["Certifications", /\b(certifications|licenses)\b/],
+   244→      ["Recommendations", /\b(recommendations?|endorsements?)\b/],
+   245→    ];
+   246→    for (const [label, re] of map) {
+   247→      if (re.test(lower)) found.push(label);
+   248→    }
+   249→    return found.length ? found : ["Unstructured text"];
+   250→  };
+   251→
+   252→  /* ------------------------------ Importers ------------------------------- */
+   253→
+   254→  const handleFile = async (file: File) => {
+   255→    setParsing(true);
+   256→    try {
+   257→      const text = await extractTextFromFile(file);
+   258→      setLinkedinText(text);
+   259→      setImportMethod("upload");
+   260→      const firstLine = text.split("\n").find((l) => l.trim().length > 0) ?? "";
+   261→      setParsedSummary({
+   262→        name: firstLine.slice(0, 80) || "Imported profile",
+   263→        title: "From uploaded file",
+   264→        sections: detectSections(text),
+   265→      });
+   266→      toast.success("LinkedIn profile imported from file");
+   267→    } catch (e) {
+   268→      toast.error(
+   269→        e instanceof Error ? e.message : "Failed to extract text from file"
+   270→      );
+   271→    } finally {
+   272→      setParsing(false);
+   273→    }
+   274→  };
+   275→
+   276→  const handlePasteSubmit = () => {
+   277→    if (!linkedinText.trim()) {
+   278→      toast.error("Paste some LinkedIn profile text first");
+   279→      return;
+   280→    }
+   281→    setImportMethod("paste");
+   282→    const firstLine = linkedinText
+   283→      .split("\n")
+   284→      .find((l) => l.trim().length > 0) ?? "";
+   285→    setParsedSummary({
+   286→      name: firstLine.slice(0, 80) || "Pasted profile",
+   287→      title: "From pasted text",
+   288→      sections: detectSections(linkedinText),
+   289→    });
+   290→    toast.success("LinkedIn profile text captured");
+   291→  };
+   292→
+   293→  const handleUseResume = () => {
+   294→    setImportMethod("resume");
+   295→    setLinkedinText("");
+   296→    setParsedSummary({
+   297→      name: d.name,
+   298→      title: d.title,
+   299→      sections: ["Resume-based analysis"],
+   300→    });
+   301→    toast.success("Using your resume as the source");
+   302→  };
+   303→
+   304→  /* ------------------------------- Analyze -------------------------------- */
+   305→
+   306→  const onAnalyze = async () => {
+   307→    const payload =
+   308→      importMethod === "resume" || !linkedinText.trim()
+   309→        ? { resumeText }
+   310→        : { resumeText, linkedinText };
+   311→    const result = await runAnalyze("/api/ai/linkedin/analyze", payload);
+   312→    if (result) {
+   313→      useCareerStore
+   314→        .getState()
+   315→        .setScore("linkedin", result.seoScore, "SEO");
+   316→      toast.success("LinkedIn analysis complete");
+   317→      setTab("analysis");
+   318→    }
+   319→  };
+   320→
+   321→  const onGenerateMessages = async () => {
+   322→    await runNetworking("/api/ai/linkedin/networking", {
+   323→      name: d.name,
+   324→      resumeText,
+   325→      targetRole: d.title,
+   326→    });
+   327→  };
+   328→
+   329→  /* --------------------------- Derived helpers ---------------------------- */
+   330→
+   331→  const hasAnalysis = Boolean(analysis);
+   332→  const overallStrength = analysis?.profileHealth.strength ?? 0;
+   333→
+   334→  /* ------------------------------ Initials -------------------------------- */
+   335→
+   336→  const initials = d.name
+   337→    .split(" ")
+   338→    .map((p) => p[0])
+   339→    .slice(0, 2)
+   340→    .join("")
+   341→    .toUpperCase();
+   342→
+   343→  /* ------------------------------------------------------------------------ */
+   344→  /*  RENDER                                                                   */
+   345→  /* ------------------------------------------------------------------------ */
+   346→
+   347→  return (
+   348→    <div className="space-y-6">
+   349→      <ModuleHeader
+   350→        icon={Linkedin}
+   351→        title="LinkedIn Optimizer"
+   352→        description="Deep section-by-section analysis, SEO, networking & profile health"
+   353→      />
+   354→
+   355→      <Tabs value={tab} onValueChange={setTab} className="w-full">
+   356→        <div className="overflow-x-auto">
+   357→          <TabsList className="w-full sm:w-auto">
+   358→            <TabsTrigger value="import" className="gap-1.5">
+   359→              <Upload className="size-3.5" /> Import
+   360→            </TabsTrigger>
+   361→            <TabsTrigger value="analysis" className="gap-1.5" disabled={!hasAnalysis}>
+   362→              <FileText className="size-3.5" /> Analysis
+   363→            </TabsTrigger>
+   364→            <TabsTrigger value="seo" className="gap-1.5" disabled={!hasAnalysis}>
+   365→              <Search className="size-3.5" /> SEO &amp; Networking
+   366→            </TabsTrigger>
+   367→            <TabsTrigger value="health" className="gap-1.5" disabled={!hasAnalysis}>
+   368→              <Activity className="size-3.5" /> Profile Health
+   369→            </TabsTrigger>
+   370→          </TabsList>
+   371→        </div>
+   372→
+   373→        {/* ====================== TAB 1: IMPORT ====================== */}
+   374→        <TabsContent value="import" className="space-y-6">
+   375→          <Card>
+   376→            <CardHeader className="pb-3">
+   377→              <SectionTitle icon={Upload}>Import Your LinkedIn Profile</SectionTitle>
+   378→              <CardDescription className="text-xs">
+   379→                Choose how you want to feed your profile into the optimizer. You
+   380→                can upload a saved PDF of your LinkedIn page, paste the text, or
+   381→                just analyze against your resume.
+   382→              </CardDescription>
+   383→            </CardHeader>
+   384→            <CardContent className="space-y-4">
+   385→              <div className="grid gap-4 sm:grid-cols-3">
+   386→                {/* Option 1: Upload */}
+   387→                <button
+   388→                  type="button"
+   389→                  onClick={() => fileInputRef.current?.click()}
+   390→                  className={cn(
+   391→                    "flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors",
+   392→                    importMethod === "upload"
+   393→                      ? "border-primary bg-primary/5"
+   394→                      : "border-border hover:bg-muted/40"
+   395→                  )}
+   396→                >
+   397→                  <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+   398→                    <Upload className="size-5" />
+   399→                  </div>
+   400→                  <div>
+   401→                    <p className="text-sm font-semibold">Upload LinkedIn PDF</p>
+   402→                    <p className="mt-0.5 text-xs text-muted-foreground">
+   403→                      Save your profile page as PDF and upload it here.
+   404→                    </p>
+   405→                  </div>
+   406→                </button>
+   407→                <input
+   408→                  ref={fileInputRef}
+   409→                  type="file"
+   410→                  accept=".pdf,.docx,.txt"
+   411→                  className="hidden"
+   412→                  onChange={(e) => {
+   413→                    const f = e.target.files?.[0];
+   414→                    if (f) handleFile(f);
+   415→                    e.target.value = "";
+   416→                  }}
+   417→                />
+   418→
+   419→                {/* Option 2: Paste */}
+   420→                <button
+   421→                  type="button"
+   422→                  onClick={() => setImportMethod("paste")}
+   423→                  className={cn(
+   424→                    "flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors",
+   425→                    importMethod === "paste"
+   426→                      ? "border-primary bg-primary/5"
+   427→                      : "border-border hover:bg-muted/40"
+   428→                  )}
+   429→                >
+   430→                  <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+   431→                    <FileText className="size-5" />
+   432→                  </div>
+   433→                  <div>
+   434→                    <p className="text-sm font-semibold">Paste profile text</p>
+   435→                    <p className="mt-0.5 text-xs text-muted-foreground">
+   436→                      Copy your LinkedIn sections and paste them below.
+   437→                    </p>
+   438→                  </div>
+   439→                </button>
+   440→
+   441→                {/* Option 3: Use resume */}
+   442→                <button
+   443→                  type="button"
+   444→                  onClick={handleUseResume}
+   445→                  className={cn(
+   446→                    "flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors",
+   447→                    importMethod === "resume"
+   448→                      ? "border-primary bg-primary/5"
+   449→                      : "border-border hover:bg-muted/40"
+   450→                  )}
+   451→                >
+   452→                  <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
+   453→                    <Briefcase className="size-5" />
+   454→                  </div>
+   455→                  <div>
+   456→                    <p className="text-sm font-semibold">Use my resume</p>
+   457→                    <p className="mt-0.5 text-xs text-muted-foreground">
+   458→                      Analyze against the resume currently loaded in the app.
+   459→                    </p>
+   460→                  </div>
+   461→                </button>
+   462→              </div>
+   463→
+   464→              {/* Paste textarea */}
+   465→              {importMethod === "paste" && (
+   466→                <div className="space-y-2">
+   467→                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   468→                    Paste your LinkedIn profile text
+   469→                  </label>
+   470→                  <Textarea
+   471→                    value={linkedinText}
+   472→                    onChange={(e) => setLinkedinText(e.target.value)}
+   473→                    placeholder="Paste your LinkedIn About, Experience, Skills, etc. here…"
+   474→                    className="min-h-40"
+   475→                  />
+   476→                  <div className="flex justify-end">
+   477→                    <Button size="sm" onClick={handlePasteSubmit}>
+   478→                      Capture text
+   479→                    </Button>
+   480→                  </div>
+   481→                </div>
+   482→              )}
+   483→
+   484→              {parsing && (
+   485→                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+   486→                  <TypingDots /> Extracting text from file…
+   487→                </div>
+   488→              )}
+   489→
+   490→              {/* Parsed summary */}
+   491→              {parsedSummary && !parsing && (
+   492→                <div className="rounded-xl border border-border/60 bg-muted/40 p-4">
+   493→                  <div className="mb-3 flex items-start justify-between gap-2">
+   494→                    <div className="flex items-center gap-3">
+   495→                      <div className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/80 to-emerald-600 text-sm font-bold text-primary-foreground">
+   496→                        {initials}
+   497→                      </div>
+   498→                      <div>
+   499→                        <p className="text-sm font-semibold">
+   500→                          {parsedSummary.name}
+   501→                        </p>
+   502→                        <p className="text-xs text-muted-foreground">
+   503→                          {parsedSummary.title}
+   504→                        </p>
+   505→                      </div>
+   506→                    </div>
+   507→                    <Badge variant="secondary" className="bg-primary/12 text-primary">
+   508→                      Ready
+   509→                    </Badge>
+   510→                  </div>
+   511→                  <div>
+   512→                    <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   513→                      Detected sections
+   514→                    </p>
+   515→                    <div className="flex flex-wrap gap-1.5">
+   516→                      {parsedSummary.sections.map((s) => (
+   517→                        <Badge key={s} variant="secondary" className="bg-muted">
+   518→                          {s}
+   519→                        </Badge>
+   520→                      ))}
+   521→                    </div>
+   522→                  </div>
+   523→                </div>
+   524→              )}
+   525→
+   526→              {/* Analyze button */}
+   527→              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+   528→                <p className="text-xs text-muted-foreground">
+   529→                  {importMethod === "resume" || !linkedinText.trim()
+   530→                    ? "We'll analyze based on your resume and treat your LinkedIn profile as empty."
+   531→                    : "We'll compare your resume against your current LinkedIn profile."}
+   532→                </p>
+   533→                <AIButton
+   534→                  onClick={onAnalyze}
+   535→                  loading={analyzing}
+   536→                  disabled={!parsedSummary}
+   537→                >
+   538→                  {hasAnalysis ? "Re-run analysis" : "Analyze profile"}
+   539→                </AIButton>
+   540→              </div>
+   541→            </CardContent>
+   542→          </Card>
+   543→
+   544→          {/* Loading / error / empty for analyze inside import tab */}
+   545→          {analyzeError && (
+   546→            <Card className="border-red-500/30 bg-red-500/5">
+   547→              <CardContent className="py-3 text-sm text-red-600 dark:text-red-400">
+   548→                {analyzeError}
+   549→              </CardContent>
+   550→            </Card>
+   551→          )}
+   552→
+   553→          {analyzing && !hasAnalysis && (
+   554→            <Card>
+   555→              <CardContent className="flex items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
+   556→                <TypingDots /> Running deep section-by-section analysis…
+   557→              </CardContent>
+   558→            </Card>
+   559→          )}
+   560→
+   561→          {!hasAnalysis && !analyzing && !analyzeError && (
+   562→            <AIEmptyState
+   563→              icon={Linkedin}
+   564→              title="No analysis yet"
+   565→              description="Pick an import method above, then click Analyze profile to get section-by-section recommendations, SEO score, networking messages, and profile health."
+   566→            />
+   567→          )}
+   568→        </TabsContent>
+   569→
+   570→        {/* ====================== TAB 2: ANALYSIS ====================== */}
+   571→        <TabsContent value="analysis" className="space-y-6">
+   572→          {analyzing && !analysis && (
+   573→            <Card>
+   574→              <CardContent className="flex items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
+   575→                <TypingDots /> Running deep section-by-section analysis…
+   576→              </CardContent>
+   577→            </Card>
+   578→          )}
+   579→
+   580→          {analyzeError && (
+   581→            <Card className="border-red-500/30 bg-red-500/5">
+   582→              <CardContent className="py-3 text-sm text-red-600 dark:text-red-400">
+   583→                {analyzeError}
+   584→              </CardContent>
+   585→            </Card>
+   586→          )}
+   587→
+   588→          {analysis && (
+   589→            <>
+   590→              {/* Headline card */}
+   591→              <Card>
+   592→                <CardHeader className="pb-3">
+   593→                  <SectionTitle icon={BadgeCheck}>Headline</SectionTitle>
+   594→                  <CardDescription className="text-xs">
+   595→                    The single most-searched field on your profile.
+   596→                  </CardDescription>
+   597→                </CardHeader>
+   598→                <CardContent>
+   599→                  <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
+   600→                    <div className="flex justify-center">
+   601→                      <ScoreRing
+   602→                        value={analysis.headline.score}
+   603→                        size={80}
+   604→                        label="Score"
+   605→                      />
+   606→                    </div>
+   607→                    <div className="space-y-4">
+   608→                      <div>
+   609→                        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   610→                          Current headline
+   611→                        </p>
+   612→                        <p className="rounded-lg border border-border/60 bg-muted/40 p-3 text-sm">
+   613→                          {analysis.headline.current || (
+   614→                            <span className="text-muted-foreground italic">
+   615→                              (none detected)
+   616→                            </span>
+   617→                          )}
+   618→                        </p>
+   619→                      </div>
+   620→                      {analysis.headline.issues.length > 0 && (
+   621→                        <div>
+   622→                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   623→                            Issues found
+   624→                          </p>
+   625→                          <ul className="space-y-1.5">
+   626→                            {analysis.headline.issues.map((iss, i) => (
+   627→                              <li
+   628→                                key={i}
+   629→                                className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400"
+   630→                              >
+   631→                                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+   632→                                <span>{iss}</span>
+   633→                              </li>
+   634→                            ))}
+   635→                          </ul>
+   636→                        </div>
+   637→                      )}
+   638→                      <div>
+   639→                        <div className="mb-1 flex items-center justify-between">
+   640→                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   641→                            Suggested headline
+   642→                          </p>
+   643→                          <CopyButton
+   644→                            text={analysis.headline.suggested}
+   645→                            label="Suggested headline"
+   646→                          />
+   647→                        </div>
+   648→                        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium">
+   649→                          <CheckCircle className="mr-1.5 inline size-4 text-emerald-500 align-text-bottom" />
+   650→                          {analysis.headline.suggested}
+   651→                        </p>
+   652→                      </div>
+   653→                    </div>
+   654→                  </div>
+   655→                </CardContent>
+   656→              </Card>
+   657→
+   658→              {/* About card */}
+   659→              <Card>
+   660→                <CardHeader className="pb-3">
+   661→                  <SectionTitle icon={FileText}>About Section</SectionTitle>
+   662→                  <CardDescription className="text-xs">
+   663→                    First-person story with 7 quality checks.
+   664→                  </CardDescription>
+   665→                </CardHeader>
+   666→                <CardContent>
+   667→                  <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
+   668→                    <div className="flex justify-center">
+   669→                      <ScoreRing
+   670→                        value={analysis.about.score}
+   671→                        size={80}
+   672→                        label="Score"
+   673→                      />
+   674→                    </div>
+   675→                    <div className="space-y-4">
+   676→                      <div>
+   677→                        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   678→                          Quality checks
+   679→                        </p>
+   680→                        <div className="flex flex-wrap gap-1.5">
+   681→                          {analysis.about.checks.map((c, i) => (
+   682→                            <Pill key={i} tone={c.pass ? "good" : "bad"}>
+   683→                              {c.pass ? "✓" : "✗"} {c.label}
+   684→                            </Pill>
+   685→                          ))}
+   686→                        </div>
+   687→                      </div>
+   688→                      <div>
+   689→                        <div className="mb-1 flex items-center justify-between">
+   690→                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   691→                            Suggested About
+   692→                          </p>
+   693→                          <CopyButton
+   694→                            text={analysis.about.suggested}
+   695→                            label="About section"
+   696→                          />
+   697→                        </div>
+   698→                        <p className="max-h-72 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm leading-relaxed">
+   699→                          {analysis.about.suggested}
+   700→                        </p>
+   701→                      </div>
+   702→                    </div>
+   703→                  </div>
+   704→                </CardContent>
+   705→              </Card>
+   706→
+   707→              {/* Experience card */}
+   708→              <Card>
+   709→                <CardHeader className="pb-3">
+   710→                  <SectionTitle icon={Briefcase}>
+   711→                    Experience Bullets
+   712→                  </SectionTitle>
+   713→                  <CardDescription className="text-xs">
+   714→                    Side-by-side before / after rewrites for each role.
+   715→                  </CardDescription>
+   716→                </CardHeader>
+   717→                <CardContent className="space-y-4">
+   718→                  {analysis.experience.length === 0 && (
+   719→                    <p className="text-sm text-muted-foreground">
+   720→                      No experience entries detected.
+   721→                    </p>
+   722→                  )}
+   723→                  {analysis.experience.map((exp, i) => (
+   724→                    <div
+   725→                      key={i}
+   726→                      className="rounded-xl border border-border/60 p-4"
+   727→                    >
+   728→                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+   729→                        <div>
+   730→                          <h3 className="text-sm font-semibold">{exp.role}</h3>
+   731→                          <p className="text-xs text-muted-foreground">
+   732→                            {exp.company}
+   733→                          </p>
+   734→                        </div>
+   735→                        <CopyButton
+   736→                          text={exp.rewrittenBullets
+   737→                            .map((b) => "• " + b)
+   738→                            .join("\n")}
+   739→                          label={`${exp.company} bullets`}
+   740→                        />
+   741→                      </div>
+   742→                      <div className="grid gap-4 sm:grid-cols-2">
+   743→                        <div>
+   744→                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-red-600 dark:text-red-400">
+   745→                            Before
+   746→                          </p>
+   747→                          <ul className="space-y-1.5">
+   748→                            {(exp.currentBullets.length
+   749→                              ? exp.currentBullets
+   750→                              : ["(no current bullets detected)"]
+   751→                            ).map((b, j) => (
+   752→                              <li
+   753→                                key={j}
+   754→                                className="flex items-start gap-2 text-xs text-muted-foreground"
+   755→                              >
+   756→                                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-red-400" />
+   757→                                <span>{b}</span>
+   758→                              </li>
+   759→                            ))}
+   760→                          </ul>
+   761→                        </div>
+   762→                        <div>
+   763→                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+   764→                            After
+   765→                          </p>
+   766→                          <ul className="space-y-1.5">
+   767→                            {exp.rewrittenBullets.map((b, j) => (
+   768→                              <li
+   769→                                key={j}
+   770→                                className="flex items-start gap-2 text-xs"
+   771→                              >
+   772→                                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-emerald-500" />
+   773→                                <span>{b}</span>
+   774→                              </li>
+   775→                            ))}
+   776→                          </ul>
+   777→                        </div>
+   778→                      </div>
+   779→                    </div>
+   780→                  ))}
+   781→                </CardContent>
+   782→              </Card>
+   783→
+   784→              {/* Skills gap card */}
+   785→              <Card>
+   786→                <CardHeader className="pb-3">
+   787→                  <SectionTitle icon={TrendingUp}>Skills Gap</SectionTitle>
+   788→                  <CardDescription className="text-xs">
+   789→                    Compare your resume vs. LinkedIn vs. market demand.
+   790→                  </CardDescription>
+   791→                </CardHeader>
+   792→                <CardContent className="space-y-4">
+   793→                  <div className="grid gap-4 sm:grid-cols-3">
+   794→                    <div className="rounded-lg border border-border/60 p-3">
+   795→                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   796→                        Resume Skills
+   797→                      </p>
+   798→                      <div className="flex flex-wrap gap-1.5">
+   799→                        {analysis.skillsGap.resume.length === 0 && (
+   800→                          <span className="text-xs text-muted-foreground">
+   801→                            None
+   802→                          </span>
+   803→                        )}
+   804→                        {analysis.skillsGap.resume.map((s) => (
+   805→                          <Badge key={s} variant="secondary" className="bg-muted">
+   806→                            {s}
+   807→                          </Badge>
+   808→                        ))}
+   809→                      </div>
+   810→                    </div>
+   811→                    <div className="rounded-lg border border-border/60 p-3">
+   812→                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   813→                        LinkedIn Skills
+   814→                      </p>
+   815→                      <div className="flex flex-wrap gap-1.5">
+   816→                        {analysis.skillsGap.linkedin.length === 0 && (
+   817→                          <span className="text-xs text-muted-foreground">
+   818→                            None
+   819→                          </span>
+   820→                        )}
+   821→                        {analysis.skillsGap.linkedin.map((s) => (
+   822→                          <Badge key={s} variant="secondary" className="bg-muted">
+   823→                            {s}
+   824→                          </Badge>
+   825→                        ))}
+   826→                      </div>
+   827→                    </div>
+   828→                    <div className="rounded-lg border border-border/60 p-3">
+   829→                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   830→                        Market Skills
+   831→                      </p>
+   832→                      <div className="flex flex-wrap gap-1.5">
+   833→                        {analysis.skillsGap.market.length === 0 && (
+   834→                          <span className="text-xs text-muted-foreground">
+   835→                            None
+   836→                          </span>
+   837→                        )}
+   838→                        {analysis.skillsGap.market.map((s) => (
+   839→                          <Badge key={s} variant="secondary" className="bg-muted">
+   840→                            {s}
+   841→                          </Badge>
+   842→                        ))}
+   843→                      </div>
+   844→                    </div>
+   845→                  </div>
+   846→
+   847→                  <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+   848→                    <div className="mb-2 flex items-center justify-between">
+   849→                      <p className="flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
+   850→                        <AlertTriangle className="size-4" /> Missing from your
+   851→                        LinkedIn
+   852→                      </p>
+   853→                      <CopyButton
+   854→                        text={analysis.skillsGap.missing.join(", ")}
+   855→                        label="Missing skills"
+   856→                      />
+   857→                    </div>
+   858→                    {analysis.skillsGap.missing.length === 0 ? (
+   859→                      <p className="text-xs text-muted-foreground">
+   860→                        No gaps detected — your profile covers the market.
+   861→                      </p>
+   862→                    ) : (
+   863→                      <div className="flex flex-wrap gap-1.5">
+   864→                        {analysis.skillsGap.missing.map((s) => (
+   865→                          <Badge
+   866→                            key={s}
+   867→                            variant="secondary"
+   868→                            className="border-0 bg-red-500/15 text-red-600 dark:text-red-400"
+   869→                          >
+   870→                            {s}
+   871→                          </Badge>
+   872→                        ))}
+   873→                      </div>
+   874→                    )}
+   875→                  </div>
+   876→                </CardContent>
+   877→              </Card>
+   878→
+   879→              {/* Featured card */}
+   880→              <Card>
+   881→                <CardHeader className="pb-3">
+   882→                  <SectionTitle icon={Star}>Featured Section</SectionTitle>
+   883→                  <CardDescription className="text-xs">
+   884→                    Pin these to the top of your profile.
+   885→                  </CardDescription>
+   886→                </CardHeader>
+   887→                <CardContent className="space-y-2">
+   888→                  {analysis.featured.length === 0 && (
+   889→                    <p className="text-sm text-muted-foreground">
+   890→                      No featured suggestions.
+   891→                    </p>
+   892→                  )}
+   893→                  {analysis.featured.map((f, i) => (
+   894→                    <div
+   895→                      key={i}
+   896→                      className="flex items-start gap-3 rounded-lg border border-border/60 p-3"
+   897→                    >
+   898→                      <div className="grid size-8 shrink-0 place-items-center rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+   899→                        <Star className="size-4" />
+   900→                      </div>
+   901→                      <p className="flex-1 text-sm">{f}</p>
+   902→                    </div>
+   903→                  ))}
+   904→                </CardContent>
+   905→              </Card>
+   906→            </>
+   907→          )}
+   908→        </TabsContent>
+   909→
+   910→        {/* ====================== TAB 3: SEO & NETWORKING ====================== */}
+   911→        <TabsContent value="seo" className="space-y-6">
+   912→          {analysis && (
+   913→            <>
+   914→              {/* Search visibility */}
+   915→              <Card>
+   916→                <CardHeader className="pb-3">
+   917→                  <SectionTitle icon={Search}>Search Visibility</SectionTitle>
+   918→                  <CardDescription className="text-xs">
+   919→                    How discoverable your profile is to recruiters.
+   920→                  </CardDescription>
+   921→                </CardHeader>
+   922→                <CardContent>
+   923→                  <div className="grid gap-6 lg:grid-cols-[auto_1fr] lg:items-center">
+   924→                    <div className="flex justify-center">
+   925→                      <ScoreRing
+   926→                        value={analysis.seoScore}
+   927→                        size={130}
+   928→                        label="SEO"
+   929→                      />
+   930→                    </div>
+   931→                    <div className="grid gap-4 sm:grid-cols-2">
+   932→                      <div>
+   933→                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   934→                          Keyword coverage
+   935→                        </p>
+   936→                        <div className="max-h-72 space-y-1.5 overflow-y-auto scroll-thin">
+   937→                          {analysis.keywordCoverage.map((k, i) => (
+   938→                            <div
+   939→                              key={i}
+   940→                              className="flex items-center justify-between rounded-md border border-border/60 px-3 py-1.5 text-sm"
+   941→                            >
+   942→                              <span>{k.keyword}</span>
+   943→                              {k.present ? (
+   944→                                <CheckCircle className="size-4 text-emerald-500" />
+   945→                              ) : (
+   946→                                <span className="text-red-500">✗</span>
+   947→                              )}
+   948→                            </div>
+   949→                          ))}
+   950→                        </div>
+   951→                      </div>
+   952→                      <div>
+   953→                        <div className="mb-2 flex items-center justify-between">
+   954→                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+   955→                            Recruiter keywords
+   956→                          </p>
+   957→                          <CopyButton
+   958→                            text={analysis.recruiterKeywords.join(", ")}
+   959→                            label="Recruiter keywords"
+   960→                          />
+   961→                        </div>
+   962→                        <div className="flex flex-wrap gap-1.5">
+   963→                          {analysis.recruiterKeywords.map((k) => (
+   964→                            <Pill key={k} tone="info">
+   965→                              {k}
+   966→                            </Pill>
+   967→                          ))}
+   968→                        </div>
+   969→                      </div>
+   970→                    </div>
+   971→                  </div>
+   972→                </CardContent>
+   973→              </Card>
+   974→
+   975→              {/* Banner generator */}
+   976→              <Card>
+   977→                <CardHeader className="pb-3">
+   978→                  <SectionTitle icon={ImageIcon}>Banner Generator</SectionTitle>
+   979→                  <CardDescription className="text-xs">
+   980→                    A visual concept for your LinkedIn cover photo.
+   981→                  </CardDescription>
+   982→                </CardHeader>
+   983→                <CardContent className="space-y-4">
+   984→                  <div className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-r from-primary/70 via-emerald-500/60 to-teal-500/70 sm:h-48">
+   985→                    <div className="absolute inset-0 opacity-30 mix-blend-overlay [background:radial-gradient(circle_at_20%_20%,white,transparent_40%),radial-gradient(circle_at_80%_60%,white,transparent_35%)]" />
+   986→                    <div className="absolute inset-0 flex flex-col justify-center p-6">
+   987→                      <p className="text-lg font-bold text-white drop-shadow sm:text-2xl">
+   988→                        {d.name}
+   989→                      </p>
+   990→                      <p className="text-sm font-medium text-white/90 drop-shadow sm:text-base">
+   991→                        {analysis.bannerIdea.text}
+   992→                      </p>
+   993→                      <div className="mt-3 flex flex-wrap gap-1.5">
+   994→                        {analysis.skillsGap.resume
+   995→                          .slice(0, 4)
+   996→                          .map((s) => (
+   997→                            <span
+   998→                              key={s}
+   999→                              className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur"
+  1000→                            >
+  1001→                              {s}
+  1002→                            </span>
+  1003→                          ))}
+  1004→                      </div>
+  1005→                    </div>
+  1006→                    <div className="absolute right-3 top-3 grid size-12 place-items-center rounded-md bg-white/20 backdrop-blur">
+  1007→                      <div className="grid size-8 place-items-center rounded-sm bg-white/40 text-[8px] font-bold text-white">
+  1008→                        QR
+  1009→                      </div>
+  1010→                    </div>
+  1011→                    <div className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-black/30 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur">
+  1012→                      <ImageIcon className="size-3" /> Banner mockup
+  1013→                    </div>
+  1014→                  </div>
+  1015→                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  1016→                    <div className="flex-1">
+  1017→                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+  1018→                        Layout idea
+  1019→                      </p>
+  1020→                      <p className="text-sm text-muted-foreground">
+  1021→                        {analysis.bannerIdea.layout}
+  1022→                      </p>
+  1023→                    </div>
+  1024→                    <CopyButton
+  1025→                      text={`${analysis.bannerIdea.text}\n\n${analysis.bannerIdea.layout}`}
+  1026→                      label="Banner concept"
+  1027→                    />
+  1028→                  </div>
+  1029→                </CardContent>
+  1030→              </Card>
+  1031→
+  1032→              {/* Networking messages */}
+  1033→              <Card>
+  1034→                <CardHeader className="pb-3">
+  1035→                  <SectionTitle icon={MessageSquare}>
+  1036→                    Networking Messages
+  1037→                  </SectionTitle>
+  1038→                  <CardDescription className="text-xs">
+  1039→                    4 ready-to-send templates, personalized for {d.name}.
+  1040→                  </CardDescription>
+  1041→                </CardHeader>
+  1042→                <CardContent className="space-y-4">
+  1043→                  {!messages && !messaging && !messageError && (
+  1044→                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-8 text-center">
+  1045→                      <p className="text-sm text-muted-foreground">
+  1046→                        Generate personalized outreach messages based on your
+  1047→                        resume.
+  1048→                      </p>
+  1049→                      <AIButton onClick={onGenerateMessages} loading={messaging}>
+  1050→                        Generate networking messages
+  1051→                      </AIButton>
+  1052→                    </div>
+  1053→                  )}
+  1054→
+  1055→                  {messaging && (
+  1056→                    <div className="flex items-center justify-center gap-3 py-8 text-sm text-muted-foreground">
+  1057→                      <TypingDots /> Crafting your messages…
+  1058→                    </div>
+  1059→                  )}
+  1060→
+  1061→                  {messageError && (
+  1062→                    <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600 dark:text-red-400">
+  1063→                      {messageError}
+  1064→                    </div>
+  1065→                  )}
+  1066→
+  1067→                  {messages && (
+  1068→                    <>
+  1069→                      {messages.connectionRequest && (
+  1070→                        <MessageBlock
+  1071→                          icon={Users}
+  1072→                          title="Connection Request"
+  1073→                          text={messages.connectionRequest}
+  1074→                        />
+  1075→                      )}
+  1076→                      {messages.recruiterMessage && (
+  1077→                        <MessageBlock
+  1078→                          icon={Briefcase}
+  1079→                          title="Recruiter Message"
+  1080→                          text={messages.recruiterMessage}
+  1081→                        />
+  1082→                      )}
+  1083→                      {messages.thankYou && (
+  1084→                        <MessageBlock
+  1085→                          icon={CheckCircle}
+  1086→                          title="Thank You Note"
+  1087→                          text={messages.thankYou}
+  1088→                        />
+  1089→                      )}
+  1090→                      {messages.referralRequest && (
+  1091→                        <MessageBlock
+  1092→                          icon={Users}
+  1093→                          title="Referral Request"
+  1094→                          text={messages.referralRequest}
+  1095→                        />
+  1096→                      )}
+  1097→                      <div className="flex justify-end">
+  1098→                        <AIButton
+  1099→                          variant="outline"
+  1100→                          onClick={onGenerateMessages}
+  1101→                          loading={messaging}
+  1102→                        >
+  1103→                          Regenerate messages
+  1104→                        </AIButton>
+  1105→                      </div>
+  1106→                    </>
+  1107→                  )}
+  1108→                </CardContent>
+  1109→              </Card>
+  1110→            </>
+  1111→          )}
+  1112→        </TabsContent>
+  1113→
+  1114→        {/* ====================== TAB 4: PROFILE HEALTH ====================== */}
+  1115→        <TabsContent value="health" className="space-y-6">
+  1116→          {analysis && (
+  1117→            <>
+  1118→              {/* Weekly profile health */}
+  1119→              <Card>
+  1120→                <CardHeader className="pb-3">
+  1121→                  <SectionTitle icon={Activity}>
+  1122→                    Weekly Profile Health
+  1123→                  </SectionTitle>
+  1124→                  <CardDescription className="text-xs">
+  1125→                    Snapshot of where your profile stands this week.
+  1126→                  </CardDescription>
+  1127→                </CardHeader>
+  1128→                <CardContent>
+  1129→                  <div className="grid gap-6 lg:grid-cols-[auto_1fr] lg:items-center">
+  1130→                    <div className="flex justify-center">
+  1131→                      <ScoreRing
+  1132→                        value={overallStrength}
+  1133→                        size={130}
+  1134→                        label="Strength"
+  1135→                      />
+  1136→                    </div>
+  1137→                    <div className="grid gap-4 sm:grid-cols-2">
+  1138→                      <HealthMetric
+  1139→                        label="Profile Strength"
+  1140→                        value={`${overallStrength}%`}
+  1141→                      >
+  1142→                        <Progress value={overallStrength} className="mt-2" />
+  1143→                      </HealthMetric>
+  1144→
+  1145→                      <HealthMetric
+  1146→                        label="Activity"
+  1147→                        value={
+  1148→                          <Pill
+  1149→                            tone={
+  1150→                              analysis.profileHealth.activity === "High"
+  1151→                                ? "good"
+  1152→                                : analysis.profileHealth.activity === "Medium"
+  1153→                                ? "warn"
+  1154→                                : "bad"
+  1155→                            }
+  1156→                          >
+  1157→                            {analysis.profileHealth.activity}
+  1158→                          </Pill>
+  1159→                        }
+  1160→                      />
+  1161→
+  1162→                      <HealthMetric
+  1163→                        label="Posts needed (30d)"
+  1164→                        value={
+  1165→                          <span
+  1166→                            className={cn(
+  1167→                              "text-2xl font-bold",
+  1168→                              analysis.profileHealth.postsNeeded > 0
+  1169→                                ? "text-amber-500"
+  1170→                                : "text-emerald-500"
+  1171→                            )}
+  1172→                          >
+  1173→                            {analysis.profileHealth.postsNeeded}
+  1174→                          </span>
+  1175→                        }
+  1176→                      />
+  1177→
+  1178→                      <HealthMetric
+  1179→                        label="Recommendations needed"
+  1180→                        value={
+  1181→                          <span
+  1182→                            className={cn(
+  1183→                              "text-2xl font-bold",
+  1184→                              analysis.profileHealth.recommendationsNeeded > 0
+  1185→                                ? "text-amber-500"
+  1186→                                : "text-emerald-500"
+  1187→                            )}
+  1188→                          >
+  1189→                            {analysis.profileHealth.recommendationsNeeded}
+  1190→                          </span>
+  1191→                        }
+  1192→                      />
+  1193→
+  1194→                      <HealthMetric
+  1195→                        label="Skills missing"
+  1196→                        value={
+  1197→                          <span
+  1198→                            className={cn(
+  1199→                              "text-2xl font-bold",
+  1200→                              analysis.profileHealth.skillsMissing > 0
+  1201→                                ? "text-red-500"
+  1202→                                : "text-emerald-500"
+  1203→                            )}
+  1204→                          >
+  1205→                            {analysis.profileHealth.skillsMissing}
+  1206→                          </span>
+  1207→                        }
+  1208→                      />
+  1209→
+  1210→                      <HealthMetric
+  1211→                        label="Headline status"
+  1212→                        value={
+  1213→                          <Pill
+  1214→                            tone={
+  1215→                              analysis.profileHealth.headlineStatus === "Excellent"
+  1216→                                ? "good"
+  1217→                                : analysis.profileHealth.headlineStatus === "Good"
+  1218→                                ? "warn"
+  1219→                                : "bad"
+  1220→                            }
+  1221→                          >
+  1222→                            {analysis.profileHealth.headlineStatus}
+  1223→                          </Pill>
+  1224→                        }
+  1225→                      />
+  1226→                    </div>
+  1227→                  </div>
+  1228→                </CardContent>
+  1229→              </Card>
+  1230→
+  1231→              {/* AI Career Copilot */}
+  1232→              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+  1233→                <CardHeader className="pb-3">
+  1234→                  <SectionTitle icon={Sparkles}>AI Career Copilot</SectionTitle>
+  1235→                  <CardDescription className="text-xs">
+  1236→                    Weekly insight and 3 things to do next.
+  1237→                  </CardDescription>
+  1238→                </CardHeader>
+  1239→                <CardContent className="space-y-4">
+  1240→                  <div className="rounded-lg border border-primary/20 bg-background/60 p-4">
+  1241→                    <p className="text-sm">
+  1242→                      Your profile is{" "}
+  1243→                      <span className="font-bold text-primary">
+  1244→                        {overallStrength}%
+  1245→                      </span>{" "}
+  1246→                      strong —{" "}
+  1247→                      {overallStrength >= 80
+  1248→                        ? `better than ~${Math.min(
+  1249→                            95,
+  1250→                            Math.round(overallStrength + 5)
+  1251→                          )}% of ${d.title}s on LinkedIn. Keep posting consistently to stay top-of-mind.`
+  1252→                        : overallStrength >= 50
+  1253→                        ? `ahead of about ${Math.round(
+  1254→                            overallStrength
+  1255→                          )}% of ${d.title}s. A few targeted updates will push you into the top quartile.`
+  1256→                        : `below where most ${d.title}s sit. Focus on the quick wins below to climb fast.`}
+  1257→                    </p>
+  1258→                  </div>
+  1259→
+  1260→                  <div>
+  1261→                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+  1262→                      Recommended next actions
+  1263→                    </p>
+  1264→                    <ul className="space-y-2">
+  1265→                      <ActionItem
+  1266→                        n={1}
+  1267→                        text={
+  1268→                          analysis.profileHealth.headlineStatus === "Needs Work"
+  1269→                            ? `Replace your headline with the suggested one — recruiters search by title + keywords.`
+  1270→                            : `Refine your headline further with one more quantified achievement.`
+  1271→                        }
+  1272→                      />
+  1273→                      <ActionItem
+  1274→                        n={2}
+  1275→                        text={
+  1276→                          analysis.profileHealth.postsNeeded > 0
+  1277→                            ? `Publish ${analysis.profileHealth.postsNeeded} post${
+  1278→                                analysis.profileHealth.postsNeeded > 1 ? "s" : ""
+  1279→                              } in the next 30 days — share a project lesson or a tactical write-up.`
+  1280→                            : `Keep your current posting cadence — you're visible.`
+  1281→                        }
+  1282→                      />
+  1283→                      <ActionItem
+  1284→                        n={3}
+  1285→                        text={
+  1286→                          analysis.skillsGap.missing.length > 0
+  1287→                            ? `Add the ${analysis.skillsGap.missing
+  1288→                                .slice(0, 3)
+  1289→                                .join(", ")} skill${
+  1290→                                analysis.skillsGap.missing.length > 1 ? "s" : ""
+  1291→                              } to your LinkedIn Skills section and request endorsements.`
+  1292→                            : `Request ${analysis.profileHealth.recommendationsNeeded} more recommendation${
+  1293→                                analysis.profileHealth.recommendationsNeeded ===
+  1294→                                1
+  1295→                                  ? ""
+  1296→                                  : "s"
+  1297→                              } from recent collaborators.`
+  1298→                        }
+  1299→                      />
+  1300→                    </ul>
+  1301→                  </div>
+  1302→                </CardContent>
+  1303→              </Card>
+  1304→            </>
+  1305→          )}
+  1306→        </TabsContent>
+  1307→      </Tabs>
+  1308→    </div>
+  1309→  );
+  1310→}
+  1311→
+  1312→/* -------------------------------------------------------------------------- */
+  1313→/*  Sub-components                                                             */
+  1314→/* -------------------------------------------------------------------------- */
+  1315→
+  1316→function MessageBlock({
+  1317→  icon: Icon,
+  1318→  title,
+  1319→  text,
+  1320→}: {
+  1321→  icon: React.ComponentType<{ className?: string }>;
+  1322→  title: string;
+  1323→  text: string;
+  1324→}) {
+  1325→  return (
+  1326→    <div className="rounded-xl border border-border/60 p-4">
+  1327→      <div className="mb-2 flex items-center justify-between">
+  1328→        <p className="flex items-center gap-2 text-sm font-semibold">
+  1329→          <Icon className="size-4 text-primary" />
+  1330→          {title}
+  1331→        </p>
+  1332→        <CopyButton text={text} label={title} />
+  1333→      </div>
+  1334→      <p className="max-h-60 overflow-y-auto scroll-thin whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-sm leading-relaxed">
+  1335→        {text}
+  1336→      </p>
+  1337→    </div>
+  1338→  );
+  1339→}
+  1340→
+  1341→function HealthMetric({
+  1342→  label,
+  1343→  value,
+  1344→  children,
+  1345→}: {
+  1346→  label: string;
+  1347→  value: React.ReactNode;
+  1348→  children?: React.ReactNode;
+  1349→}) {
+  1350→  return (
+  1351→    <div className="rounded-lg border border-border/60 p-3">
+  1352→      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+  1353→        {label}
+  1354→      </p>
+  1355→      <div className="mt-1">{value}</div>
+  1356→      {children}
+  1357→    </div>
+  1358→  );
+  1359→}
+  1360→
+  1361→function ActionItem({ n, text }: { n: number; text: string }) {
+  1362→  return (
+  1363→    <li className="flex items-start gap-3 text-sm">
+  1364→      <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-xs font-bold text-primary">
+  1365→        {n}
+  1366→      </span>
+  1367→      <span>{text}</span>
+  1368→    </li>
+  1369→  );
+  1370→}
+  1371→

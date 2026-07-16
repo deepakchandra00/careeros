@@ -1,0 +1,802 @@
+  2213→                            fontSize: 13,
+  2214→                            fontWeight: 700,
+  2215→                            color: "#111827",
+  2216→                          }}
+  2217→                        >
+  2218→                          {exp.role}
+  2219→                        </div>
+  2220→                        <div style={{ fontSize: 12, color: a, fontWeight: 600 }}>
+  2221→                          {exp.company}
+  2222→                          {exp.location ? ` \u00b7 ${exp.location}` : ""}
+  2223→                        </div>
+  2224→                      </div>
+  2225→                      {range && (
+  2226→                        <span
+  2227→                          style={{
+  2228→                            fontSize: 11,
+  2229→                            color: "#6b7280",
+  2230→                            flexShrink: 0,
+  2231→                          }}
+  2232→                        >
+  2233→                          {range}
+  2234→                        </span>
+  2235→                      )}
+  2236→                    </div>
+  2237→                    {bullets.length > 0 && (
+  2238→                      <ul
+  2239→                        style={{
+  2240→                          margin: "6px 0 0 0",
+  2241→                          padding: 0,
+  2242→                          listStyle: "none",
+  2243→                          display: "flex",
+  2244→                          flexDirection: "column",
+  2245→                          gap: 3,
+  2246→                        }}
+  2247→                      >
+  2248→                        {bullets.map((b, i) => (
+  2249→                          <li
+  2250→                            key={i}
+  2251→                            style={{
+  2252→                              fontSize: 11.5,
+  2253→                              color: "#374151",
+  2254→                              paddingLeft: 12,
+  2255→                              position: "relative",
+  2256→                              lineHeight: 1.4,
+  2257→                            }}
+  2258→                          >
+  2259→                            <span
+  2260→                              style={{
+  2261→                                position: "absolute",
+  2262→                                left: 0,
+  2263→                                color: a,
+  2264→                              }}
+  2265→                            >
+  2266→                              •
+  2267→                            </span>
+  2268→                            {b}
+  2269→                          </li>
+  2270→                        ))}
+  2271→                      </ul>
+  2272→                    )}
+  2273→                  </div>
+  2274→                );
+  2275→              })}
+  2276→            </div>
+  2277→          </CcMainSection>
+  2278→        )}
+  2279→
+  2280→        {showEducation && (
+  2281→          <CcMainSection title="Education" accent={a}>
+  2282→            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+  2283→              {data.education.map((ed) => {
+  2284→                const range = formatRange(ed.start, ed.end);
+  2285→                return (
+  2286→                  <div key={ed.id} style={{ breakInside: "avoid" }}>
+  2287→                    <div
+  2288→                      style={{
+  2289→                        display: "flex",
+  2290→                        justifyContent: "space-between",
+  2291→                        alignItems: "baseline",
+  2292→                        gap: 8,
+  2293→                      }}
+  2294→                    >
+  2295→                      <div
+  2296→                        style={{
+  2297→                          fontSize: 12.5,
+  2298→                          fontWeight: 700,
+  2299→                          color: "#111827",
+  2300→                        }}
+  2301→                      >
+  2302→                        {ed.degree}
+  2303→                      </div>
+  2304→                      {range && (
+  2305→                        <span
+  2306→                          style={{
+  2307→                            fontSize: 11,
+  2308→                            color: "#6b7280",
+  2309→                            flexShrink: 0,
+  2310→                          }}
+  2311→                        >
+  2312→                          {range}
+  2313→                        </span>
+  2314→                      )}
+  2315→                    </div>
+  2316→                    <div style={{ fontSize: 11.5, color: "#374151" }}>
+  2317→                      {ed.school}
+  2318→                      {ed.location ? ` \u00b7 ${ed.location}` : ""}
+  2319→                    </div>
+  2320→                    {ed.grade && (
+  2321→                      <div style={{ fontSize: 11, color: "#6b7280" }}>
+  2322→                        {ed.grade}
+  2323→                      </div>
+  2324→                    )}
+  2325→                  </div>
+  2326→                );
+  2327→              })}
+  2328→            </div>
+  2329→          </CcMainSection>
+  2330→        )}
+  2331→
+  2332→        {showSkills && (
+  2333→          <CcMainSection title="Skills" accent={a}>
+  2334→            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+  2335→              {data.skills.map((s, i) => (
+  2336→                <span
+  2337→                  key={i}
+  2338→                  style={{
+  2339→                    fontSize: 11,
+  2340→                    padding: "4px 10px",
+  2341→                    background: "#f0fdfa",
+  2342→                    color: a,
+  2343→                    border: `1px solid ${a}55`,
+  2344→                    borderRadius: 999,
+  2345→                    fontWeight: 600,
+  2346→                    lineHeight: 1.3,
+  2347→                  }}
+  2348→                >
+  2349→                  {s}
+  2350→                </span>
+  2351→              ))}
+  2352→            </div>
+  2353→          </CcMainSection>
+  2354→        )}
+  2355→
+  2356→        {showProjects && (
+  2357→          <CcMainSection title="Projects" accent={a}>
+  2358→            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  2359→              {data.projects.map((p) => {
+  2360→                const tech = joinTech(p.tech);
+  2361→                return (
+  2362→                  <div key={p.id} style={{ breakInside: "avoid" }}>
+  2363→                    <div
+  2364→                      style={{
+  2365→                        display: "flex",
+  2366→                        justifyContent: "space-between",
+  2367→                        alignItems: "baseline",
+  2368→                        gap: 8,
+  2369→                      }}
+  2370→                    >
+  2371→                      <div
+  2372→                        style={{
+  2373→                          fontSize: 12.5,
+  2374→                          fontWeight: 700,
+  2375→                          color: "#111827",
+  2376→                        }}
+  2377→                      >
+  2378→                        {p.name}
+  2379→                      </div>
+  2380→                      {p.link && (
+  2381→                        <span
+  2382→                          style={{
+  2383→                            fontSize: 10.5,
+  2384→                            color: a,
+  2385→                            flexShrink: 0,
+  2386→                          }}
+  2387→                        >
+  2388→                          {p.link}
+  2389→                        </span>
+  2390→                      )}
+  2391→                    </div>
+  2392→                    {p.description && (
+  2393→                      <p
+  2394→                        style={{
+  2395→                          margin: "2px 0 0 0",
+  2396→                          fontSize: 11.5,
+  2397→                          color: "#374151",
+  2398→                          lineHeight: 1.4,
+  2399→                        }}
+  2400→                      >
+  2401→                        {p.description}
+  2402→                      </p>
+  2403→                    )}
+  2404→                    {tech && (
+  2405→                      <p
+  2406→                        style={{
+  2407→                          margin: "2px 0 0 0",
+  2408→                          fontSize: 10.5,
+  2409→                          color: "#6b7280",
+  2410→                        }}
+  2411→                      >
+  2412→                        <span style={{ fontWeight: 600 }}>Tech:</span> {tech}
+  2413→                      </p>
+  2414→                    )}
+  2415→                  </div>
+  2416→                );
+  2417→              })}
+  2418→            </div>
+  2419→          </CcMainSection>
+  2420→        )}
+  2421→
+  2422→        {showCerts && (
+  2423→          <CcMainSection title="Certifications" accent={a}>
+  2424→            <ul
+  2425→              style={{
+  2426→                listStyle: "none",
+  2427→                padding: 0,
+  2428→                margin: 0,
+  2429→                display: "flex",
+  2430→                flexDirection: "column",
+  2431→                gap: 6,
+  2432→              }}
+  2433→            >
+  2434→              {data.certifications.map((c) => (
+  2435→                <li key={c.id} style={{ breakInside: "avoid" }}>
+  2436→                  <div
+  2437→                    style={{
+  2438→                      fontSize: 12,
+  2439→                      fontWeight: 700,
+  2440→                      color: "#111827",
+  2441→                    }}
+  2442→                  >
+  2443→                    {c.title}
+  2444→                  </div>
+  2445→                  {c.subtitle && (
+  2446→                    <div style={{ fontSize: 11, color: "#374151" }}>
+  2447→                      {c.subtitle}
+  2448→                    </div>
+  2449→                  )}
+  2450→                  {c.date && (
+  2451→                    <div style={{ fontSize: 10.5, color: "#6b7280" }}>
+  2452→                      {c.date}
+  2453→                    </div>
+  2454→                  )}
+  2455→                </li>
+  2456→              ))}
+  2457→            </ul>
+  2458→          </CcMainSection>
+  2459→        )}
+  2460→      </div>
+  2461→    </div>
+  2462→  );
+  2463→}
+  2464→
+  2465→function CcMainSection({
+  2466→  title,
+  2467→  accent,
+  2468→  children,
+  2469→}: {
+  2470→  title: string;
+  2471→  accent: string;
+  2472→  children: React.ReactNode;
+  2473→}) {
+  2474→  return (
+  2475→    <section>
+  2476→      <h2
+  2477→        style={{
+  2478→          fontSize: 12,
+  2479→          fontWeight: 800,
+  2480→          letterSpacing: "0.14em",
+  2481→          textTransform: "uppercase",
+  2482→          color: accent,
+  2483→          margin: "0 0 10px 0",
+  2484→          paddingBottom: 4,
+  2485→          borderBottom: `1px solid ${accent}`,
+  2486→        }}
+  2487→      >
+  2488→        {title}
+  2489→      </h2>
+  2490→      {children}
+  2491→    </section>
+  2492→  );
+  2493→}
+  2494→
+  2495→/* ============================================================
+  2496→ * 13) COMBINED BLUE — blue sidebar, avatar overlaps boundary
+  2497→ * ========================================================== */
+  2498→
+  2499→export function CombinedBlueTemplate({
+  2500→  data,
+  2501→  sections,
+  2502→  accent,
+  2503→}: {
+  2504→  data: ResumeData;
+  2505→  sections: Record<string, boolean>;
+  2506→  accent: string;
+  2507→}) {
+  2508→  const blue = "#1e40af";
+  2509→  const a = accent || blue;
+  2510→  const showPersonal = visible(sections, "personal");
+  2511→  const showSummary =
+  2512→    visible(sections, "summary") && data.summary.trim().length > 0;
+  2513→  const showExperience =
+  2514→    visible(sections, "experience") && data.experience.length > 0;
+  2515→  const showSkills = visible(sections, "skills") && data.skills.length > 0;
+  2516→  const showProjects = visible(sections, "projects") && data.projects.length > 0;
+  2517→  const showEducation =
+  2518→    visible(sections, "education") && data.education.length > 0;
+  2519→  const showLanguages =
+  2520→    visible(sections, "languages") && data.languages.length > 0;
+  2521→
+  2522→  const contacts = buildContact(data);
+  2523→  const showContact = showPersonal && contacts.length > 0;
+  2524→
+  2525→  return (
+  2526→    <div
+  2527→      className="resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl"
+  2528→      style={{
+  2529→        display: "grid",
+  2530→        gridTemplateColumns: "33% 67%",
+  2531→        minHeight: 1123,
+  2532→        position: "relative",
+  2533→      }}
+  2534→    >
+  2535→      {/* Sidebar */}
+  2536→      <aside
+  2537→        style={{
+  2538→          backgroundColor: blue,
+  2539→          color: "white",
+  2540→          padding: "70px 28px 28px 28px",
+  2541→          display: "flex",
+  2542→          flexDirection: "column",
+  2543→          gap: 22,
+  2544→        }}
+  2545→      >
+  2546→        {showPersonal && (
+  2547→          <div style={{ textAlign: "center" }}>
+  2548→            <h1
+  2549→              style={{
+  2550→                fontSize: 18,
+  2551→                fontWeight: 800,
+  2552→                margin: 0,
+  2553→                lineHeight: 1.2,
+  2554→                color: "white",
+  2555→              }}
+  2556→            >
+  2557→              {data.name || "Your Name"}
+  2558→            </h1>
+  2559→            {data.title && (
+  2560→              <p
+  2561→                style={{
+  2562→                  fontSize: 12,
+  2563→                  color: "#bfdbfe",
+  2564→                  margin: "4px 0 0 0",
+  2565→                  lineHeight: 1.3,
+  2566→                }}
+  2567→              >
+  2568→                {data.title}
+  2569→              </p>
+  2570→            )}
+  2571→          </div>
+  2572→        )}
+  2573→
+  2574→        {showContact && (
+  2575→          <CbSidebarSection title="Contact">
+  2576→            <ul
+  2577→              style={{
+  2578→                listStyle: "none",
+  2579→                padding: 0,
+  2580→                margin: 0,
+  2581→                display: "flex",
+  2582→                flexDirection: "column",
+  2583→                gap: 6,
+  2584→              }}
+  2585→            >
+  2586→              {contacts.map((c, i) => {
+  2587→                const Icon = c.icon;
+  2588→                return (
+  2589→                  <li
+  2590→                    key={i}
+  2591→                    style={{
+  2592→                      display: "flex",
+  2593→                      alignItems: "flex-start",
+  2594→                      gap: 6,
+  2595→                      fontSize: 11,
+  2596→                      color: "#dbeafe",
+  2597→                      lineHeight: 1.3,
+  2598→                    }}
+  2599→                  >
+  2600→                    <Icon size={12} color="white" style={{ flexShrink: 0, marginTop: 2 }} />
+  2601→                    <span style={{ wordBreak: "break-word" }}>{c.value}</span>
+  2602→                  </li>
+  2603→                );
+  2604→              })}
+  2605→            </ul>
+  2606→          </CbSidebarSection>
+  2607→        )}
+  2608→
+  2609→        {showSkills && (
+  2610→          <CbSidebarSection title="Skills">
+  2611→            <ul
+  2612→              style={{
+  2613→                listStyle: "none",
+  2614→                padding: 0,
+  2615→                margin: 0,
+  2616→                display: "flex",
+  2617→                flexDirection: "column",
+  2618→                gap: 4,
+  2619→              }}
+  2620→            >
+  2621→              {data.skills.map((s, i) => (
+  2622→                <li
+  2623→                  key={i}
+  2624→                  style={{ fontSize: 11, color: "#dbeafe", lineHeight: 1.4 }}
+  2625→                >
+  2626→                  {s}
+  2627→                </li>
+  2628→              ))}
+  2629→            </ul>
+  2630→          </CbSidebarSection>
+  2631→        )}
+  2632→
+  2633→        {showLanguages && (
+  2634→          <CbSidebarSection title="Languages">
+  2635→            <ul
+  2636→              style={{
+  2637→                listStyle: "none",
+  2638→                padding: 0,
+  2639→                margin: 0,
+  2640→                display: "flex",
+  2641→                flexDirection: "column",
+  2642→                gap: 4,
+  2643→              }}
+  2644→            >
+  2645→              {data.languages.map((l, i) => (
+  2646→                <li key={i} style={{ fontSize: 11, color: "#dbeafe" }}>
+  2647→                  {l}
+  2648→                </li>
+  2649→              ))}
+  2650→            </ul>
+  2651→          </CbSidebarSection>
+  2652→        )}
+  2653→      </aside>
+  2654→
+  2655→      {/* Avatar overlapping the sidebar/main boundary */}
+  2656→      {showPersonal && (
+  2657→        <div
+  2658→          style={{
+  2659→            position: "absolute",
+  2660→            top: 24,
+  2661→            left: "calc(33% - 50px)",
+  2662→            zIndex: 5,
+  2663→          }}
+  2664→        >
+  2665→          <Avatar data={data} size={100} ring="white" ringWidth={4} />
+  2666→        </div>
+  2667→      )}
+  2668→
+  2669→      {/* Main */}
+  2670→      <main
+  2671→        style={{
+  2672→          backgroundColor: "white",
+  2673→          padding: "70px 28px 28px 28px",
+  2674→          color: "#1e293b",
+  2675→          display: "flex",
+  2676→          flexDirection: "column",
+  2677→          gap: 18,
+  2678→        }}
+  2679→      >
+  2680→        {showSummary && (
+  2681→          <CbMainSection title="Summary" accent={a}>
+  2682→            <p
+  2683→              style={{
+  2684→                fontSize: 12,
+  2685→                lineHeight: 1.5,
+  2686→                margin: 0,
+  2687→                color: "#334155",
+  2688→              }}
+  2689→            >
+  2690→              {data.summary}
+  2691→            </p>
+  2692→          </CbMainSection>
+  2693→        )}
+  2694→
+  2695→        {showExperience && (
+  2696→          <CbMainSection title="Experience" accent={a}>
+  2697→            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+  2698→              {data.experience.map((exp) => {
+  2699→                const bullets = nonEmptyBullets(exp.bullets);
+  2700→                const range = formatRange(exp.start, exp.end);
+  2701→                return (
+  2702→                  <div key={exp.id} style={{ breakInside: "avoid" }}>
+  2703→                    <div
+  2704→                      style={{
+  2705→                        display: "flex",
+  2706→                        justifyContent: "space-between",
+  2707→                        alignItems: "baseline",
+  2708→                        gap: 8,
+  2709→                      }}
+  2710→                    >
+  2711→                      <div>
+  2712→                        <div
+  2713→                          style={{
+  2714→                            fontSize: 13,
+  2715→                            fontWeight: 700,
+  2716→                            color: "#0f172a",
+  2717→                          }}
+  2718→                        >
+  2719→                          {exp.role}
+  2720→                        </div>
+  2721→                        <div style={{ fontSize: 12, color: a, fontWeight: 600 }}>
+  2722→                          {exp.company}
+  2723→                          {exp.location ? ` \u00b7 ${exp.location}` : ""}
+  2724→                        </div>
+  2725→                      </div>
+  2726→                      {range && (
+  2727→                        <span
+  2728→                          style={{
+  2729→                            fontSize: 11,
+  2730→                            color: "#64748b",
+  2731→                            flexShrink: 0,
+  2732→                          }}
+  2733→                        >
+  2734→                          {range}
+  2735→                        </span>
+  2736→                      )}
+  2737→                    </div>
+  2738→                    {bullets.length > 0 && (
+  2739→                      <ul
+  2740→                        style={{
+  2741→                          margin: "6px 0 0 0",
+  2742→                          padding: 0,
+  2743→                          listStyle: "none",
+  2744→                          display: "flex",
+  2745→                          flexDirection: "column",
+  2746→                          gap: 3,
+  2747→                        }}
+  2748→                      >
+  2749→                        {bullets.map((b, i) => (
+  2750→                          <li
+  2751→                            key={i}
+  2752→                            style={{
+  2753→                              fontSize: 11.5,
+  2754→                              color: "#334155",
+  2755→                              paddingLeft: 12,
+  2756→                              position: "relative",
+  2757→                              lineHeight: 1.4,
+  2758→                            }}
+  2759→                          >
+  2760→                            <span
+  2761→                              style={{
+  2762→                                position: "absolute",
+  2763→                                left: 0,
+  2764→                                color: a,
+  2765→                              }}
+  2766→                            >
+  2767→                              •
+  2768→                            </span>
+  2769→                            {b}
+  2770→                          </li>
+  2771→                        ))}
+  2772→                      </ul>
+  2773→                    )}
+  2774→                  </div>
+  2775→                );
+  2776→              })}
+  2777→            </div>
+  2778→          </CbMainSection>
+  2779→        )}
+  2780→
+  2781→        {showProjects && (
+  2782→          <CbMainSection title="Projects" accent={a}>
+  2783→            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  2784→              {data.projects.map((p) => {
+  2785→                const tech = joinTech(p.tech);
+  2786→                return (
+  2787→                  <div key={p.id} style={{ breakInside: "avoid" }}>
+  2788→                    <div
+  2789→                      style={{
+  2790→                        display: "flex",
+  2791→                        justifyContent: "space-between",
+  2792→                        alignItems: "baseline",
+  2793→                        gap: 8,
+  2794→                      }}
+  2795→                    >
+  2796→                      <div
+  2797→                        style={{
+  2798→                          fontSize: 12.5,
+  2799→                          fontWeight: 700,
+  2800→                          color: "#0f172a",
+  2801→                        }}
+  2802→                      >
+  2803→                        {p.name}
+  2804→                      </div>
+  2805→                      {p.link && (
+  2806→                        <span
+  2807→                          style={{
+  2808→                            fontSize: 10.5,
+  2809→                            color: a,
+  2810→                            flexShrink: 0,
+  2811→                          }}
+  2812→                        >
+  2813→                          {p.link}
+  2814→                        </span>
+  2815→                      )}
+  2816→                    </div>
+  2817→                    {p.description && (
+  2818→                      <p
+  2819→                        style={{
+  2820→                          margin: "2px 0 0 0",
+  2821→                          fontSize: 11.5,
+  2822→                          color: "#334155",
+  2823→                          lineHeight: 1.4,
+  2824→                        }}
+  2825→                      >
+  2826→                        {p.description}
+  2827→                      </p>
+  2828→                    )}
+  2829→                    {tech && (
+  2830→                      <p
+  2831→                        style={{
+  2832→                          margin: "2px 0 0 0",
+  2833→                          fontSize: 10.5,
+  2834→                          color: "#64748b",
+  2835→                        }}
+  2836→                      >
+  2837→                        <span style={{ fontWeight: 600 }}>Tech:</span> {tech}
+  2838→                      </p>
+  2839→                    )}
+  2840→                  </div>
+  2841→                );
+  2842→              })}
+  2843→            </div>
+  2844→          </CbMainSection>
+  2845→        )}
+  2846→
+  2847→        {showEducation && (
+  2848→          <CbMainSection title="Education" accent={a}>
+  2849→            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+  2850→              {data.education.map((ed) => {
+  2851→                const range = formatRange(ed.start, ed.end);
+  2852→                return (
+  2853→                  <div key={ed.id} style={{ breakInside: "avoid" }}>
+  2854→                    <div
+  2855→                      style={{
+  2856→                        display: "flex",
+  2857→                        justifyContent: "space-between",
+  2858→                        alignItems: "baseline",
+  2859→                        gap: 8,
+  2860→                      }}
+  2861→                    >
+  2862→                      <div
+  2863→                        style={{
+  2864→                          fontSize: 12.5,
+  2865→                          fontWeight: 700,
+  2866→                          color: "#0f172a",
+  2867→                        }}
+  2868→                      >
+  2869→                        {ed.degree}
+  2870→                      </div>
+  2871→                      {range && (
+  2872→                        <span
+  2873→                          style={{
+  2874→                            fontSize: 11,
+  2875→                            color: "#64748b",
+  2876→                            flexShrink: 0,
+  2877→                          }}
+  2878→                        >
+  2879→                          {range}
+  2880→                        </span>
+  2881→                      )}
+  2882→                    </div>
+  2883→                    <div style={{ fontSize: 11.5, color: "#334155" }}>
+  2884→                      {ed.school}
+  2885→                      {ed.location ? ` \u00b7 ${ed.location}` : ""}
+  2886→                    </div>
+  2887→                    {ed.grade && (
+  2888→                      <div style={{ fontSize: 11, color: "#64748b" }}>
+  2889→                        {ed.grade}
+  2890→                      </div>
+  2891→                    )}
+  2892→                  </div>
+  2893→                );
+  2894→              })}
+  2895→            </div>
+  2896→          </CbMainSection>
+  2897→        )}
+  2898→      </main>
+  2899→    </div>
+  2900→  );
+  2901→}
+  2902→
+  2903→function CbSidebarSection({
+  2904→  title,
+  2905→  children,
+  2906→}: {
+  2907→  title: string;
+  2908→  children: React.ReactNode;
+  2909→}) {
+  2910→  return (
+  2911→    <section>
+  2912→      <h2
+  2913→        style={{
+  2914→          fontSize: 11,
+  2915→          fontWeight: 700,
+  2916→          letterSpacing: "0.16em",
+  2917→          textTransform: "uppercase",
+  2918→          margin: "0 0 8px 0",
+  2919→          color: "white",
+  2920→          opacity: 0.95,
+  2921→        }}
+  2922→      >
+  2923→        {title}
+  2924→      </h2>
+  2925→      {children}
+  2926→    </section>
+  2927→  );
+  2928→}
+  2929→
+  2930→function CbMainSection({
+  2931→  title,
+  2932→  accent,
+  2933→  children,
+  2934→}: {
+  2935→  title: string;
+  2936→  accent: string;
+  2937→  children: React.ReactNode;
+  2938→}) {
+  2939→  return (
+  2940→    <section>
+  2941→      <h2
+  2942→        style={{
+  2943→          fontSize: 12,
+  2944→          fontWeight: 800,
+  2945→          letterSpacing: "0.14em",
+  2946→          textTransform: "uppercase",
+  2947→          color: "#0f172a",
+  2948→          margin: "0 0 10px 0",
+  2949→          paddingBottom: 4,
+  2950→          borderBottom: `2px solid ${accent}`,
+  2951→        }}
+  2952→      >
+  2953→        {title}
+  2954→      </h2>
+  2955→      {children}
+  2956→    </section>
+  2957→  );
+  2958→}
+  2959→
+  2960→/* ============================================================
+  2961→ * 14) NAVY YELLOW PRO — dark navy sidebar + yellow accents
+  2962→ * ============================================================ */
+  2963→
+  2964→export function NavyYellowProTemplate({
+  2965→  data,
+  2966→  sections,
+  2967→  accent,
+  2968→}: {
+  2969→  data: ResumeData;
+  2970→  sections: Record<string, boolean>;
+  2971→  accent: string;
+  2972→}) {
+  2973→  const navy = "#1e3a5f";
+  2974→  const yellow = "#fbbf24";
+  2975→  const a = accent || navy;
+  2976→  const showPersonal = visible(sections, "personal");
+  2977→  const showSummary =
+  2978→    visible(sections, "summary") && data.summary.trim().length > 0;
+  2979→  const showExperience =
+  2980→    visible(sections, "experience") && data.experience.length > 0;
+  2981→  const showSkills = visible(sections, "skills") && data.skills.length > 0;
+  2982→  const showProjects = visible(sections, "projects") && data.projects.length > 0;
+  2983→  const showEducation =
+  2984→    visible(sections, "education") && data.education.length > 0;
+  2985→
+  2986→  const contacts = buildContact(data);
+  2987→  const showContact = showPersonal && contacts.length > 0;
+  2988→
+  2989→  return (
+  2990→    <div
+  2991→      className="resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl"
+  2992→      style={{ display: "grid", gridTemplateColumns: "30% 70%", minHeight: 1123 }}
+  2993→    >
+  2994→      {/* Sidebar */}
+  2995→      <aside
+  2996→        style={{
+  2997→          backgroundColor: navy,
+  2998→          color: "white",
+  2999→          padding: 28,
+  3000→          display: "flex",
+  3001→          flexDirection: "column",
+  3002→          gap: 22,
+  3003→        }}
+  3004→      >
+  3005→        {showPersonal && (
+  3006→          <div style={{ textAlign: "center" }}>
+  3007→            <div
+  3008→              style={{
+  3009→                display: "flex",
+  3010→                justifyContent: "center",
+  3011→                marginBottom: 14,
+  3012→              }}
+
+[showing lines 2213-3012 of 6908; use offset=3013 with limit to continue reading]

@@ -1,0 +1,309 @@
+     1→     1→# AI CareerOS — Build Worklog
+     2→     2→
+     3→     3→This file tracks all agent work on the AI CareerOS platform.
+     4→     4→
+     5→     5→---
+     6→     6→Task ID: 0
+     7→     7→Agent: orchestrator
+     8→     8→Task: Foundation — theme, layout, app shell, stores, AI helper, all API routes, dashboard module
+     9→     9→
+    10→    10→Work Log:
+    11→    11→- Created emerald/slate theme in globals.css with light + dark modes, custom scrollbar, gradient + glass utilities
+    12→    12→- Updated layout.tsx with ThemeProvider (next-themes), Sonner toaster, CareerOS metadata
+    13→    13→- Created lib/ai.ts (complete/chat/extractJson helpers using z-ai-web-dev-sdk, server-only)
+    14→    14→- Created lib/modules.ts (17 modules + admin registry with icons, descriptions, badges)
+    15→    15→- Created store/app-store.ts (active module + sidebar state via Zustand)
+    16→    16→- Created store/resume-store.ts (rich default Deepak Sharma resume data)
+    17→    17→- Created 11 API routes under src/app/api/ai/: rewrite, ats-review, jd-match, coach, salary, interview, linkedin, naukri, cover-letter, roadmap, skill-gap, rewriter, job-search (all use lib/ai.ts, return JSON)
+    18→    18→- Created components/shared/blocks.tsx (ModuleHeader, AIButton, ScoreRing, Pill, AIEmptyState, TypingDots) and components/shared/utils.ts (useMounted, useAI hook)
+    19→    19→- Created components/app/sidebar.tsx (grouped nav, upgrade card, user card, mobile sheet)
+    20→    20→- Created components/app/topbar.tsx (greeting, search, quick actions, theme toggle, avatar)
+    21→    21→- Created components/app/footer.tsx (sticky via mt-auto in page shell)
+    22→    22→- Created components/app/theme-toggle.tsx
+    23→    23→- Created src/app/page.tsx (shell: Sidebar + Topbar + active module + Footer, hash sync, Cmd+K)
+    24→    24→- Created components/modules/dashboard.tsx (hero, 6 stat cards, growth area chart, interview radial, activity feed, AI coach prompts, quick access grid)
+    25→    25→
+    26→    26→Stage Summary:
+    27→    27→- Foundation complete. App shell + dashboard working.
+    28→    28→- Shared component API for modules:
+    29→    29→  - `ModuleHeader` from "@/components/shared/blocks" — props: { icon, title, description, children }
+    30→    30→  - `AIButton` — props: { children, loading, onClick, variant, className, disabled }
+    31→    31→  - `ScoreRing` — props: { value, size, label, suffix }
+    32→    32→  - `Pill` — props: { children, tone: "default"|"good"|"warn"|"bad"|"info" }
+    33→    33→  - `AIEmptyState` — props: { icon, title, description }
+    34→    34→  - `TypingDots`
+    35→    35→  - `useAI<T>()` hook from "@/components/shared/utils" — returns { data, loading, error, run, setData, setError }; call `run("/api/ai/xxx", body)`
+    36→    36→- Resume data available via `useResumeStore` (state.data with name, title, summary, experience[], skills[], projects[], education[], certifications[], languages[]). Helper to serialize to text: `const data = useResumeStore(s=>s.data); const text = JSON.stringify(data, null, 2)` — OR build a readable string.
+    37→    37→- UI components available in "@/components/ui/*" (all shadcn New York).
+    38→    38→- Icons: lucide-react.
+    39→    39→- Charts: recharts.
+    40→    40→- IMPORTANT: every module component is a named export (e.g. `export function DashboardModule()`), must be a client component ("use client"), and must be visually rich using Card grids. Use the shared blocks.
+    41→    41→- Color rule: NO indigo/blue as primary. Emerald/teal is primary. Purple/amber/red are OK as accents.
+    42→    42→- Sticky footer handled by page shell (mt-auto on footer). Modules just render content; do not add their own footer.
+    43→    43→
+    44→    44→---
+    45→    45→Task ID: 2-a
+    46→    46→Agent: general-purpose
+    47→    47→Task: Build Interview Coach + Salary Predictor modules
+    48→    48→
+    49→    49→Work Log:
+    50→    50→- Read worklog.md and inspected foundation (blocks.tsx, utils.ts, resume-store.ts, dashboard.tsx, globals.css, API routes for /api/ai/interview and /api/ai/salary, page.tsx module registry)
+    51→    51→- Created src/components/modules/interview.tsx exporting `InterviewModule`:
+    52→    52→  - ModuleHeader with Mic icon, "Interview Coach", "AI-generated questions & mock interview feedback"
+    53→    53→  - Input Card: resume chip (auto from store) + optional JD Textarea + Generate Questions AIButton → POST /api/ai/interview with { resumeText, jd? }
+    54→    54→  - Resume serialized to readable text per the spec (name/title/summary/experience/skills/projects)
+    55→    55→  - Loading state with TypingDots; error card; AIEmptyState with Mic icon before results
+    56→    56→  - Results: lg 2-col grid — main Card holds shadcn Tabs with 6 tabs (HR, Technical, Behavioral, System Design, Coding, Architecture), each tab lists numbered QuestionCards with per-tab accent color, copy-to-clipboard (clipboard API + sonner toast, switches Copy→Check) and a Practice button (toast only)
+    57→    57→  - Sidebar: "Likely Topics" (purple-tinted card with info Pills) + "Prep Tips" (amber-tinted numbered list)
+    58→    58→  - Bottom: full-width gradient (emerald/teal) "Mock Interview" Card with animated faux equalizer Waveform (inline @keyframes), Start Mock Interview + Enable Camera buttons (toast only), live-mic/time/clarity chips
+    59→    59→- Created src/components/modules/salary.tsx exporting `SalaryModule`:
+    60→    60→  - ModuleHeader with IndianRupee icon, "Salary Predictor", "Know your market worth across India & global"
+    61→    61→  - Input form Card: Role (default from store title), Experience years (default 6), Location (default "Bengaluru"), Skills comma-separated (default from store skills), Current CTC LPA optional number; Predict Salary AIButton → POST /api/ai/salary
+    62→    62→  - Loading/error/empty states (AIEmptyState with IndianRupee icon)
+    63→    63→  - Results hero Card: emerald→teal gradient, big ₹low–high LPA + median + USD + demand badges, plus a recharts BarChart (Low/Median/High bars with distinct cell colors) inside a glass panel
+    64→    64→  - 4-stat row: Demand Pill (tone mapped Very High/High→good, Medium→info, Low→warn), Median INR, US range, Growth outlook
+    65→    65→  - Top Companies Card: colored initial-circle chips (sonner toast on click)
+    66→    66→  - Two-column: Negotiation Tips (amber-tinted list with Check icons) + Perks (purple-tinted Pill grid with Gift icons)
+    67→    67→  - Comparable Roles Card: green Pill list
+    68→    68→- Color discipline: emerald/teal primary everywhere; purple/amber/red as accents only — no indigo/blue primaries
+    69→    69→- Ran `bun run lint` → clean (no errors). Ran `bunx tsc --noEmit` → no errors in interview.tsx or salary.tsx (remaining TS errors are in roadmap.tsx, owned by another agent)
+    70→    70→- Removed unused `cn` imports from both files for cleanliness
+    71→    71→
+    72→    72→Stage Summary:
+    73→    73→- Files created:
+    74→    74→  - /home/z/my-project/src/components/modules/interview.tsx — `export function InterviewModule()`
+    75→    75→  - /home/z/my-project/src/components/modules/salary.tsx — `export function SalaryModule()`
+    76→    76→- Both are "use client" named exports, importable from src/app/page.tsx (already wired in MODULE_COMPONENTS map)
+    77→    77→- Key decisions:
+    78→    78→  - Used sonner `toast` (already mounted in layout.tsx) for copy/practice/company/mock-interview feedback
+    79→    79→  - Inline `<style>` keyframe for the mock-interview waveform (no globals.css edits needed, kept changes scoped to the 2 files)
+    80→    80→  - Tab list uses flex-wrap + per-tab count badge so all 6 tabs remain visible on mobile
+    81→    81→  - Salary hero doubles as the chart container (BarChart Low/Median/High) to satisfy the "hero card with bar chart visualization" requirement without a separate chart card
+    82→    82→  - Demand level mapped to Pill tones via a typed record for type-safe coloring
+    83→    83→- API contracts honored exactly: interview returns {hr, technical, behavioral, systemDesign, coding, architecture, tips, likelyTopics}; salary returns {marketSalaryINR{low,high,median}, marketSalaryUSD{low,high}, topCompanies, demandLevel, growthOutlook, negotiationTips, perks, comparableRoles}
+    84→    84→- Next actions for orchestrator: wire these into the sidebar if not already (module ids `interview` and `salary` already exist in lib/modules.ts registry); consider adding real mock-interview + voice capture in a future task
+    85→    85→
+    86→    86→---
+    87→    87→Task ID: 2-b
+    88→    88→Agent: general-purpose
+    89→    89→Task: Build Job Tracker (Kanban) + Job Search modules
+    90→    90→
+    91→    91→Work Log:
+    92→    92→- Read worklog.md to confirm shared component API (ModuleHeader, AIButton, Pill, AIEmptyState), useAI hook, useResumeStore defaults (Deepak Sharma — Senior Frontend Engineer, Bengaluru), and /api/ai/job-search response shape.
+    93→    93→- Inspected existing dashboard.tsx, dialog.tsx, select.tsx, badge.tsx, card.tsx, button.tsx, input.tsx, sonner.tsx, globals.css (.scroll-thin utility) to align with established conventions and emerald-primary theme.
+    94→    94→- Created /home/z/my-project/src/components/modules/job-tracker.tsx — pure client-state Kanban board with 6 accent-colored columns (Wishlist=slate, Applied=primary, Interview=amber, HR=purple, Offer=emerald, Rejected=red), 8 realistic seed cards distributed across stages (incl. Staff Engineer @ Atlassian in Interview, SDE III @ Microsoft in Applied, Senior React Engineer @ Flipkart in Offer), per-column count badges, top toolbar (Add Application Dialog with company/role/location/salary/source/stage form, search filter, total/active/offers/rejected stats Pills), card hover-lift with reveal-on-hover "→" advance-stage button, full JobCard detail Dialog with score Pill + source badge + tags + advance CTA, sonner toasts on stage advance and add. Vertical scroll uses max-h-[70vh] overflow-y-auto with .scroll-thin class as required.
+    95→    95→- Created /home/z/my-project/src/components/modules/job-search.tsx — AI job search using useAI<SearchResponse>(). Prominent search panel (query + role datalist input + location + AIButton "Search"), source filter chips for all 5 boards with active/inactive styling and reset. Before-search state: AIEmptyState + Trending searches suggestion chips (one-click triggers search). Loading state: 4 skeleton cards. Results: stat strip Card with totalFound + marketInsight line + topHiringCompanies as outlined badges, result count with active-filter note, then list of JobResultCards — each with colored initial avatar, title, company, location·experience·salary·posted meta row, source badge, remote Pill, match-score Pill (tone by score), up to 4 tag badges, Apply button (toast "Redirecting to {source}…" with title/company) and Save button (toast "Added to tracker"). Defaults role/location pulled from resume store.
+    96→    96→- Ran `bun run lint` — clean (eslint config is permissive; no errors reported).
+    97→    97→- Ran `bunx tsc --noEmit` and filtered for my files — zero TypeScript errors in job-tracker.tsx / job-search.tsx. (Remaining tsc errors are from other agents' not-yet-created modules — resume-builder, resume-review, jd-optimizer, etc. — out of scope for Task 2-b.)
+    98→    98→
+    99→    99→Stage Summary:
+   100→   100→- Files created:
+   101→   101→  - /home/z/my-project/src/components/modules/job-tracker.tsx — `export function JobTrackerModule()`
+   102→   102→  - /home/z/my-project/src/components/modules/job-search.tsx — `export function JobSearchModule()`
+   103→   103→- Key decisions:
+   104→   104→  - Pure client-side Kanban via React.useState (no AI / no persistence) — matches "smooth, client-side" requirement; seeded with realistic Indian-market listings.
+   105→   105→  - Advance-stage uses a fixed COLUMN_FLOW (wishlist→applied→interview→hr→offer); rejected/offer are terminal and hide the advance button.
+   106→   106→  - Score Pill tone function shared between modules (≥85 good, ≥70 info, ≥50 warn, else bad) for visual consistency.
+   107→   107→  - Source badges use brand-tinted backgrounds (LinkedIn #0a66c2, Naukri red, Indeed purple, Wellfound amber, Glassdoor emerald) — accents only, never as primary.
+   108→   108→  - Job Search chips actually filter results client-side (not just visual); reset control re-enables all sources.
+   109→   109→  - Sonner toasts wired for advance, add, apply, save — matches the dashboard's existing Sonner toaster setup.
+   110→   110→  - Lint clean, no TS errors in my files.
+   111→   111→
+   112→   112→---
+   113→   113→Task ID: 3
+   114→   114→Agent: general-purpose
+   115→   115→Task: Build Admin Panel module
+   116→   116→
+   117→   117→Work Log:
+   118→   118→- Read worklog.md to understand foundation (theme, shared blocks API, shadcn New York components, recharts, lucide-react, color rule: emerald primary, no indigo/blue).
+   119→   119→- Inspected shared/blocks.tsx (ModuleHeader, Pill, cn), dashboard.tsx for chart patterns (oklch colors, gradient defs, tooltip style), table/tabs/avatar/select/switch/dropdown-menu shadcn APIs.
+   120→   120→- Created src/components/modules/admin.tsx as `export function AdminModule()` with "use client" directive.
+   121→   121→- Module structure:
+   122→   122→  - ModuleHeader with ShieldCheck icon, title "Admin Panel", description "Users, subscriptions, templates & analytics", plus Reports + New user buttons.
+   123→   123→  - 4 top stat cards (Total Users 12,847 +18%, MRR ₹14.2L +12%, Active Subscriptions 3,421 +6%, Support Tickets 47 open) each with colored icon tile + delta Pill + sub-text.
+   124→   124→  - 11-tab Tabs component (Overview, Users, Subscriptions, Templates, LLMs, Prompt Library, Blogs, Coupons, Invoices, Support, CMS) in a horizontally scrollable TabsList.
+   125→   125→  - Overview tab: 12-month revenue AreaChart (emerald gradient fill), plan distribution donut PieChart (Free 60% / Pro 32% / Teams 8% with Cell colors + legend grid), user growth LineChart (purple), top modules BarChart (Resume Builder, ATS Review, JD Match, LinkedIn, Coach), and 5-item recent activity feed.
+   126→   126→  - Users tab: Table with 8 seeded users (Avatar with colored initials fallback, name+email, plan Pill, status Pill, joined date, MRR), search Input + plan Select filter (useMemo filtered), Export CSV button triggering sonner toast, per-row DropdownMenu actions.
+   127→   127→  - Subscriptions tab: 3-plan Table (Free/Pro/Teams) with price, period, active users, MRR, churn Pill (warn if >3.5%), enable Switch, footer total MRR.
+   128→   128→  - Templates tab: 8 resume template cards (Modern, ATS, Executive, Minimal, Google, Microsoft, Startup, Creative) in 4-col grid with gradient header, FileText icon, usage count, enable Switch.
+   129→   129→  - LLMs tab: Smart Routing toggle card (gradient, ₹2.1L/mo saved) explaining cheapest/best model selection, plus 6 model cards (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro, GLM-5, DeepSeek V3, Local Llama) each with provider, status Pill (Active/Routing/Disabled), cost/1K, latency, requests today, priority badge, enable Switch.
+   130→   130→  - Support tab: 5 tickets with id, subject, user, priority Pill (High=bad, Medium=warn, Low=default), status Pill (Open=warn, In Progress=info, Resolved=good), last-update timestamp, conditional icon.
+   131→   131→  - Coming-soon tabs (Prompt Library, Blogs, Coupons, Invoices, CMS): polished placeholder Card with icon, label, description, and "Coming soon" Badge.
+   132→   132→  - Footer note: "AI CareerOS Admin · Phase 1 MVP" with system-status indicator.
+   133→   133→- Ran `bun run lint` — clean, zero errors. Cleaned up unused imports (TrendingDown, DollarSign, CircleDollarSign, Settings2, Puzzle, Progress, Legend).
+   134→   134→- Ran `bunx tsc --noEmit` — no errors in admin.tsx (remaining tsc errors are in other agents' files: roadmap.tsx + missing module imports in page.tsx).
+   135→   135→
+   136→   136→Stage Summary:
+   137→   137→- File created: /home/z/my-project/src/components/modules/admin.tsx — `export function AdminModule()`.
+   138→   138→- Pure rich data-dashboard UI, no AI calls, all seeded data inline.
+   139→   139→- Recharts used heavily in Overview (Area, Pie/donut, Line, Bar) with emerald/purple/amber oklch palette matching foundation.
+   140→   140→- Emerald primary throughout; purple/amber/red used as accents only. Zero indigo/blue.
+   141→   141→- Reusable sub-components extracted: StatCard, SectionCard, ComingSoonCard + helpers (planTone, statusTone, ticketStatusTone, llmStatusTone, initials, chartTooltipStyle).
+   142→   142→- Interactive: search + plan filter on Users tab with useMemo, sonner toast on Export CSV, Switch toggles on Subscriptions/Templates/LLMs, DropdownMenu per user row.
+   143→   143→- Conforms to shared API: ModuleHeader + Pill from @/components/shared/blocks, cn from @/lib/utils, all shadcn from @/components/ui/*.
+   144→   144→- Ready to be rendered by src/app/page.tsx (already imports AdminModule).
+   145→   145→
+   146→   146→---
+   147→   147→Task ID: 1-b
+   148→   148→Agent: general-purpose
+   149→   149→Task: Build Resume Review (ATS) + JD Optimizer + Version Manager modules
+   150→   150→
+   151→   151→Work Log:
+   152→   152→- Read worklog + shared blocks (ModuleHeader, AIButton, ScoreRing, Pill, AIEmptyState, TypingDots), useAI hook, resume store shape, ats-review and jd-match API route contracts, app-store setModule, sonner toaster wiring in layout.tsx
+   153→   153→- Created src/components/modules/resume-review.tsx (ResumeReviewModule):
+   154→   154→  - ModuleHeader (ScanSearch icon) with AIButton "Analyze"
+   155→   155→  - Drag-and-drop upload zone (dashed border, hidden file input, dragOver highlight state) + uploaded filename chip with remove + "Use current resume" button. File load toasts a note that the current store resume is what gets analyzed (per spec — no real PDF parsing)
+   156→   156→  - Resume text serialized from store via the spec template (name, title, summary, experience+bullets, skills, projects+tech)
+   157→   157→  - Results dashboard: big ScoreRing (ATS) next to 3 stat cards (Grade Pill, ₹low–high LPA, Interview Probability Pill with tone), Missing Keywords card with bad-tone Pills, 3 IssueCards (Weak Bullets / Grammar / Formatting — each with count badge + example bullets in muted text), Strengths checkmark card, Top Recommendations numbered list in primary-tinted card
+   158→   158→  - Empty state (AIEmptyState ScanSearch) + loading state (TypingDots) + error card (red-tinted AlertTriangle)
+   159→   159→- Created src/components/modules/jd-optimizer.tsx (JdOptimizerModule):
+   160→   160→  - ModuleHeader (Target icon) with AIButton "Calculate Match"
+   161→   161→  - Two side-by-side Textareas (stacks on mobile): LEFT = Job Description (with Clear + char count), RIGHT = Your Resume pre-filled from store (mono, with Reset + char count). Empty-JD guard toasts an error before firing
+   162→   162→  - Results: ScoreRing (Match) with grade Pill + 4 MiniStats (Matched/Missing/Extra/Grade with tone-coded icons), two-column Matched Skills (good Pills) vs Missing Skills (bad Pills), Extra Skills info Pills card, Strengths + Gaps cards, Rewrite Suggestions numbered list in primary-tinted card with "Rewrite Resume →" button that toasts "Opening Resume Rewriter…" and calls useAppStore.setModule("resume-rewriter")
+   163→   163→  - Empty state + loading state + error card consistent with module 1
+   164→   164→- Created src/components/modules/version-manager.tsx (VersionManagerModule):
+   165→   165→  - ModuleHeader (Layers icon) with "New Version" button (toast)
+   166→   166→  - 4-tile stat strip: Total Versions (7), Avg ATS (88), Best Score (94 / React Resume), Archived (1) — each with tone-colored icon
+   167→   167→  - Filter chip bar: All / Active / Archived with live counts; primary-fill when active, muted otherwise
+   168→   168→  - 7-card responsive grid (sm:2, lg:3) of pre-seeded versions: React, React Native, Architect, Manager, Product, USA, Europe. Each card: colored top accent bar, role icon in tinted square, name + role, MiniRing (custom 56px donut, stroke 6, color-matched to accent) showing ATS score, Active/Archived Pill, "Updated Xd ago" with Clock icon, market + version badges, dropdown dot-menu (Edit/Duplicate/Delete — toast on click)
+   169→   169→  - Custom MiniRing component (smaller than ScoreRing, text-sm value) for compact card layout
+   170→   170→  - No AI calls — pure static-but-rich UI per spec
+   171→   171→- Color discipline maintained: emerald/teal primary, purple/amber/rose accents only, zero indigo/blue. Accent colors per version card use oklch values in emerald/teal/purple/amber/rose/orange families
+   172→   172→- Ran `bun run lint` → clean (0 errors). `bunx tsc --noEmit` on the three new files → 0 errors (remaining tsc errors are for sibling modules outside this task's scope: resume-builder, resume-rewriter, portfolio, cover-letter, etc.)
+   173→   173→
+   174→   174→Stage Summary:
+   175→   175→- Files created (3):
+   176→   176→  - src/components/modules/resume-review.tsx — export ResumeReviewModule
+   177→   177→  - src/components/modules/jd-optimizer.tsx — export JdOptimizerModule
+   178→   178→  - src/components/modules/version-manager.tsx — export VersionManagerModule
+   179→   179→- Key decisions:
+   180→   180→  - Resume text serialization centralized in each module via React.useMemo over useResumeStore(s=>s.data) using the spec template string (not JSON.stringify) so the AI sees human-readable content
+   181→   181→  - Upload zone is visual-only: file is captured for the filename chip + toast, but the actual analysis always uses the store resume (spec explicitly notes "we can't actually parse PDF")
+   182→   182→  - Version cards use a local MiniRing (size 56, stroke 6, text-sm) instead of the shared ScoreRing because ScoreRing hardcodes text-2xl which overflows a 56px circle; keeps visual consistency with the shared ring style
+   183→   183→  - JdOptimizer "Rewrite Resume →" button uses useAppStore.setModule("resume-rewriter") for actual navigation (cleaner than toast-only), plus a toast for feedback — both behaviors were allowed by spec
+   184→   184→  - All toasts via sonner (already wired in layout.tsx via SonnerToaster)
+   185→   185→- All three modules ready to be imported by src/app/page.tsx (imports already wired there).
+   186→   186→
+   187→   187→---
+   188→   188→Task ID: 2-c
+   189→   189→Agent: general-purpose
+   190→   190→Task: Build Skill Gap + Learning Roadmap + AI Career Coach modules
+   191→   191→
+   192→   192→Work Log:
+   193→   193→- Read worklog.md, shared blocks (ModuleHeader/AIButton/ScoreRing/Pill/AIEmptyState/TypingDots), useAI hook, resume-store, dashboard.tsx reference, globals.css utilities, and the three target API routes (skill-gap, roadmap, coach) to lock down request/response shapes.
+   194→   194→- Created src/components/modules/skill-gap.tsx → SkillGapModule. Header (GitCompareArrows). Input card with Target Role (default "Staff Engineer"), comma-separated Current Skills (default seeded from resume store), Experience years (number). "Analyze Gap" AIButton → POST /api/ai/skill-gap. Results: top gradient card with ScoreRing (gapScore, label "Gap") + currentLevel →ArrowRight→ targetLevel transition; two-column grid of "Skills You Have" (emerald chips with CheckCircle2) and "Missing Skills" (cards with importance Pill — Critical=bad, High=warn, Medium=info — plus why text); "Strengths to Leverage" amber-tinted numbered list; "Quick Wins" emerald chips; "Long Term Bets" purple chips. AIEmptyState + shimmer SkeletonResults for loading. Reset button.
+   195→   195→- Created src/components/modules/roadmap.tsx → RoadmapModule. Header (Map icon — imported as MapIcon to avoid shadowing the global Map constructor used by ResourceGrid). Input card: Target Role + Missing Skills (default "Docker, GraphQL, AWS, System Design") + "Generate Roadmap" AIButton → POST /api/ai/roadmap. Results: title+overview gradient card; three phase cards (30=emerald, 60=amber, 90=purple) side-by-side on lg, each with colored gradient header, phase goal callout, and a vertical-timeline week list (dots + connector line) with focus + Checkbox task checklist (stateful, line-through on check); Resources card with resources grouped by skill, each resource showing a type-colored icon + name + type badge (Course=emerald, Book=amber, Docs=purple, Project=red, Video=teal); Milestones horizontal stepper with CircleCheck nodes; Certifications purple chips. Skeleton loading state. Reset button clears checklist + inputs.
+   196→   196→- Created src/components/modules/coach.tsx → CoachModule. Header (Bot). Full-height Card (h-[calc(100vh-13rem)] min-h-[28rem], border-primary/20) with flex-col layout: scrollable messages area (flex-1, overflow-y-auto, .scroll-thin, subtle primary-tinted gradient bg) rendering alternating bubbles — assistant bubbles left-aligned with Bot avatar + primary/10 ring-1 bg + rounded-tl-sm, user bubbles right-aligned with User avatar + primary bg + primary-foreground text + rounded-tr-sm. TypingDots inside an assistant bubble while loading. Auto-scrolls to bottom via bottomRef on messages/loading change. Input bar sticky at bottom: auto-grow Textarea (field-sizing-content, max-h-40, resize-none) + 11x11 icon Send button. Enter sends, Shift+Enter inserts newline (plain Enter preventDefault). Six starter prompt chips ("Why am I not getting calls?", "Review my resume", "Optimize my LinkedIn", "Negotiate my salary", "Write a resignation letter", "Interview questions for manager role") shown above input only while conversation is empty (just the welcome assistant turn); clicking sends immediately. Conversation state via useState<Message[]> seeded with a welcome assistant message. On send: append user msg, POST /api/ai/coach with full messages array + resumeContext (serialized from store using the exact spec snippet), append reply. Error banner inline. Clear button resets to welcome.
+   197→   197→- Ran `bun run lint` → clean (exit 0). Ran `bunx tsc --noEmit` → fixed two real bugs surfaced in roadmap.tsx: (1) lucide-react `Map` import shadowed the global `Map` constructor used in ResourceGrid's `new Map<string, Resource[]>()` (renamed import to `MapIcon` and updated both icon={Map} usages); (2) Pill from shared/blocks does not accept className — replaced the "items count" Pill with a plain styled span and dropped the now-unused Pill import. Re-verified: zero type errors in the three new files, lint still exit 0.
+   198→   198→
+   199→   199→Stage Summary:
+   200→   200→- Files created (exact paths + named exports, all imported by src/app/page.tsx):
+   201→   201→  - src/components/modules/skill-gap.tsx — `export function SkillGapModule()`
+   202→   202→  - src/components/modules/roadmap.tsx — `export function RoadmapModule()`
+   203→   203→  - src/components/modules/coach.tsx — `export function CoachModule()`
+   204→   204→- All three are client components ("use client"), TypeScript-strict, use the shared blocks (ModuleHeader/AIButton/ScoreRing/Pill/AIEmptyState/TypingDots) + useAI hook + cn() + resume store, and consume their respective /api/ai/* routes.
+   205→   205→- Color discipline: emerald/teal is primary throughout; purple + amber + red used only as accents (roadmap phases, long-term bets, resource type badges, alert banners). No indigo/blue primary.
+   206→   206→- Key decisions:
+   207→   207→  - Coach uses a local useState + manual fetch (not useAI) because chat requires cumulative history + a TypingDots loading bubble inside the message stream — useAI's single-shot data model doesn't fit.
+   208→   208→  - Roadmap's per-task Checkbox state lives in the module (Record<string, boolean>) so learners can check off tasks; reset clears it.
+   209→   209→  - Skill gap maps importance→Pill tone (Critical=bad/red, High=warn/amber, Medium=info/purple) and gapScore→ScoreRing color (handled by ScoreRing's internal thresholds).
+   210→   210→  - Coach layout pinned to `h-[calc(100vh-13rem)]` to fit under the h-16 topbar + page py-8 padding + module header, with min-h-[28rem] for small viewports.
+   211→   211→- Lint: `bun run lint` → exit 0 (clean across the repo). TypeScript: no errors in the three new files (pre-existing errors in page.tsx for not-yet-built sibling modules are out of scope for Task 2-c).
+   212→   212→
+   213→   213→---
+   214→   214→Task ID: 1-c
+   215→   215→Agent: general-purpose
+   216→   216→Task: Build LinkedIn + Naukri + Portfolio + Cover Letter modules
+   217→   217→
+   218→   218→Work Log:
+   219→   219→- Read worklog.md to understand the foundation (theme, stores, shared blocks API, existing API routes)
+   220→   220→- Inspected blocks.tsx, utils.ts (useAI hook), resume-store.ts, page.tsx, dashboard.tsx, and UI primitives (Card, Button, Tabs, Switch, Select, Progress, Tooltip, Badge) to lock in shared patterns
+   221→   221→- Inspected the three API routes (linkedin, naukri, cover-letter) to mirror their response shapes in TypeScript interfaces
+   222→   222→- Created src/components/modules/linkedin.tsx — LinkedinModule:
+   223→   223→  * "Generate Optimization" AIButton → POST /api/ai/linkedin using serialized store resume
+   224→   224→  * SEO score card with ScoreRing + numbered seoTips list
+   225→   225→  * LinkedIn-style profile preview card (py-0/gap-0 + banner gradient + -mt-12 overlap, initials avatar with border-card cutout, sky BadgeCheck, headline + about blocks with copy buttons)
+   226→   226→  * Experience bullets rendered per company with per-company copy
+   227→   227→  * 2x2 grid: Skills chips (top 3 highlighted), Featured list (amber stars), Recruiter Keywords (info Pills), Banner Idea (tinted dashed card)
+   228→   228→  * Reusable inline CopyButton component using navigator.clipboard + sonner toast
+   229→   229→  * AIEmptyState + TypingDots loading state + red error card
+   230→   230→- Created src/components/modules/naukri.tsx — NaukriModule:
+   231→   231→  * Header includes "Unique" purple badge + "Analyze Profile" AIButton → POST /api/ai/naukri
+   232→   232→  * Visibility forecast card: two ScoreRings (Now → Target) with ArrowRight + big "+N%" uplift badge, plus Progress bar showing before/after
+   233→   233→  * Section cards each with copy: Resume Headline, Career Profile, Profile Summary (full-width), Key Skills chips (top 5 highlighted)
+   234→   234→  * Employment entries (Naukri format) card with per-entry copy
+   235→   235→  * Issues (red-tinted cards with AlertTriangle) and Fixes (primary-tinted cards with CheckCircle) side-by-side
+   236→   236→- Created src/components/modules/portfolio.tsx — PortfolioModule:
+   237→   237→  * Pure static UI driven by useResumeStore (no AI calls)
+   238→   238→  * LEFT: mock browser window (3 dots + URL bar "deepaksharma.dev" + ExternalLink) wrapping a live portfolio preview that renders hero (initials avatar, title, name, summary, contact pills), About stats grid (6+ years / 10M+ users / 8 teams), Projects grid, optional Blog section, Skills chips, contact footer
+   239→   239→  * 3 theme variants via Tabs: Midnight (dark navy), Aurora (teal→purple→pink gradient), Minimal (light) — applied via inline styles on the preview container
+   240→   240→  * RIGHT controls: theme Tabs + theme swatch preview, 6 accent color swatches (Emerald/Teal/Amber/Purple/Rose/Fuchsia) with selected ring via boxShadow, Include projects Switch, Include blog Switch (visual only), Publish button that fires sonner success toast "Portfolio published to deepaksharma.careeros.app"
+   241→   241→  * Accent color flows through preview (avatar, buttons, badges, section numbers, project tech tags, contact border)
+   242→   242→- Created src/components/modules/cover-letter.tsx — CoverLetterModule:
+   243→   243→  * LEFT inputs card: large JD Textarea, tone Select (Confident/Warm/Concise/Story-driven/Formal), "Using: Deepak Sharma's resume" chip, Generate Letter AIButton (disabled when JD empty, toast.error if user tries)
+   244→   244→  * RIGHT output: AIEmptyState before generation, TypingDots loading, then a toolbar (word count + tone label · Copy / Download .txt via Blob+URL.createObjectURL / Regenerate) above a paper-styled Card (bg-white text-slate-900, font-serif, 15px, generous padding, max-w-2xl mx-auto) rendering the letter with whitespace-pre-wrap
+   245→   245→- Ran `bun run lint` — clean (no errors in any file)
+   246→   246→- Ran `bunx tsc --noEmit` — confirmed zero type errors in the four new files (pre-existing errors in other agents' WIP modules and example/skill folders remain)
+   247→   247→
+   248→   248→Stage Summary:
+   249→   249→- 4 module files created at the exact requested paths with the exact named exports imported by src/app/page.tsx:
+   250→   250→  * /home/z/my-project/src/components/modules/linkedin.tsx — export function LinkedinModule()
+   251→   251→  * /home/z/my-project/src/components/modules/naukri.tsx — export function NaukriModule()
+   252→   252→  * /home/z/my-project/src/components/modules/portfolio.tsx — export function PortfolioModule()
+   253→   253→  * /home/z/my-project/src/components/modules/cover-letter.tsx — export function CoverLetterModule()
+   254→   254→- All modules are "use client", use the shared blocks (ModuleHeader, AIButton, ScoreRing, Pill, AIEmptyState, TypingDots) + useAI hook + useResumeStore, and serialize the resume to text per the spec
+   255→   255→- Color rule respected: emerald/teal primary throughout; LinkedIn module uses a subtle sky/teal banner gradient + sky BadgeCheck for LinkedIn visual identity only; purple used as accent for Naukri "Unique" badge + recruiter-keyword Pills; amber for Featured; red/green for Naukri Issues/Fixes; Portfolio accent picker deliberately excludes indigo/blue (uses Emerald/Teal/Amber/Purple/Rose/Fuchsia)
+   256→   256→- Premium SaaS quality: Card grids, badges, consistent p-4/p-6 + gap-4/gap-6 spacing, copy-to-clipboard on every generated text block, sonner toasts for feedback, loading + empty + error states handled in all three AI-driven modules
+   257→   257→- Next actions for orchestrator: wire remaining module components referenced in page.tsx (resume-builder, resume-review, jd-optimizer, resume-rewriter, version-manager, interview, salary, job-tracker, job-search, skill-gap, roadmap, coach, admin) — these currently cause tsc errors because they don't exist yet
+   258→   258→
+   259→   259→---
+   260→   260→Task ID: 1-a
+   261→   261→Agent: general-purpose
+   262→   262→Task: Build Resume Builder + Resume Rewriter modules
+   263→   263→
+   264→   264→Work Log:
+   265→   265→- Read worklog.md, blocks.tsx, utils.ts, resume-store.ts, rewrite/rewriter API routes, dashboard.tsx, page.tsx, and shadcn UI primitives (card, button, input, textarea, select, tabs, checkbox, tooltip, badge, scroll-area, separator) to ground the build in existing conventions
+   266→   266→- Created src/components/modules/resume-builder.tsx — export ResumeBuilderModule. Two-column layout (60/40): live editable white document preview on the left with inline borderless inputs for name/title/contact/summary/experience-roles-and-dates, hover-revealed AI toolbar on every bullet (Improve / Shorten / Expand / Rewrite with per-bullet loading state via loadingMap keyed by `${expId}:${idx}`), summary Textarea with its own 3-button AI toolbar, skills as removable chips with inline add, projects/education/certifications/languages rendered. Right sidebar (sticky) has: 8-template visual selector (Modern/ATS/Executive/Minimal/Google/Microsoft/Startup/Creative — each paints a top accent bar + colored section headers + colored bullet dots on the document), 12-section visibility toggle list with drag-grip icons, and an "AI Boost" card with "Improve All Bullets" that iterates sequentially through every bullet with a live progress bar. "Expand" handles multi-bullet responses by splitting on newlines and splicing into the bullets array. Header has Reset (uses store.reset) and Download PDF (toast). All AI calls go through /api/ai/rewrite. Toasts via sonner.
+   267→   267→- Created src/components/modules/resume-rewriter.tsx — export ResumeRewriterModule. Horizontal stepper with 5 seniority levels (Entry → Senior → Lead → Architect → Manager) as cards with icons (GraduationCap/Code2/Users/Boxes/Crown), ChevronRight connectors between them on sm+, active card highlighted with primary bg + check badge. Options row: target company Input with Building2 icon, tone Select (Confident/Concise/Story-driven/Technical/Executive), and an AIButton "Rewrite Resume" that calls /api/ai/rewriter with a memoized plain-text resume built from store data. Results area: AIEmptyState when idle, pulsing-Sparkles loading card while in flight, then a 3-card grid — (1) New Headline card with newTitle in primary color + newSummary in a Quote-marked tinted block, (2) Rewritten Experience card listing each role with arrow indicator + bullet list, (3) Suggested Skills card with primary-tinted badges. Below those, a 2-card row: Suggested Skills chips + an amber-tinted Rationale card with numbered points. Action bar at top of results has Regenerate (re-runs last params) and "Save as new version" (toast: "Saved to Version Manager"). Uses useAI<RewriterResult>() hook. Defensive `?? []` fallbacks on all AI array fields.
+   268→   268→- Fixed a TS error: icon prop type signature `React.ComponentType<{ className?: string }>` was too narrow for EditableContact which passes `style={{ color: accent }}`. Added shared `IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>` and applied to EditableContact, AIIconButton, and SectionDef.
+   269→   269→- Ran `bun run lint` — clean (no errors in my files).
+   270→   270→- Ran `bunx tsc --noEmit` — only pre-existing errors in examples/websocket and skills/ folders remain; my two module files compile cleanly.
+   271→   271→
+   272→   272→Stage Summary:
+   273→   273→- Files created:
+   274→   274→  - /home/z/my-project/src/components/modules/resume-builder.tsx — ResumeBuilderModule (export function)
+   275→   275→  - /home/z/my-project/src/components/modules/resume-rewriter.tsx — ResumeRewriterModule (export function)
+   276→   276→- Key decisions:
+   277→   277→  - Used zustand store directly (setData/updateSummary/updateBullet) for all document edits so changes persist across module switches; added local helpers `update`, `updateExperience`, `replaceBullet` (handles expand→multi-bullet splice), `addBullet`, `removeBullet`, `addSkill`, `removeSkill`.
+   278→   278→  - Per-bullet loading tracked via `Record<string, RewriteAction>` keyed `${expId}:${idx}` so only the active icon button shows a spinner and other actions disable.
+   279→   279→  - Document preview is force-white (`bg-white text-slate-800`) so it stays a realistic resume look in both light and dark modes.
+   280→   280→  - Template accent applied via inline styles (top border, section header color, bullet dots, skill chip background) — avoids needing 8 separate Tailwind palettes.
+   281→   281→  - Rewriter uses useAI hook as specified; built a memoized plain-text resume serializer matching the spec.
+   282→   282→  - Color rule respected: primary emerald/teal everywhere, amber/purple/rose used only as accents (template swatches, rationale card).
+   283→   283→- Both modules imported by src/app/page.tsx via the existing MODULE_COMPONENTS map; no edits to page.tsx were needed.
+   284→   284→
+   285→   285→---
+   286→   286→Task ID: 4
+   287→   287→Agent: orchestrator
+   288→   288→Task: End-to-end verification + sticky footer fix
+   289→   289→
+   290→   290→Work Log:
+   291→   291→- Fixed page.tsx shell: wrapped content in `flex min-h-screen flex-col`, main is `flex-1` so footer (mt-auto) truly sticks to viewport bottom on short pages and pushes down naturally on long pages.
+   292→   292→- Started dev server (next dev -p 3000), compiled / in ~7s, HTTP 200 (94KB HTML).
+   293→   293→- Agent Browser verification:
+   294→   294→  - Dashboard renders: hero greeting, 6 stat cards, growth area chart, interview radial chart, activity feed, AI coach prompt widget, quick-access grid. No console errors.
+   295→   295→  - Navigation: all 18 modules (17 + Admin) accessible via grouped sidebar; active state highlights correctly.
+   296→   296→  - AI Career Coach (real LLM via z-ai-web-dev-sdk): sent "Why am I not getting calls?" → received detailed resume-aware response referencing Razorpay/Swiggy, Next.js migration, 10M+ users. POST /api/ai/coach 200.
+   297→   297→  - Resume Builder AI rewrite: clicked "Improve bullet" on "Developed React app." → AI returned "Architected and developed a React application with TypeScript, implementing responsive UI components that improved user engagement by 35% and reduced page load time by 40%." POST /api/ai/rewrite 200.
+   298→   298→  - Job Search AI: ran search "Senior React Engineer" Bengaluru → 8 job results returned across LinkedIn/Naukri/Indeed/Wellfound/Glassdoor with Apply/Save buttons. POST /api/ai/job-search 200.
+   299→   299→  - Job Tracker: Kanban renders all 6 columns (Wishlist/Applied/Interview/HR/Offer/Rejected) with seeded cards.
+   300→   300→  - Admin Panel: 4 stat cards + tabbed interface (Overview/Users/Subscriptions/Templates/LLMs/...) + recharts charts render.
+   301→   301→  - Sticky footer: on short page (Skill Gap empty state), footer bottom = viewport height (844px) — sticks correctly.
+   302→   302→  - Mobile (390x844): sidebar hidden, hamburger menu opens overlay sidebar with dark backdrop, no horizontal overflow, footer at bottom.
+   303→   303→- VLM screenshot review confirmed dashboard visual quality (dark teal theme, structured layout).
+   304→   304→- Lint: `bun run lint` → 0 errors across entire project.
+   305→   305→- tsc: 0 errors in app code (only pre-existing errors in examples/ and skills/ folders).
+   306→   306→
+   307→   307→Stage Summary:
+   308→   308→- AI CareerOS fully functional end-to-end. 18 modules + admin, 13 AI API routes, 3 critical AI flows browser-verified (coach chat, resume rewrite, job search). Responsive + sticky footer confirmed. Ready for preview.
+   309→   309→

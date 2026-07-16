@@ -1,0 +1,1571 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useTheme } from "next-themes";
+     5→import Editor from "@monaco-editor/react";
+     6→import {
+     7→  Code2,
+     8→  Play,
+     9→  RotateCcw,
+    10→  Lightbulb,
+    11→  Check,
+    12→  CheckCircle2,
+    13→  Search,
+    14→  X,
+    15→  Trophy,
+    16→  AlertCircle,
+    17→  Clock,
+    18→  Database,
+    19→  Zap,
+    20→  Sparkles,
+    21→  ListTree,
+    22→  FileCode2,
+    23→  Terminal,
+    24→  ChevronRight,
+    25→} from "lucide-react";
+    26→import { toast } from "sonner";
+    27→import {
+    28→  Card,
+    29→  CardContent,
+    30→  CardHeader,
+    31→  CardTitle,
+    32→  CardDescription,
+    33→} from "@/components/ui/card";
+    34→import { Button } from "@/components/ui/button";
+    35→import { Badge } from "@/components/ui/badge";
+    36→import { Input } from "@/components/ui/input";
+    37→import { Progress } from "@/components/ui/progress";
+    38→import { ScrollArea } from "@/components/ui/scroll-area";
+    39→import {
+    40→  Select,
+    41→  SelectContent,
+    42→  SelectItem,
+    43→  SelectTrigger,
+    44→  SelectValue,
+    45→} from "@/components/ui/select";
+    46→import {
+    47→  AIButton,
+    48→  AIEmptyState,
+    49→  ModuleHeader,
+    50→  Pill,
+    51→  ScoreRing,
+    52→  TypingDots,
+    53→} from "@/components/shared/blocks";
+    54→import { useMounted } from "@/components/shared/utils";
+    55→import { cn } from "@/lib/utils";
+    56→
+    57→// ---------- Types ----------
+    58→type Difficulty = "Easy" | "Medium" | "Hard";
+    59→type Language = "JavaScript" | "TypeScript" | "Python" | "Java";
+    60→
+    61→interface TestCase {
+    62→  args: unknown[];
+    63→  expected: unknown;
+    64→  /** Compare arrays order-insensitively (outer level). */
+    65→  unordered?: boolean;
+    66→}
+    67→
+    68→interface Problem {
+    69→  id: string;
+    70→  title: string;
+    71→  difficulty: Difficulty;
+    72→  language: Language;
+    73→  topics: string[];
+    74→  description: string;
+    75→  example: string;
+    76→  starterCode: string;
+    77→  solution: string;
+    78→  /** Present only for JavaScript problems that support live execution. */
+    79→  fnName?: string;
+    80→  tests?: TestCase[];
+    81→}
+    82→
+    83→interface CodeReview {
+    84→  correctness: "Correct" | "Mostly Correct" | "Has Bugs" | "Incorrect";
+    85→  score: number;
+    86→  complexity: { time: string; space: string };
+    87→  strengths: string[];
+    88→  issues: string[];
+    89→  suggestions: string[];
+    90→  betterApproach: string;
+    91→}
+    92→
+    93→type OutputMode = "idle" | "running" | "review" | "solution";
+    94→
+    95→interface RunResult {
+    96→  passed: number;
+    97→  total: number;
+    98→  cases: {
+    99→    label: string;
+   100→    passed: boolean;
+   101→    actual: string;
+   102→    expected: string;
+   103→    error?: string;
+   104→  }[];
+   105→}
+   106→
+   107→// ---------- Constants ----------
+   108→const MONACO_LANG: Record<Language, string> = {
+   109→  JavaScript: "javascript",
+   110→  TypeScript: "typescript",
+   111→  Python: "python",
+   112→  Java: "java",
+   113→};
+   114→
+   115→const DIFFICULTY_TONE: Record<Difficulty, "good" | "warn" | "bad"> = {
+   116→  Easy: "good",
+   117→  Medium: "warn",
+   118→  Hard: "bad",
+   119→};
+   120→
+   121→const LANGUAGE_COLOR: Record<Language, string> = {
+   122→  JavaScript: "oklch(0.75 0.16 70)",
+   123→  TypeScript: "oklch(0.6 0.18 250)",
+   124→  Python: "oklch(0.62 0.15 162)",
+   125→  Java: "oklch(0.6 0.18 25)",
+   126→};
+   127→
+   128→// ---------- Problems (15) ----------
+   129→const PROBLEMS: Problem[] = [
+   130→  {
+   131→    id: "two-sum",
+   132→    title: "Two Sum",
+   133→    difficulty: "Easy",
+   134→    language: "JavaScript",
+   135→    topics: ["Array", "Hash Table"],
+   136→    description:
+   137→      "Given an array of integers `nums` and an integer `target`, return the indices of the two numbers such that they add up to `target`. You may assume each input has exactly one solution, and you may not use the same element twice.",
+   138→    example: "Input: nums = [2,7,11,15], target = 9 → Output: [0,1]",
+   139→    starterCode: `function twoSum(nums, target) {
+   140→  // your code here
+   141→  return [];
+   142→}
+   143→`,
+   144→    solution: `function twoSum(nums, target) {
+   145→  const map = new Map();
+   146→  for (let i = 0; i < nums.length; i++) {
+   147→    const diff = target - nums[i];
+   148→    if (map.has(diff)) return [map.get(diff), i];
+   149→    map.set(nums[i], i);
+   150→  }
+   151→  return [];
+   152→}`,
+   153→    fnName: "twoSum",
+   154→    tests: [
+   155→      { args: [[2, 7, 11, 15], 9], expected: [0, 1] },
+   156→      { args: [[3, 2, 4], 6], expected: [1, 2] },
+   157→      { args: [[3, 3], 6], expected: [0, 1] },
+   158→    ],
+   159→  },
+   160→  {
+   161→    id: "valid-parentheses",
+   162→    title: "Valid Parentheses",
+   163→    difficulty: "Easy",
+   164→    language: "JavaScript",
+   165→    topics: ["String", "Stack"],
+   166→    description:
+   167→      "Given a string `s` containing just the characters `(`, `)`, `{`, `}`, `[` and `]`, determine if the input string is valid. A string is valid if open brackets are closed by the same type, in the correct order.",
+   168→    example: 'Input: s = "()[]{}" → Output: true',
+   169→    starterCode: `function isValid(s) {
+   170→  // your code here
+   171→  return false;
+   172→}
+   173→`,
+   174→    solution: `function isValid(s) {
+   175→  const map = { ")": "(", "]": "[", "}": "{" };
+   176→  const stack = [];
+   177→  for (const c of s) {
+   178→    if (c === "(" || c === "[" || c === "{") stack.push(c);
+   179→    else if (stack.pop() !== map[c]) return false;
+   180→  }
+   181→  return stack.length === 0;
+   182→}`,
+   183→    fnName: "isValid",
+   184→    tests: [
+   185→      { args: ["()"], expected: true },
+   186→      { args: ["()[]{}"], expected: true },
+   187→      { args: ["(]"], expected: false },
+   188→      { args: ["([)]"], expected: false },
+   189→      { args: ["{[]}"], expected: true },
+   190→    ],
+   191→  },
+   192→  {
+   193→    id: "palindrome-number",
+   194→    title: "Palindrome Number",
+   195→    difficulty: "Easy",
+   196→    language: "Python",
+   197→    topics: ["Math"],
+   198→    description:
+   199→      "Given an integer `x`, return `true` if `x` is a palindrome integer. An integer is a palindrome when it reads the same backward as forward. For a follow-up challenge, solve it without converting the integer to a string.",
+   200→    example: "Input: x = 121 → Output: true",
+   201→    starterCode: `class Solution:
+   202→    def isPalindrome(self, x: int) -> bool:
+   203→        # your code here
+   204→        return False
+   205→`,
+   206→    solution: `class Solution:
+   207→    def isPalindrome(self, x: int) -> bool:
+   208→        if x < 0:
+   209→            return False
+   210→        s = str(x)
+   211→        return s == s[::-1]`,
+   212→  },
+   213→  {
+   214→    id: "reverse-linked-list",
+   215→    title: "Reverse Linked List",
+   216→    difficulty: "Easy",
+   217→    language: "Java",
+   218→    topics: ["Linked List", "Recursion"],
+   219→    description:
+   220→      "Given the `head` of a singly linked list, reverse the list and return the new head. Try solving both iteratively and recursively.",
+   221→    example: "Input: head = [1,2,3,4,5] → Output: [5,4,3,2,1]",
+   222→    starterCode: `/**
+   223→ * Definition for singly-linked list.
+   224→ * public class ListNode {
+   225→ *     int val;
+   226→ *     ListNode next;
+   227→ *     ListNode() {}
+   228→ *     ListNode(int val) { this.val = val; }
+   229→ *     ListNode(int val, ListNode next) { this.val = val; this.next = next; }
+   230→ * }
+   231→ */
+   232→class Solution {
+   233→    public ListNode reverseList(ListNode head) {
+   234→        // your code here
+   235→        return null;
+   236→    }
+   237→}
+   238→`,
+   239→    solution: `class Solution {
+   240→    public ListNode reverseList(ListNode head) {
+   241→        ListNode prev = null;
+   242→        while (head != null) {
+   243→            ListNode next = head.next;
+   244→            head.next = prev;
+   245→            prev = head;
+   246→            head = next;
+   247→        }
+   248→        return prev;
+   249→    }
+   250→}`,
+   251→  },
+   252→  {
+   253→    id: "merge-two-sorted-lists",
+   254→    title: "Merge Two Sorted Lists",
+   255→    difficulty: "Easy",
+   256→    language: "TypeScript",
+   257→    topics: ["Linked List", "Recursion"],
+   258→    description:
+   259→      "Merge two sorted linked lists `list1` and `list2` into one sorted list by splicing together the nodes of the first two lists. Return the head of the merged linked list.",
+   260→    example: "Input: list1 = [1,2,4], list2 = [1,3,4] → Output: [1,1,2,3,4,4]",
+   261→    starterCode: `/**
+   262→ * Definition for singly-linked list.
+   263→ * class ListNode {
+   264→ *   val: number
+   265→ *   next: ListNode | null
+   266→ * }
+   267→ */
+   268→function mergeTwoLists(
+   269→  list1: ListNode | null,
+   270→  list2: ListNode | null
+   271→): ListNode | null {
+   272→  // your code here
+   273→  return null;
+   274→}
+   275→`,
+   276→    solution: `function mergeTwoLists(
+   277→  list1: ListNode | null,
+   278→  list2: ListNode | null
+   279→): ListNode | null {
+   280→  const dummy = new ListNode();
+   281→  let tail = dummy;
+   282→  while (list1 && list2) {
+   283→    if (list1.val < list2.val) {
+   284→      tail.next = list1;
+   285→      list1 = list1.next;
+   286→    } else {
+   287→      tail.next = list2;
+   288→      list2 = list2.next;
+   289→    }
+   290→    tail = tail.next;
+   291→  }
+   292→  tail.next = list1 ?? list2;
+   293→  return dummy.next;
+   294→}`,
+   295→  },
+   296→  {
+   297→    id: "longest-substring",
+   298→    title: "Longest Substring Without Repeating Characters",
+   299→    difficulty: "Medium",
+   300→    language: "JavaScript",
+   301→    topics: ["Hash Table", "Sliding Window", "String"],
+   302→    description:
+   303→      "Given a string `s`, find the length of the longest substring without repeating characters. A sliding window with a hash map of last-seen indices solves this in O(n) time.",
+   304→    example: 'Input: s = "abcabcbb" → Output: 3',
+   305→    starterCode: `function lengthOfLongestSubstring(s) {
+   306→  // your code here
+   307→  return 0;
+   308→}
+   309→`,
+   310→    solution: `function lengthOfLongestSubstring(s) {
+   311→  const seen = new Map();
+   312→  let left = 0;
+   313→  let max = 0;
+   314→  for (let right = 0; right < s.length; right++) {
+   315→    const c = s[right];
+   316→    if (seen.has(c) && seen.get(c) >= left) left = seen.get(c) + 1;
+   317→    seen.set(c, right);
+   318→    max = Math.max(max, right - left + 1);
+   319→  }
+   320→  return max;
+   321→}`,
+   322→    fnName: "lengthOfLongestSubstring",
+   323→    tests: [
+   324→      { args: ["abcabcbb"], expected: 3 },
+   325→      { args: ["bbbbb"], expected: 1 },
+   326→      { args: ["pwwkew"], expected: 3 },
+   327→      { args: [""], expected: 0 },
+   328→      { args: [" "], expected: 1 },
+   329→    ],
+   330→  },
+   331→  {
+   332→    id: "container-with-most-water",
+   333→    title: "Container With Most Water",
+   334→    difficulty: "Medium",
+   335→    language: "Python",
+   336→    topics: ["Array", "Two Pointers", "Greedy"],
+   337→    description:
+   338→      "Given an integer array `height` of length `n`, find two lines that together with the x-axis form a container that holds the most water. Return the maximum amount of water a container can store.",
+   339→    example: "Input: height = [1,8,6,2,5,4,8,3,7] → Output: 49",
+   340→    starterCode: `class Solution:
+   341→    def maxArea(self, height: list[int]) -> int:
+   342→        # your code here
+   343→        return 0
+   344→`,
+   345→    solution: `class Solution:
+   346→    def maxArea(self, height: list[int]) -> int:
+   347→        left, right = 0, len(height) - 1
+   348→        best = 0
+   349→        while left < right:
+   350→            best = max(best, min(height[left], height[right]) * (right - left))
+   351→            if height[left] < height[right]:
+   352→                left += 1
+   353→            else:
+   354→                right -= 1
+   355→        return best`,
+   356→  },
+   357→  {
+   358→    id: "group-anagrams",
+   359→    title: "Group Anagrams",
+   360→    difficulty: "Medium",
+   361→    language: "TypeScript",
+   362→    topics: ["Array", "Hash Table", "String", "Sorting"],
+   363→    description:
+   364→      "Given an array of strings `strs`, group the anagrams together. Return the groups in any order. An anagram is a word formed by rearranging the letters of another word.",
+   365→    example:
+   366→      'Input: strs = ["eat","tea","tan","ate","nat","bat"] → Output: [["bat"],["nat","tan"],["ate","eat","tea"]]',
+   367→    starterCode: `function groupAnagrams(strs: string[]): string[][] {
+   368→  // your code here
+   369→  return [];
+   370→}
+   371→`,
+   372→    solution: `function groupAnagrams(strs: string[]): string[][] {
+   373→  const map = new Map<string, string[]>();
+   374→  for (const s of strs) {
+   375→    const key = s.split("").sort().join("");
+   376→    if (!map.has(key)) map.set(key, []);
+   377→    map.get(key)!.push(s);
+   378→  }
+   379→  return Array.from(map.values());
+   380→}`,
+   381→  },
+   382→  {
+   383→    id: "3sum",
+   384→    title: "3Sum",
+   385→    difficulty: "Medium",
+   386→    language: "JavaScript",
+   387→    topics: ["Array", "Two Pointers", "Sorting"],
+   388→    description:
+   389→      "Given an integer array `nums`, return all unique triplets `[nums[i], nums[j], nums[k]]` such that `i != j != k` and `nums[i] + nums[j] + nums[k] == 0`. The solution set must not contain duplicate triplets.",
+   390→    example: "Input: nums = [-1,0,1,2,-1,-4] → Output: [[-1,-1,2],[-1,0,1]]",
+   391→    starterCode: `function threeSum(nums) {
+   392→  // your code here
+   393→  return [];
+   394→}
+   395→`,
+   396→    solution: `function threeSum(nums) {
+   397→  nums.sort((a, b) => a - b);
+   398→  const res = [];
+   399→  for (let i = 0; i < nums.length - 2; i++) {
+   400→    if (i > 0 && nums[i] === nums[i - 1]) continue;
+   401→    let left = i + 1;
+   402→    let right = nums.length - 1;
+   403→    while (left < right) {
+   404→      const sum = nums[i] + nums[left] + nums[right];
+   405→      if (sum === 0) {
+   406→        res.push([nums[i], nums[left], nums[right]]);
+   407→        while (nums[left] === nums[left + 1]) left++;
+   408→        while (nums[right] === nums[right - 1]) right--;
+   409→        left++;
+   410→        right--;
+   411→      } else if (sum < 0) left++;
+   412→      else right--;
+   413→    }
+   414→  }
+   415→  return res;
+   416→}`,
+   417→    fnName: "threeSum",
+   418→    tests: [
+   419→      {
+   420→        args: [[-1, 0, 1, 2, -1, -4]],
+   421→        expected: [
+   422→          [-1, -1, 2],
+   423→          [-1, 0, 1],
+   424→        ],
+   425→        unordered: true,
+   426→      },
+   427→      { args: [[0, 1, 1]], expected: [], unordered: true },
+   428→      { args: [[0, 0, 0]], expected: [[0, 0, 0]], unordered: true },
+   429→    ],
+   430→  },
+   431→  {
+   432→    id: "binary-tree-level-order",
+   433→    title: "Binary Tree Level Order Traversal",
+   434→    difficulty: "Medium",
+   435→    language: "Java",
+   436→    topics: ["Tree", "BFS", "Binary Tree"],
+   437→    description:
+   438→      "Given the `root` of a binary tree, return the level order traversal of its nodes' values (i.e., from left to right, level by level).",
+   439→    example:
+   440→      "Input: root = [3,9,20,null,null,15,7] → Output: [[3],[9,20],[15,7]]",
+   441→    starterCode: `/**
+   442→ * Definition for a binary tree node.
+   443→ * public class TreeNode {
+   444→ *     int val;
+   445→ *     TreeNode left;
+   446→ *     TreeNode right;
+   447→ *     TreeNode() {}
+   448→ *     TreeNode(int val) { this.val = val; }
+   449→ * }
+   450→ */
+   451→class Solution {
+   452→    public List<List<Integer>> levelOrder(TreeNode root) {
+   453→        // your code here
+   454→        return new ArrayList<>();
+   455→    }
+   456→}
+   457→`,
+   458→    solution: `class Solution {
+   459→    public List<List<Integer>> levelOrder(TreeNode root) {
+   460→        List<List<Integer>> res = new ArrayList<>();
+   461→        if (root == null) return res;
+   462→        Queue<TreeNode> q = new ArrayDeque<>();
+   463→        q.offer(root);
+   464→        while (!q.isEmpty()) {
+   465→            int size = q.size();
+   466→            List<Integer> level = new ArrayList<>();
+   467→            for (int i = 0; i < size; i++) {
+   468→                TreeNode node = q.poll();
+   469→                level.add(node.val);
+   470→                if (node.left != null) q.offer(node.left);
+   471→                if (node.right != null) q.offer(node.right);
+   472→            }
+   473→            res.add(level);
+   474→        }
+   475→        return res;
+   476→    }
+   477→}`,
+   478→  },
+   479→  {
+   480→    id: "word-break",
+   481→    title: "Word Break",
+   482→    difficulty: "Medium",
+   483→    language: "Python",
+   484→    topics: ["Dynamic Programming", "Trie"],
+   485→    description:
+   486→      "Given a string `s` and a dictionary of strings `wordDict`, return `true` if `s` can be segmented into a space-separated sequence of one or more dictionary words. The same word may be reused multiple times.",
+   487→    example:
+   488→      'Input: s = "leetcode", wordDict = ["leet","code"] → Output: true',
+   489→    starterCode: `class Solution:
+   490→    def wordBreak(self, s: str, wordDict: list[str]) -> bool:
+   491→        # your code here
+   492→        return False
+   493→`,
+   494→    solution: `class Solution:
+   495→    def wordBreak(self, s: str, wordDict: list[str]) -> bool:
+   496→        words = set(wordDict)
+   497→        dp = [False] * (len(s) + 1)
+   498→        dp[0] = True
+   499→        for i in range(1, len(s) + 1):
+   500→            for j in range(i):
+   501→                if dp[j] and s[j:i] in words:
+   502→                    dp[i] = True
+   503→                    break
+   504→        return dp[len(s)]`,
+   505→  },
+   506→  {
+   507→    id: "lru-cache",
+   508→    title: "LRU Cache",
+   509→    difficulty: "Hard",
+   510→    language: "TypeScript",
+   511→    topics: ["Hash Table", "Linked List", "Design", "Doubly-Linked List"],
+   512→    description:
+   513→      "Design a data structure that follows the constraints of a Least Recently Used (LRU) cache. Implement `LRUCache(capacity)`, `get(key)` which returns the value (or -1 if not found), and `put(key, value)` which evicts the LRU key when capacity is exceeded. Both operations must run in O(1) average time.",
+   514→    example:
+   515→      "LRUCache lru = new LRUCache(2); lru.put(1,1); lru.put(2,2); lru.get(1); lru.put(3,3); // evicts key 2",
+   516→    starterCode: `class LRUCache {
+   517→  constructor(capacity: number) {
+   518→    // your code here
+   519→  }
+   520→
+   521→  get(key: number): number {
+   522→    // your code here
+   523→    return -1;
+   524→  }
+   525→
+   526→  put(key: number, value: number): void {
+   527→    // your code here
+   528→  }
+   529→}
+   530→`,
+   531→    solution: `class LRUCache {
+   532→  private capacity: number;
+   533→  private map: Map<number, number>;
+   534→
+   535→  constructor(capacity: number) {
+   536→    this.capacity = capacity;
+   537→    this.map = new Map();
+   538→  }
+   539→
+   540→  get(key: number): number {
+   541→    if (!this.map.has(key)) return -1;
+   542→    const value = this.map.get(key)!;
+   543→    this.map.delete(key);
+   544→    this.map.set(key, value);
+   545→    return value;
+   546→  }
+   547→
+   548→  put(key: number, value: number): void {
+   549→    if (this.map.has(key)) this.map.delete(key);
+   550→    this.map.set(key, value);
+   551→    if (this.map.size > this.capacity) {
+   552→      const oldest = this.map.keys().next().value as number;
+   553→      this.map.delete(oldest);
+   554→    }
+   555→  }
+   556→}`,
+   557→  },
+   558→  {
+   559→    id: "median-two-sorted-arrays",
+   560→    title: "Median of Two Sorted Arrays",
+   561→    difficulty: "Hard",
+   562→    language: "JavaScript",
+   563→    topics: ["Array", "Binary Search", "Divide and Conquer"],
+   564→    description:
+   565→      "Given two sorted arrays `nums1` and `nums2` of size `m` and `n`, return the median of the two sorted arrays. The overall run time complexity should be O(log (m+n)).",
+   566→    example: "Input: nums1 = [1,3], nums2 = [2] → Output: 2.0",
+   567→    starterCode: `function findMedianSortedArrays(nums1, nums2) {
+   568→  // your code here
+   569→  return 0;
+   570→}
+   571→`,
+   572→    solution: `function findMedianSortedArrays(nums1, nums2) {
+   573→  const merged = [...nums1, ...nums2].sort((a, b) => a - b);
+   574→  const n = merged.length;
+   575→  if (n % 2 === 1) return merged[Math.floor(n / 2)];
+   576→  return (merged[n / 2 - 1] + merged[n / 2]) / 2;
+   577→}`,
+   578→    fnName: "findMedianSortedArrays",
+   579→    tests: [
+   580→      { args: [[1, 3], [2]], expected: 2.0 },
+   581→      { args: [[1, 2], [3, 4]], expected: 2.5 },
+   582→    ],
+   583→  },
+   584→  {
+   585→    id: "regex-matching",
+   586→    title: "Regular Expression Matching",
+   587→    difficulty: "Hard",
+   588→    language: "Python",
+   589→    topics: ["Dynamic Programming", "Recursion", "String"],
+   590→    description:
+   591→      "Given an input string `s` and a pattern `p`, implement regular expression matching with support for `.` (matches any single character) and `*` (matches zero or more of the preceding element). The matching should cover the entire input string (not partial).",
+   592→    example: 'Input: s = "aab", p = "c*a*b" → Output: true',
+   593→    starterCode: `class Solution:
+   594→    def isMatch(self, s: str, p: str) -> bool:
+   595→        # your code here
+   596→        return False
+   597→`,
+   598→    solution: `class Solution:
+   599→    def isMatch(self, s: str, p: str) -> bool:
+   600→        m, n = len(s), len(p)
+   601→        dp = [[False] * (n + 1) for _ in range(m + 1)]
+   602→        dp[0][0] = True
+   603→        for j in range(2, n + 1):
+   604→            if p[j - 1] == "*":
+   605→                dp[0][j] = dp[0][j - 2]
+   606→        for i in range(1, m + 1):
+   607→            for j in range(1, n + 1):
+   608→                if p[j - 1] == "*":
+   609→                    dp[i][j] = dp[i][j - 2]
+   610→                    if p[j - 2] == s[i - 1] or p[j - 2] == ".":
+   611→                        dp[i][j] = dp[i][j] or dp[i - 1][j]
+   612→                elif p[j - 1] == s[i - 1] or p[j - 1] == ".":
+   613→                    dp[i][j] = dp[i - 1][j - 1]
+   614→        return dp[m][n]`,
+   615→  },
+   616→  {
+   617→    id: "design-twitter",
+   618→    title: "Design Twitter",
+   619→    difficulty: "Hard",
+   620→    language: "Java",
+   621→    topics: ["Hash Table", "Linked List", "Design", "Heap (Priority Queue)"],
+   622→    description:
+   623→      "Design a simplified version of Twitter where users can post tweets, follow/unfollow other users, and retrieve a news feed of the 10 most recent tweets in the user's news feed. Each tweet has a monotonically increasing timestamp.",
+   624→    example: "twitter.postTweet(1,5); twitter.getNewsFeed(1); // returns [5]",
+   625→    starterCode: `class Twitter {
+   626→    public Twitter() {
+   627→        // your code here
+   628→    }
+   629→
+   630→    public void postTweet(int userId, int tweetId) {
+   631→        // your code here
+   632→    }
+   633→
+   634→    public List<Integer> getNewsFeed(int userId) {
+   635→        // your code here
+   636→        return new ArrayList<>();
+   637→    }
+   638→
+   639→    public void follow(int followerId, int followeeId) {
+   640→        // your code here
+   641→    }
+   642→
+   643→    public void unfollow(int followerId, int followeeId) {
+   644→        // your code here
+   645→    }
+   646→}
+   647→`,
+   648→    solution: `class Twitter {
+   649→    private int timestamp = 0;
+   650→    private Map<Integer, Set<Integer>> following = new HashMap<>();
+   651→    private Map<Integer, List<int[]>> tweets = new HashMap<>();
+   652→
+   653→    public Twitter() {}
+   654→
+   655→    public void postTweet(int userId, int tweetId) {
+   656→        tweets.computeIfAbsent(userId, k -> new ArrayList<>())
+   657→              .add(new int[]{timestamp++, tweetId});
+   658→    }
+   659→
+   660→    public List<Integer> getNewsFeed(int userId) {
+   661→        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> b[0] - a[0]);
+   662→        Set<Integer> users = new HashSet<>(following.getOrDefault(userId, new HashSet<>()));
+   663→        users.add(userId);
+   664→        for (int u : users) {
+   665→            List<int[]> t = tweets.get(u);
+   666→            if (t != null && !t.isEmpty()) {
+   667→                int[] last = t.get(t.size() - 1);
+   668→                pq.offer(new int[]{last[0], last[1], u, t.size() - 1});
+   669→            }
+   670→        }
+   671→        List<Integer> res = new ArrayList<>();
+   672→        while (!pq.isEmpty() && res.size() < 10) {
+   673→            int[] top = pq.poll();
+   674→            res.add(top[1]);
+   675→            int idx = top[3] - 1;
+   676→            if (idx >= 0) {
+   677→                int[] prev = tweets.get(top[2]).get(idx);
+   678→                pq.offer(new int[]{prev[0], prev[1], top[2], idx});
+   679→            }
+   680→        }
+   681→        return res;
+   682→    }
+   683→
+   684→    public void follow(int followerId, int followeeId) {
+   685→        following.computeIfAbsent(followerId, k -> new HashSet<>()).add(followeeId);
+   686→    }
+   687→
+   688→    public void unfollow(int followerId, int followeeId) {
+   689→        following.getOrDefault(followerId, new HashSet<>()).remove(followeeId);
+   690→    }
+   691→}`,
+   692→  },
+   693→];
+   694→
+   695→// ---------- Helpers ----------
+   696→function formatValue(v: unknown): string {
+   697→  if (typeof v === "string") return JSON.stringify(v);
+   698→  if (typeof v === "number" || typeof v === "boolean" || v === null)
+   699→    return String(v);
+   700→  try {
+   701→    return JSON.stringify(v);
+   702→  } catch {
+   703→    return String(v);
+   704→  }
+   705→}
+   706→
+   707→function normalizeForCompare(v: unknown, unordered: boolean): string {
+   708→  if (Array.isArray(v)) {
+   709→    const inner = v.map((item) =>
+   710→      Array.isArray(item)
+   711→        ? normalizeForCompare(item, false) // sort inner numeric arrays
+   712→        : formatValue(item)
+   713→    );
+   714→    if (unordered) inner.sort();
+   715→    else if (v.every((x) => typeof x === "number")) inner.sort((a, b) => Number(a) - Number(b));
+   716→    return "[" + inner.join(",") + "]";
+   717→  }
+   718→  return formatValue(v);
+   719→}
+   720→
+   721→function valuesEqual(actual: unknown, expected: unknown, unordered?: boolean): boolean {
+   722→  // Number tolerance
+   723→  if (typeof actual === "number" && typeof expected === "number") {
+   724→    return Math.abs(actual - expected) < 1e-5;
+   725→  }
+   726→  return normalizeForCompare(actual, !!unordered) === normalizeForCompare(expected, !!unordered);
+   727→}
+   728→
+   729→function runJavaScript(
+   730→  code: string,
+   731→  fnName: string,
+   732→  tests: TestCase[]
+   733→): RunResult {
+   734→  const cases: RunResult["cases"] = [];
+   735→  let fn: ((...args: unknown[]) => unknown) | null = null;
+   736→  let loadError: string | null = null;
+   737→  try {
+   738→    const factory = new Function(`
+   739→      ${code}
+   740→      return typeof ${fnName} === "function" ? ${fnName} : null;
+   741→    `);
+   742→    fn = factory() as ((...args: unknown[]) => unknown) | null;
+   743→    if (!fn) loadError = `Function "${fnName}" is not defined.`;
+   744→  } catch (e) {
+   745→    loadError = e instanceof Error ? e.message : String(e);
+   746→  }
+   747→
+   748→  for (let i = 0; i < tests.length; i++) {
+   749→    const t = tests[i];
+   750→    if (loadError) {
+   751→      cases.push({
+   752→        label: `Test ${i + 1}`,
+   753→        passed: false,
+   754→        actual: "—",
+   755→        expected: formatValue(t.expected),
+   756→        error: loadError,
+   757→      });
+   758→      continue;
+   759→    }
+   760→    try {
+   761→      const out = fn!(...t.args);
+   762→      const passed = valuesEqual(out, t.expected, t.unordered);
+   763→      cases.push({
+   764→        label: `Test ${i + 1}`,
+   765→        passed,
+   766→        actual: formatValue(out),
+   767→        expected: formatValue(t.expected),
+   768→      });
+   769→    } catch (e) {
+   770→      cases.push({
+   771→        label: `Test ${i + 1}`,
+   772→        passed: false,
+   773→        actual: "—",
+   774→        expected: formatValue(t.expected),
+   775→        error: e instanceof Error ? e.message : String(e),
+   776→      });
+   777→    }
+   778→  }
+   779→  return {
+   780→    passed: cases.filter((c) => c.passed).length,
+   781→    total: tests.length,
+   782→    cases,
+   783→  };
+   784→}
+   785→
+   786→// ---------- Subcomponents ----------
+   787→function DifficultyBadge({ difficulty }: { difficulty: Difficulty }) {
+   788→  return <Pill tone={DIFFICULTY_TONE[difficulty]}>{difficulty}</Pill>;
+   789→}
+   790→
+   791→function LanguageTag({ language }: { language: Language }) {
+   792→  const color = LANGUAGE_COLOR[language];
+   793→  return (
+   794→    <span
+   795→      className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+   796→      style={{ color, borderColor: `${color}40`, backgroundColor: `${color}14` }}
+   797→    >
+   798→      <FileCode2 className="size-3" />
+   799→      {language}
+   800→    </span>
+   801→  );
+   802→}
+   803→
+   804→function ProblemListItem({
+   805→  problem,
+   806→  solved,
+   807→  active,
+   808→  onClick,
+   809→}: {
+   810→  problem: Problem;
+   811→  solved: boolean;
+   812→  active: boolean;
+   813→  onClick: () => void;
+   814→}) {
+   815→  return (
+   816→    <button
+   817→      onClick={onClick}
+   818→      className={cn(
+   819→        "group w-full rounded-xl border bg-card/60 p-4 text-left transition-all hover:border-primary/50 hover:bg-accent/40",
+   820→        active
+   821→          ? "border-primary/70 bg-primary/5 ring-1 ring-primary/30"
+   822→          : "border-border/70"
+   823→      )}
+   824→    >
+   825→      <div className="flex items-start justify-between gap-3">
+   826→        <div className="flex-1 space-y-1">
+   827→          <div className="flex items-center gap-2">
+   828→            <h3
+   829→              className={cn(
+   830→                "text-sm font-semibold leading-tight",
+   831→                active ? "text-primary" : "text-foreground"
+   832→              )}
+   833→            >
+   834→              {problem.title}
+   835→            </h3>
+   836→            {solved && (
+   837→              <CheckCircle2 className="size-4 shrink-0 text-primary" />
+   838→            )}
+   839→          </div>
+   840→          <div className="flex flex-wrap items-center gap-1.5">
+   841→            <DifficultyBadge difficulty={problem.difficulty} />
+   842→            <LanguageTag language={problem.language} />
+   843→          </div>
+   844→        </div>
+   845→        <ChevronRight
+   846→          className={cn(
+   847→            "size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5",
+   848→            active && "text-primary"
+   849→          )}
+   850→        />
+   851→      </div>
+   852→      <div className="mt-2.5 flex flex-wrap gap-1">
+   853→        {problem.topics.map((t) => (
+   854→          <span
+   855→            key={t}
+   856→            className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+   857→          >
+   858→            {t}
+   859→          </span>
+   860→        ))}
+   861→      </div>
+   862→    </button>
+   863→  );
+   864→}
+   865→
+   866→function OutputPanel({
+   867→  mode,
+   868→  runResult,
+   869→  review,
+   870→  reviewLoading,
+   871→  solution,
+   872→  problem,
+   873→}: {
+   874→  mode: OutputMode;
+   875→  runResult: RunResult | null;
+   876→  review: CodeReview | null;
+   877→  reviewLoading: boolean;
+   878→  solution: string | null;
+   879→  problem: Problem;
+   880→}) {
+   881→  if (mode === "idle") {
+   882→    return (
+   883→      <AIEmptyState
+   884→        icon={Terminal}
+   885→        title="Run code or get AI review"
+   886→        description="Execute your solution against test cases, or ask the AI for an in-depth review with complexity analysis and improvement tips."
+   887→      />
+   888→    );
+   889→  }
+   890→
+   891→  if (mode === "running") {
+   892→    if (!runResult) {
+   893→      return (
+   894→        <div className="flex items-center gap-2 rounded-xl border p-4 text-sm text-muted-foreground">
+   895→          <TypingDots /> Running tests…
+   896→        </div>
+   897→      );
+   898→    }
+   899→    const allPassed = runResult.passed === runResult.total;
+   900→    return (
+   901→      <div className="space-y-3">
+   902→        <div
+   903→          className={cn(
+   904→            "flex items-center justify-between rounded-xl border p-4",
+   905→            allPassed
+   906→              ? "border-primary/30 bg-primary/5"
+   907→              : "border-amber-500/30 bg-amber-500/5"
+   908→          )}
+   909→        >
+   910→          <div className="flex items-center gap-2">
+   911→            {allPassed ? (
+   912→              <CheckCircle2 className="size-5 text-primary" />
+   913→            ) : (
+   914→              <AlertCircle className="size-5 text-amber-500" />
+   915→            )}
+   916→            <span className="font-semibold">
+   917→              {allPassed ? "All tests passed" : "Some tests failed"}
+   918→            </span>
+   919→          </div>
+   920→          <Pill tone={allPassed ? "good" : "warn"}>
+   921→            {runResult.passed}/{runResult.total}
+   922→          </Pill>
+   923→        </div>
+   924→        <div className="space-y-2">
+   925→          {runResult.cases.map((c, i) => (
+   926→            <div
+   927→              key={i}
+   928→              className={cn(
+   929→                "rounded-lg border p-3 text-sm",
+   930→                c.passed
+   931→                  ? "border-primary/20 bg-primary/5"
+   932→                  : "border-red-500/20 bg-red-500/5"
+   933→              )}
+   934→            >
+   935→              <div className="flex items-center justify-between">
+   936→                <span className="flex items-center gap-2 font-medium">
+   937→                  {c.passed ? (
+   938→                    <Check className="size-4 text-primary" />
+   939→                  ) : (
+   940→                    <X className="size-4 text-red-500" />
+   941→                  )}
+   942→                  {c.label}
+   943→                </span>
+   944→                <Pill tone={c.passed ? "good" : "bad"}>
+   945→                  {c.passed ? "PASS" : "FAIL"}
+   946→                </Pill>
+   947→              </div>
+   948→              {c.error ? (
+   949→                <pre className="mt-2 overflow-x-auto rounded bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-300">
+   950→                  {c.error}
+   951→                </pre>
+   952→              ) : (
+   953→                <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+   954→                  <div>
+   955→                    <span className="text-muted-foreground">Output: </span>
+   956→                    <code className="font-mono">{c.actual}</code>
+   957→                  </div>
+   958→                  <div>
+   959→                    <span className="text-muted-foreground">Expected: </span>
+   960→                    <code className="font-mono">{c.expected}</code>
+   961→                  </div>
+   962→                </div>
+   963→              )}
+   964→            </div>
+   965→          ))}
+   966→        </div>
+   967→      </div>
+   968→    );
+   969→  }
+   970→
+   971→  if (mode === "review") {
+   972→    if (reviewLoading) {
+   973→      return (
+   974→        <div className="flex items-center gap-2 rounded-xl border p-4 text-sm text-muted-foreground">
+   975→          <TypingDots /> AI is reviewing your solution…
+   976→        </div>
+   977→      );
+   978→    }
+   979→    if (!review) {
+   980→      return (
+   981→        <AIEmptyState
+   982→          icon={Sparkles}
+   983→          title="Review unavailable"
+   984→          description="Could not generate an AI review. Try again in a moment."
+   985→        />
+   986→      );
+   987→    }
+   988→    const correctnessTone: "good" | "warn" | "bad" =
+   989→      review.correctness === "Correct"
+   990→        ? "good"
+   991→        : review.correctness === "Mostly Correct"
+   992→          ? "warn"
+   993→          : "bad";
+   994→    return (
+   995→      <div className="space-y-4">
+   996→        <div className="flex flex-col items-center gap-4 rounded-xl border bg-card/60 p-5 sm:flex-row sm:items-center">
+   997→          <ScoreRing value={review.score} size={104} label="Score" />
+   998→          <div className="flex-1 space-y-2 text-center sm:text-left">
+   999→            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+  1000→              <span className="text-base font-semibold">AI Code Review</span>
+  1001→              <Pill tone={correctnessTone}>{review.correctness}</Pill>
+  1002→            </div>
+  1003→            <div className="flex flex-wrap items-center justify-center gap-2 text-xs sm:justify-start">
+  1004→              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-muted-foreground">
+  1005→                <Clock className="size-3" /> {review.complexity.time}
+  1006→              </span>
+  1007→              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-muted-foreground">
+  1008→                <Database className="size-3" /> {review.complexity.space}
+  1009→              </span>
+  1010→            </div>
+  1011→          </div>
+  1012→        </div>
+  1013→
+  1014→        <ReviewSection
+  1015→          icon={CheckCircle2}
+  1016→          title="Strengths"
+  1017→          tone="good"
+  1018→          items={review.strengths}
+  1019→        />
+  1020→        <ReviewSection
+  1021→          icon={AlertCircle}
+  1022→          title="Issues"
+  1023→          tone="bad"
+  1024→          items={review.issues}
+  1025→          emptyText="No issues identified."
+  1026→        />
+  1027→        <ReviewSection
+  1028→          icon={Lightbulb}
+  1029→          title="Suggestions"
+  1030→          tone="info"
+  1031→          items={review.suggestions}
+  1032→        />
+  1033→        {review.betterApproach && review.betterApproach !== "N/A" && (
+  1034→          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+  1035→            <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+  1036→              <Zap className="size-4" /> Better Approach
+  1037→            </div>
+  1038→            <p className="mt-1.5 text-sm text-foreground/90">
+  1039→              {review.betterApproach}
+  1040→            </p>
+  1041→          </div>
+  1042→        )}
+  1043→      </div>
+  1044→    );
+  1045→  }
+  1046→
+  1047→  if (mode === "solution" && solution) {
+  1048→    return (
+  1049→      <div className="space-y-3">
+  1050→        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+  1051→          <Lightbulb className="size-4" /> Reference Solution · {problem.title}
+  1052→        </div>
+  1053→        <pre className="overflow-x-auto rounded-xl border bg-muted/40 p-4 text-xs leading-relaxed">
+  1054→          <code className="font-mono">{solution}</code>
+  1055→        </pre>
+  1056→        <p className="text-xs text-muted-foreground">
+  1057→          Treat this as a reference. Try to understand the approach before
+  1058→          moving on — and consider comparing complexity with your own.
+  1059→        </p>
+  1060→      </div>
+  1061→    );
+  1062→  }
+  1063→
+  1064→  return null;
+  1065→}
+  1066→
+  1067→function ReviewSection({
+  1068→  icon: Icon,
+  1069→  title,
+  1070→  tone,
+  1071→  items,
+  1072→  emptyText,
+  1073→}: {
+  1074→  icon: React.ComponentType<{ className?: string }>;
+  1075→  title: string;
+  1076→  tone: "good" | "warn" | "bad" | "info";
+  1077→  items: string[];
+  1078→  emptyText?: string;
+  1079→}) {
+  1080→  const toneColor = {
+  1081→    good: "text-primary",
+  1082→    warn: "text-amber-500",
+  1083→    bad: "text-red-500",
+  1084→    info: "text-purple-500",
+  1085→  }[tone];
+  1086→  const toneDot = {
+  1087→    good: "bg-primary",
+  1088→    warn: "bg-amber-500",
+  1089→    bad: "bg-red-500",
+  1090→    info: "bg-purple-500",
+  1091→  }[tone];
+  1092→  return (
+  1093→    <div className="rounded-xl border bg-card/60 p-4">
+  1094→      <div className="flex items-center gap-2 text-sm font-semibold">
+  1095→        <Icon className={cn("size-4", toneColor)} />
+  1096→        {title}
+  1097→        <span className="text-xs font-normal text-muted-foreground">
+  1098→          ({items.length})
+  1099→        </span>
+  1100→      </div>
+  1101→      {items.length === 0 ? (
+  1102→        <p className="mt-2 text-xs text-muted-foreground">
+  1103→          {emptyText ?? "None."}
+  1104→        </p>
+  1105→      ) : (
+  1106→        <ul className="mt-2 space-y-1.5">
+  1107→          {items.map((it, i) => (
+  1108→            <li key={i} className="flex gap-2 text-sm text-foreground/90">
+  1109→              <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", toneDot)} />
+  1110→              <span>{it}</span>
+  1111→            </li>
+  1112→          ))}
+  1113→        </ul>
+  1114→      )}
+  1115→    </div>
+  1116→  );
+  1117→}
+  1118→
+  1119→// ---------- Main module ----------
+  1120→export function CodingPracticeModule() {
+  1121→  const mounted = useMounted();
+  1122→  const { resolvedTheme } = useTheme();
+  1123→  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  1124→
+  1125→  const [solved, setSolved] = React.useState<Set<string>>(new Set());
+  1126→  const [activeId, setActiveId] = React.useState<string>(PROBLEMS[0].id);
+  1127→  const [codeByProblem, setCodeByProblem] = React.useState<
+  1128→    Record<string, string>
+  1129→  >(() =>
+  1130→    Object.fromEntries(PROBLEMS.map((p) => [p.id, p.starterCode]))
+  1131→  );
+  1132→  const [languageOverride, setLanguageOverride] = React.useState<
+  1133→    Record<string, Language>
+  1134→  >({});
+  1135→
+  1136→  // Filters
+  1137→  const [diffFilter, setDiffFilter] = React.useState<"All" | Difficulty>("All");
+  1138→  const [langFilter, setLangFilter] = React.useState<"All" | Language>("All");
+  1139→  const [query, setQuery] = React.useState("");
+  1140→
+  1141→  // Mobile view toggle
+  1142→  const [mobileView, setMobileView] = React.useState<"list" | "editor">(
+  1143→    "list"
+  1144→  );
+  1145→
+  1146→  // Output state
+  1147→  const [outputMode, setOutputMode] = React.useState<OutputMode>("idle");
+  1148→  const [runResult, setRunResult] = React.useState<RunResult | null>(null);
+  1149→  const [review, setReview] = React.useState<CodeReview | null>(null);
+  1150→  const [reviewLoading, setReviewLoading] = React.useState(false);
+  1151→  const [showSolution, setShowSolution] = React.useState(false);
+  1152→
+  1153→  const activeProblem = React.useMemo(
+  1154→    () => PROBLEMS.find((p) => p.id === activeId)!,
+  1155→    [activeId]
+  1156→  );
+  1157→
+  1158→  const filtered = React.useMemo(() => {
+  1159→    return PROBLEMS.filter((p) => {
+  1160→      if (diffFilter !== "All" && p.difficulty !== diffFilter) return false;
+  1161→      if (langFilter !== "All" && p.language !== langFilter) return false;
+  1162→      if (query) {
+  1163→        const q = query.toLowerCase();
+  1164→        return (
+  1165→          p.title.toLowerCase().includes(q) ||
+  1166→          p.topics.some((t) => t.toLowerCase().includes(q))
+  1167→        );
+  1168→      }
+  1169→      return true;
+  1170→    });
+  1171→  }, [diffFilter, langFilter, query]);
+  1172→
+  1173→  const code = codeByProblem[activeId] ?? activeProblem.starterCode;
+  1174→  const language =
+  1175→    languageOverride[activeId] ?? activeProblem.language;
+  1176→
+  1177→  // ---------- Actions ----------
+  1178→  const onCodeChange = (value: string | undefined) => {
+  1179→    setCodeByProblem((prev) => ({ ...prev, [activeId]: value ?? "" }));
+  1180→  };
+  1181→
+  1182→  const onSelectProblem = (id: string) => {
+  1183→    setActiveId(id);
+  1184→    setOutputMode("idle");
+  1185→    setRunResult(null);
+  1186→    setReview(null);
+  1187→    setShowSolution(false);
+  1188→    setMobileView("editor");
+  1189→  };
+  1190→
+  1191→  const onReset = () => {
+  1192→    setCodeByProblem((prev) => ({
+  1193→      ...prev,
+  1194→      [activeId]: activeProblem.starterCode,
+  1195→    }));
+  1196→    setLanguageOverride((prev) => {
+  1197→      const next = { ...prev };
+  1198→      delete next[activeId];
+  1199→      return next;
+  1200→    });
+  1201→    setOutputMode("idle");
+  1202→    setRunResult(null);
+  1203→    toast.info("Reset to starter code");
+  1204→  };
+  1205→
+  1206→  const onRun = () => {
+  1207→    if (activeProblem.language !== "JavaScript" || !activeProblem.tests || !activeProblem.fnName) {
+  1208→      toast.message("Live execution is available for JavaScript.", {
+  1209→        description: "Use AI Review for other languages.",
+  1210→      });
+  1211→      return;
+  1212→    }
+  1213→    setOutputMode("running");
+  1214→    setReview(null);
+  1215→    setShowSolution(false);
+  1216→    const fnName = activeProblem.fnName;
+  1217→    const tests = activeProblem.tests;
+  1218→    // Defer execution so UI can paint the loading state first.
+  1219→    setTimeout(() => {
+  1220→      const result = runJavaScript(code, fnName!, tests!);
+  1221→      setRunResult(result);
+  1222→      if (result.passed === result.total) {
+  1223→        setSolved((prev) => {
+  1224→          if (prev.has(activeId)) return prev;
+  1225→          const next = new Set(prev);
+  1226→          next.add(activeId);
+  1227→          return next;
+  1228→        });
+  1229→        toast.success("All tests passed — problem marked as solved!");
+  1230→      } else {
+  1231→        toast.error(`${result.passed}/${result.total} tests passed`);
+  1232→      }
+  1233→    }, 50);
+  1234→  };
+  1235→
+  1236→  const onAIReview = async () => {
+  1237→    setOutputMode("review");
+  1238→    setRunResult(null);
+  1239→    setShowSolution(false);
+  1240→    setReview(null);
+  1241→    setReviewLoading(true);
+  1242→    try {
+  1243→      const res = await fetch("/api/ai/code-review", {
+  1244→        method: "POST",
+  1245→        headers: { "Content-Type": "application/json" },
+  1246→        body: JSON.stringify({
+  1247→          code,
+  1248→          language: activeProblem.language,
+  1249→          problem: {
+  1250→            title: activeProblem.title,
+  1251→            description: activeProblem.description,
+  1252→            difficulty: activeProblem.difficulty,
+  1253→          },
+  1254→        }),
+  1255→      });
+  1256→      const json = await res.json();
+  1257→      if (!res.ok) throw new Error(json.error || "Review failed");
+  1258→      setReview(json as CodeReview);
+  1259→    } catch (e) {
+  1260→      toast.error(e instanceof Error ? e.message : "AI review failed");
+  1261→      setReview(null);
+  1262→    } finally {
+  1263→      setReviewLoading(false);
+  1264→    }
+  1265→  };
+  1266→
+  1267→  const onShowSolution = () => {
+  1268→    setOutputMode("solution");
+  1269→    setShowSolution(true);
+  1270→    setRunResult(null);
+  1271→    setReview(null);
+  1272→  };
+  1273→
+  1274→  const progress = (solved.size / PROBLEMS.length) * 100;
+  1275→
+  1276→  return (
+  1277→    <div className="space-y-6">
+  1278→      <ModuleHeader
+  1279→        icon={Code2}
+  1280→        title="Coding Practice"
+  1281→        description="Sharpen your DSA skills with a mini LeetCode-style IDE and AI review"
+  1282→      >
+  1283→        <Card className="w-full px-4 py-3 sm:w-72">
+  1284→          <div className="flex items-center justify-between gap-3">
+  1285→            <div className="flex items-center gap-2">
+  1286→              <div className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+  1287→                <Trophy className="size-4" />
+  1288→              </div>
+  1289→              <div>
+  1290→                <p className="text-xs text-muted-foreground">Solved</p>
+  1291→                <p className="text-sm font-semibold">
+  1292→                  {solved.size} / {PROBLEMS.length}
+  1293→                </p>
+  1294→              </div>
+  1295→            </div>
+  1296→            <Pill tone="good">{Math.round(progress)}%</Pill>
+  1297→          </div>
+  1298→          <Progress value={progress} className="mt-3 h-1.5" />
+  1299→        </Card>
+  1300→      </ModuleHeader>
+  1301→
+  1302→      {/* Mobile view toggle */}
+  1303→      <div className="flex items-center gap-2 lg:hidden">
+  1304→        <Button
+  1305→          size="sm"
+  1306→          variant={mobileView === "list" ? "default" : "outline"}
+  1307→          onClick={() => setMobileView("list")}
+  1308→          className="gap-1.5"
+  1309→        >
+  1310→          <ListTree className="size-3.5" /> Problems
+  1311→        </Button>
+  1312→        <Button
+  1313→          size="sm"
+  1314→          variant={mobileView === "editor" ? "default" : "outline"}
+  1315→          onClick={() => setMobileView("editor")}
+  1316→          className="gap-1.5"
+  1317→        >
+  1318→          <Code2 className="size-3.5" /> Editor
+  1319→        </Button>
+  1320→      </div>
+  1321→
+  1322→      <div className="lg:grid lg:grid-cols-[40%_60%] lg:gap-6">
+  1323→        {/* LEFT — Problem list */}
+  1324→        <div
+  1325→          className={cn(
+  1326→            "space-y-3",
+  1327→            mobileView === "list" ? "block" : "hidden",
+  1328→            "lg:block"
+  1329→          )}
+  1330→        >
+  1331→          <Card className="gap-0">
+  1332→            <CardHeader className="gap-3">
+  1333→              <CardTitle className="flex items-center gap-2 text-base">
+  1334→                <ListTree className="size-4 text-primary" />
+  1335→                Problems
+  1336→              </CardTitle>
+  1337→              <div className="relative">
+  1338→                <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+  1339→                <Input
+  1340→                  value={query}
+  1341→                  onChange={(e) => setQuery(e.target.value)}
+  1342→                  placeholder="Search title or topic…"
+  1343→                  className="pl-8"
+  1344→                />
+  1345→                {query && (
+  1346→                  <button
+  1347→                    onClick={() => setQuery("")}
+  1348→                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent"
+  1349→                  >
+  1350→                    <X className="size-3.5" />
+  1351→                  </button>
+  1352→                )}
+  1353→              </div>
+  1354→              <div className="flex flex-wrap gap-2">
+  1355→                <Select
+  1356→                  value={diffFilter}
+  1357→                  onValueChange={(v) => setDiffFilter(v as "All" | Difficulty)}
+  1358→                >
+  1359→                  <SelectTrigger size="sm" className="h-8 w-[120px]">
+  1360→                    <SelectValue placeholder="Difficulty" />
+  1361→                  </SelectTrigger>
+  1362→                  <SelectContent>
+  1363→                    <SelectItem value="All">All Difficulties</SelectItem>
+  1364→                    <SelectItem value="Easy">Easy</SelectItem>
+  1365→                    <SelectItem value="Medium">Medium</SelectItem>
+  1366→                    <SelectItem value="Hard">Hard</SelectItem>
+  1367→                  </SelectContent>
+  1368→                </Select>
+  1369→                <Select
+  1370→                  value={langFilter}
+  1371→                  onValueChange={(v) => setLangFilter(v as "All" | Language)}
+  1372→                >
+  1373→                  <SelectTrigger size="sm" className="h-8 w-[130px]">
+  1374→                    <SelectValue placeholder="Language" />
+  1375→                  </SelectTrigger>
+  1376→                  <SelectContent>
+  1377→                    <SelectItem value="All">All Languages</SelectItem>
+  1378→                    <SelectItem value="JavaScript">JavaScript</SelectItem>
+  1379→                    <SelectItem value="TypeScript">TypeScript</SelectItem>
+  1380→                    <SelectItem value="Python">Python</SelectItem>
+  1381→                    <SelectItem value="Java">Java</SelectItem>
+  1382→                  </SelectContent>
+  1383→                </Select>
+  1384→              </div>
+  1385→            </CardHeader>
+  1386→            <CardContent>
+  1387→              <ScrollArea className="h-[calc(100vh-22rem)] pr-3">
+  1388→                <div className="space-y-2">
+  1389→                  {filtered.length === 0 ? (
+  1390→                    <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+  1391→                      No problems match your filters.
+  1392→                    </div>
+  1393→                  ) : (
+  1394→                    filtered.map((p) => (
+  1395→                      <ProblemListItem
+  1396→                        key={p.id}
+  1397→                        problem={p}
+  1398→                        solved={solved.has(p.id)}
+  1399→                        active={p.id === activeId}
+  1400→                        onClick={() => onSelectProblem(p.id)}
+  1401→                      />
+  1402→                    ))
+  1403→                  )}
+  1404→                </div>
+  1405→              </ScrollArea>
+  1406→            </CardContent>
+  1407→          </Card>
+  1408→        </div>
+  1409→
+  1410→        {/* RIGHT — Detail + Editor + Output */}
+  1411→        <div
+  1412→          className={cn(
+  1413→            "space-y-4",
+  1414→            mobileView === "editor" ? "block" : "hidden",
+  1415→            "lg:block"
+  1416→          )}
+  1417→        >
+  1418→          {/* Problem detail */}
+  1419→          <Card>
+  1420→            <CardHeader>
+  1421→              <div className="flex flex-wrap items-center gap-2">
+  1422→                <CardTitle className="text-lg">
+  1423→                  {activeProblem.title}
+  1424→                </CardTitle>
+  1425→                <DifficultyBadge difficulty={activeProblem.difficulty} />
+  1426→                <LanguageTag language={activeProblem.language} />
+  1427→                {solved.has(activeProblem.id) && (
+  1428→                  <Pill tone="good">
+  1429→                    <CheckCircle2 className="size-3" /> Solved
+  1430→                  </Pill>
+  1431→                )}
+  1432→              </div>
+  1433→              <CardDescription className="flex flex-wrap gap-1 pt-1">
+  1434→                {activeProblem.topics.map((t) => (
+  1435→                  <span
+  1436→                    key={t}
+  1437→                    className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+  1438→                  >
+  1439→                    {t}
+  1440→                  </span>
+  1441→                ))}
+  1442→              </CardDescription>
+  1443→            </CardHeader>
+  1444→            <CardContent className="space-y-2">
+  1445→              <p className="text-sm leading-relaxed text-foreground/90">
+  1446→                {activeProblem.description}
+  1447→              </p>
+  1448→              <div className="rounded-lg border bg-muted/40 px-3 py-2 font-mono text-xs text-foreground/90">
+  1449→                {activeProblem.example}
+  1450→              </div>
+  1451→            </CardContent>
+  1452→          </Card>
+  1453→
+  1454→          {/* Editor + language select */}
+  1455→          <Card className="gap-0 overflow-hidden">
+  1456→            <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
+  1457→              <div className="flex items-center gap-2 text-sm font-medium">
+  1458→                <Code2 className="size-4 text-primary" />
+  1459→                Editor
+  1460→              </div>
+  1461→              <Select
+  1462→                value={language}
+  1463→                onValueChange={(v) =>
+  1464→                  setLanguageOverride((prev) => ({
+  1465→                    ...prev,
+  1466→                    [activeId]: v as Language,
+  1467→                  }))
+  1468→                }
+  1469→              >
+  1470→                <SelectTrigger size="sm" className="h-8 w-[140px]">
+  1471→                  <SelectValue />
+  1472→                </SelectTrigger>
+  1473→                <SelectContent>
+  1474→                  <SelectItem value="JavaScript">JavaScript</SelectItem>
+  1475→                  <SelectItem value="TypeScript">TypeScript</SelectItem>
+  1476→                  <SelectItem value="Python">Python</SelectItem>
+  1477→                  <SelectItem value="Java">Java</SelectItem>
+  1478→                </SelectContent>
+  1479→              </Select>
+  1480→            </div>
+  1481→            <div className="h-[400px] w-full">
+  1482→              {mounted ? (
+  1483→                <Editor
+  1484→                  height="400px"
+  1485→                  language={MONACO_LANG[language]}
+  1486→                  theme={monacoTheme}
+  1487→                  value={code}
+  1488→                  onChange={onCodeChange}
+  1489→                  options={{
+  1490→                    minimap: { enabled: false },
+  1491→                    fontSize: 13,
+  1492→                    fontFamily:
+  1493→                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  1494→                    scrollBeyondLastLine: false,
+  1495→                    smoothScrolling: true,
+  1496→                    tabSize: 2,
+  1497→                    automaticLayout: true,
+  1498→                    padding: { top: 12, bottom: 12 },
+  1499→                  }}
+  1500→                />
+  1501→              ) : (
+  1502→                <div className="grid h-full place-items-center text-sm text-muted-foreground">
+  1503→                  Loading editor…
+  1504→                </div>
+  1505→              )}
+  1506→            </div>
+  1507→          </Card>
+  1508→
+  1509→          {/* Action bar */}
+  1510→          <div className="flex flex-wrap items-center gap-2">
+  1511→            <Button onClick={onRun} size="sm" className="gap-1.5">
+  1512→              <Play className="size-3.5" /> Run
+  1513→            </Button>
+  1514→            <AIButton onClick={onAIReview} loading={reviewLoading}>
+  1515→              AI Review
+  1516→            </AIButton>
+  1517→            <Button
+  1518→              onClick={onShowSolution}
+  1519→              size="sm"
+  1520→              variant="outline"
+  1521→              className="gap-1.5"
+  1522→            >
+  1523→              <Lightbulb className="size-3.5" /> Show Solution
+  1524→            </Button>
+  1525→            <Button
+  1526→              onClick={onReset}
+  1527→              size="sm"
+  1528→              variant="ghost"
+  1529→              className="ml-auto gap-1.5"
+  1530→            >
+  1531→              <RotateCcw className="size-3.5" /> Reset
+  1532→            </Button>
+  1533→          </div>
+  1534→
+  1535→          {/* Output panel */}
+  1536→          <Card>
+  1537→            <CardHeader className="pb-3">
+  1538→              <CardTitle className="flex items-center gap-2 text-sm">
+  1539→                <Terminal className="size-4 text-primary" /> Output
+  1540→                {outputMode === "running" && runResult && (
+  1541→                  <Pill tone={runResult.passed === runResult.total ? "good" : "warn"}>
+  1542→                    {runResult.passed}/{runResult.total}
+  1543→                  </Pill>
+  1544→                )}
+  1545→                {outputMode === "review" && review && (
+  1546→                  <Pill tone="info">Score {review.score}/100</Pill>
+  1547→                )}
+  1548→              </CardTitle>
+  1549→              <CardDescription>
+  1550→                {activeProblem.language === "JavaScript"
+  1551→                  ? "Live execution enabled — Run to validate against test cases."
+  1552→                  : "Live execution is JavaScript-only — use AI Review for this language."}
+  1553→              </CardDescription>
+  1554→            </CardHeader>
+  1555→            <CardContent>
+  1556→              <OutputPanel
+  1557→                mode={outputMode}
+  1558→                runResult={runResult}
+  1559→                review={review}
+  1560→                reviewLoading={reviewLoading}
+  1561→                solution={showSolution ? activeProblem.solution : null}
+  1562→                problem={activeProblem}
+  1563→              />
+  1564→            </CardContent>
+  1565→          </Card>
+  1566→        </div>
+  1567→      </div>
+  1568→    </div>
+  1569→  );
+  1570→}
+  1571→

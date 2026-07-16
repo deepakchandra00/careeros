@@ -1,0 +1,757 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  FileText,
+     6→  Download,
+     7→  Upload,
+     8→  ClipboardPaste,
+     9→  Sparkles,
+    10→  ZoomIn,
+    11→  ZoomOut,
+    12→  RotateCcw,
+    13→  FileType2,
+    14→  Loader2,
+    15→  CheckCircle2,
+    16→  Palette,
+    17→  Type as TypeIcon,
+    18→  Check,
+    19→  ChevronDown,
+    20→} from "lucide-react";
+    21→import { toast } from "sonner";
+    22→import {
+    23→  Card,
+    24→  CardContent,
+    25→} from "@/components/ui/card";
+    26→import { Button } from "@/components/ui/button";
+    27→import { Textarea } from "@/components/ui/textarea";
+    28→import {
+    29→  Dialog,
+    30→  DialogContent,
+    31→  DialogHeader,
+    32→  DialogTitle,
+    33→  DialogDescription,
+    34→} from "@/components/ui/dialog";
+    35→import {
+    36→  Tooltip,
+    37→  TooltipTrigger,
+    38→  TooltipContent,
+    39→} from "@/components/ui/tooltip";
+    40→import {
+    41→  DropdownMenu,
+    42→  DropdownMenuTrigger,
+    43→  DropdownMenuContent,
+    44→  DropdownMenuItem,
+    45→  DropdownMenuLabel,
+    46→  DropdownMenuSeparator,
+    47→} from "@/components/ui/dropdown-menu";
+    48→import { ModuleHeader, AIButton } from "@/components/shared/blocks";
+    49→import { useResumeStore, type SectionId } from "@/store/resume-store";
+    50→import { ResumeEditor } from "@/components/modules/resume-editor";
+    51→import {
+    52→  ResumePreview,
+    53→  TEMPLATE_OPTIONS,
+    54→  FONT_OPTIONS,
+    55→  ACCENT_OPTIONS,
+    56→} from "@/components/modules/resume-templates";
+    57→import { extractTextFromFile } from "@/lib/resume/extract";
+    58→import { exportResumeDocx } from "@/lib/resume/export-docx";
+    59→import { exportResumePdf } from "@/lib/resume/export-pdf";
+    60→import { splitResumeSections, compressSkills } from "@/lib/resume/splitter";
+    61→import { cn } from "@/lib/utils";
+    62→
+    63→const ALL_SECTIONS: { id: SectionId; label: string }[] = [
+    64→  { id: "personal", label: "Personal Info" },
+    65→  { id: "summary", label: "Summary" },
+    66→  { id: "experience", label: "Experience" },
+    67→  { id: "skills", label: "Skills" },
+    68→  { id: "projects", label: "Projects" },
+    69→  { id: "education", label: "Education" },
+    70→  { id: "certifications", label: "Certifications" },
+    71→  { id: "languages", label: "Languages" },
+    72→  { id: "awards", label: "Awards" },
+    73→  { id: "publications", label: "Publications" },
+    74→  { id: "interests", label: "Interests" },
+    75→  { id: "references", label: "References" },
+    76→];
+    77→
+    78→const DEFAULT_SECTIONS: Record<string, boolean> = {
+    79→  personal: true,
+    80→  summary: true,
+    81→  experience: true,
+    82→  skills: true,
+    83→  projects: true,
+    84→  education: true,
+    85→  certifications: true,
+    86→  languages: true,
+    87→  awards: false,
+    88→  publications: false,
+    89→  interests: false,
+    90→  references: false,
+    91→};
+    92→
+    93→export function ResumeBuilderModule() {
+    94→  const data = useResumeStore((s) => s.data);
+    95→  const style = useResumeStore((s) => s.style);
+    96→  const setStyle = useResumeStore((s) => s.setStyle);
+    97→  const hydrate = useResumeStore((s) => s.hydrate);
+    98→  const setData = useResumeStore((s) => s.setData);
+    99→  const reset = useResumeStore((s) => s.reset);
+   100→
+   101→  const [sections, setSections] = React.useState<Record<string, boolean>>(
+   102→    DEFAULT_SECTIONS
+   103→  );
+   104→  const [zoom, setZoom] = React.useState(0.75);
+   105→  const [importing, setImporting] = React.useState(false);
+   106→  const [exportingDocx, setExportingDocx] = React.useState(false);
+   107→  const [exportingPdf, setExportingPdf] = React.useState(false);
+   108→  const [pasteOpen, setPasteOpen] = React.useState(false);
+   109→  const [pasteText, setPasteText] = React.useState("");
+   110→  const [pasting, setPasting] = React.useState(false);
+   111→  const [importSteps, setImportSteps] = React.useState<
+   112→    { label: string; status: "pending" | "parsing" | "done"; count?: number }[]
+   113→  >([]);
+   114→  const fileInputRef = React.useRef<HTMLInputElement>(null);
+   115→
+   116→  // Hydrate from localStorage on mount
+   117→  React.useEffect(() => {
+   118→    hydrate();
+   119→  }, [hydrate]);
+   120→
+   121→  // ---- Import flow (live-streaming chunked) ----
+   122→  /**
+   123→   * Split the resume text into sections, then parse each section sequentially
+   124→   * via /api/ai/parse-resume-chunked. After each section completes, update the
+   125→   * resume store immediately so the preview updates in real-time.
+   126→   */
+   127→  const parseAndPopulate = async (text: string): Promise<void> => {
+   128→    const splitSections = splitResumeSections(text);
+   129→
+   130→    // Initialize progress steps
+   131→    const steps: { label: string; status: "pending" | "parsing" | "done"; count?: number }[] = [
+   132→      { label: "Contact & Name", status: "pending" },
+   133→      { label: "Summary", status: "pending" },
+   134→      { label: "Skills", status: "pending" },
+   135→      { label: "Experience", status: "pending" },
+   136→      { label: "Projects", status: "pending" },
+   137→      { label: "Education", status: "pending" },
+   138→    ];
+   139→    setImportSteps([...steps]);
+   140→
+   141→    // Helper to update a step's status
+   142→    const updateStep = (idx: number, status: "parsing" | "done", count?: number) => {
+   143→      setImportSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, status, count } : s)));
+   144→    };
+   145→
+   146→    // Helper: call the chunked API for one section (with retry on rate limit)
+   147→    const parseSection = async (
+   148→      section: "contact" | "summary" | "skills" | "experience" | "projects" | "education",
+   149→      sectionText: string
+   150→    ): Promise<Record<string, unknown>> => {
+   151→      if (!sectionText || sectionText.trim().length < 10) return {};
+   152→      const processedText =
+   153→        section === "skills" ? compressSkills(sectionText) : sectionText;
+   154→      if (!processedText || processedText.trim().length < 10) return {};
+   155→
+   156→      for (let attempt = 0; attempt < 3; attempt++) {
+   157→        try {
+   158→          const res = await fetch("/api/ai/parse-resume-chunked", {
+   159→            method: "POST",
+   160→            headers: { "Content-Type": "application/json" },
+   161→            body: JSON.stringify({ section, text: processedText }),
+   162→          });
+   163→          const raw = await res.text();
+   164→          let json: unknown;
+   165→          try {
+   166→            json = raw ? JSON.parse(raw) : null;
+   167→          } catch {
+   168→            if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
+   169→            return {};
+   170→          }
+   171→          if (!res.ok) {
+   172→            if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
+   173→            return {};
+   174→          }
+   175→          return (json as Record<string, unknown>) ?? {};
+   176→        } catch {
+   177→          if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
+   178→          return {};
+   179→        }
+   180→      }
+   181→      return {};
+   182→    };
+   183→
+   184→    // Helper: split large text into ~2000 char chunks at paragraph boundaries
+   185→    // (2000 = more reliable LLM parsing than 3000, fewer JSON parse failures)
+   186→    const chunkText = (text: string, maxLen = 2000): string[] => {
+   187→      if (text.length <= maxLen) return [text];
+   188→      const paragraphs = text.split(/\n\s*\n/);
+   189→      const chunks: string[] = [];
+   190→      let current = "";
+   191→      for (const p of paragraphs) {
+   192→        if ((current + "\n\n" + p).length > maxLen && current) {
+   193→          chunks.push(current);
+   194→          current = p;
+   195→        } else {
+   196→          current = current ? current + "\n\n" + p : p;
+   197→        }
+   198→      }
+   199→      if (current) chunks.push(current);
+   200→      return chunks;
+   201→    };
+   202→
+   203→    const uid = () => Math.random().toString(36).slice(2, 10);
+   204→    // Working copy that we update incrementally
+   205→    let working = { ...data };
+   206→
+   207→    // Step 0: Contact
+   208→    updateStep(0, "parsing");
+   209→    const contactRes = await parseSection("contact", splitSections.contact);
+   210→    working = {
+   211→      ...working,
+   212→      name: (contactRes.name as string) || working.name,
+   213→      title: (contactRes.title as string) || working.title,
+   214→      email: (contactRes.email as string) || working.email,
+   215→      phone: (contactRes.phone as string) || working.phone,
+   216→      location: (contactRes.location as string) || working.location,
+   217→      linkedin: (contactRes.linkedin as string) || working.linkedin,
+   218→      github: (contactRes.github as string) || working.github,
+   219→      website: (contactRes.website as string) || working.website,
+   220→    };
+   221→    setData(working);
+   222→    updateStep(0, "done");
+   223→
+   224→    // Step 1: Summary
+   225→    updateStep(1, "parsing");
+   226→    const summaryRes = await parseSection("summary", splitSections.summary);
+   227→    working = { ...working, summary: (summaryRes.summary as string) || working.summary };
+   228→    setData(working);
+   229→    updateStep(1, "done");
+   230→
+   231→    // Step 2: Skills
+   232→    updateStep(2, "parsing");
+   233→    const skillsRes = await parseSection("skills", splitSections.skills);
+   234→    const skills = (skillsRes.skills as string[]) || working.skills;
+   235→    working = { ...working, skills };
+   236→    setData(working);
+   237→    updateStep(2, "done", skills.length);
+   238→
+   239→    // Step 3: Experience (may be chunked, with fallback retry on smaller chunks)
+   240→    updateStep(3, "parsing");
+   241→    const expChunks = chunkText(splitSections.experience);
+   242→    const allExp: typeof data.experience = [];
+   243→    for (const chunk of expChunks) {
+   244→      let r = await parseSection("experience", chunk);
+   245→      // Fallback: if this chunk returned nothing, retry with a smaller chunk size
+   246→      if (!r.experience || !Array.isArray(r.experience) || r.experience.length === 0) {
+   247→        const smallerChunks = chunkText(chunk, 1000);
+   248→        for (const sc of smallerChunks) {
+   249→          const sr = await parseSection("experience", sc);
+   250→          const sarr = sr.experience as typeof data.experience;
+   251→          if (Array.isArray(sarr)) {
+   252→            allExp.push(...sarr.map((e) => ({ ...e, id: uid() })));
+   253→            working = { ...working, experience: allExp };
+   254→            setData(working);
+   255→            updateStep(3, "parsing", allExp.length);
+   256→          }
+   257→        }
+   258→      } else {
+   259→        const arr = r.experience as typeof data.experience;
+   260→        allExp.push(...arr.map((e) => ({ ...e, id: uid() })));
+   261→        // Live update after each sub-chunk
+   262→        working = { ...working, experience: allExp };
+   263→        setData(working);
+   264→        updateStep(3, "parsing", allExp.length);
+   265→      }
+   266→    }
+   267→    if (allExp.length === 0) {
+   268→      toast.warning("Experience: 0 captured (parsing failed). Try Paste text to import manually.");
+   269→      allExp.push(...working.experience);
+   270→    }
+   271→    working = { ...working, experience: allExp };
+   272→    setData(working);
+   273→    updateStep(3, "done", allExp.length);
+   274→
+   275→    // Step 4: Projects (may be chunked, with fallback retry on smaller chunks)
+   276→    updateStep(4, "parsing");
+   277→    const projChunks = chunkText(splitSections.projects);
+   278→    const allProj: typeof data.projects = [];
+   279→    for (const chunk of projChunks) {
+   280→      let r = await parseSection("projects", chunk);
+   281→      // Fallback: if this chunk returned nothing, retry with a smaller chunk size
+   282→      if (!r.projects || !Array.isArray(r.projects) || r.projects.length === 0) {
+   283→        const smallerChunks = chunkText(chunk, 1000);
+   284→        for (const sc of smallerChunks) {
+   285→          const sr = await parseSection("projects", sc);
+   286→          const sarr = sr.projects as typeof data.projects;
+   287→          if (Array.isArray(sarr)) {
+   288→            allProj.push(...sarr.map((p) => ({ ...p, id: uid() })));
+   289→            working = { ...working, projects: allProj };
+   290→            setData(working);
+   291→            updateStep(4, "parsing", allProj.length);
+   292→          }
+   293→        }
+   294→      } else {
+   295→        const arr = r.projects as typeof data.projects;
+   296→        allProj.push(...arr.map((p) => ({ ...p, id: uid() })));
+   297→        working = { ...working, projects: allProj };
+   298→        setData(working);
+   299→        updateStep(4, "parsing", allProj.length);
+   300→      }
+   301→    }
+   302→    if (allProj.length === 0) {
+   303→      toast.warning("Projects: 0 captured (parsing failed). Try Paste text to import manually.");
+   304→      allProj.push(...working.projects);
+   305→    }
+   306→    working = { ...working, projects: allProj };
+   307→    setData(working);
+   308→    updateStep(4, "done", allProj.length);
+   309→
+   310→    // Step 5: Education
+   311→    updateStep(5, "parsing");
+   312→    const eduRes = await parseSection("education", splitSections.education);
+   313→    const education = ((eduRes.education as typeof data.education) ?? []).map((ed) => ({ ...ed, id: uid() }));
+   314→    const certifications = ((eduRes.certifications as typeof data.certifications) ?? []).map((c) => ({ ...c, id: uid() }));
+   315→    working = {
+   316→      ...working,
+   317→      education: education.length ? education : working.education,
+   318→      certifications: certifications.length ? certifications : working.certifications,
+   319→    };
+   320→    setData(working);
+   321→    updateStep(5, "done", education.length);
+   322→
+   323→    // Enable sections that have content
+   324→    const next = { ...DEFAULT_SECTIONS };
+   325→    if (working.awards.length) next.awards = true;
+   326→    if (working.publications.length) next.publications = true;
+   327→    if (working.interests.length) next.interests = true;
+   328→    if (working.references.length) next.references = true;
+   329→    setSections(next);
+   330→    setImportSteps([]);
+   331→  };
+   332→
+   333→  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   334→    const file = e.target.files?.[0];
+   335→    if (!file) return;
+   336→    setImporting(true);
+   337→    try {
+   338→      toast.info(`Extracting text from ${file.name}…`);
+   339→      const text = await extractTextFromFile(file);
+   340→      if (!text || text.length < 30) {
+   341→        throw new Error("Couldn't read enough text from this file. Try pasting the text manually.");
+   342→      }
+   343→      toast.info("AI is parsing your resume — this can take 30–60s for large files…");
+   344→      await parseAndPopulate(text);
+   345→      toast.success("Resume imported and filled in!");
+   346→    } catch (err) {
+   347→      toast.error(err instanceof Error ? err.message : "Import failed", {
+   348→        description: "Tip: click Import → Paste text to manually enter your resume.",
+   349→        duration: 8000,
+   350→      });
+   351→    } finally {
+   352→      setImporting(false);
+   353→      if (fileInputRef.current) fileInputRef.current.value = "";
+   354→    }
+   355→  };
+   356→
+   357→  /** Paste-manual fallback: user pastes resume text directly, bypassing PDF extraction. */
+   358→  const handlePasteImport = async () => {
+   359→    if (!pasteText.trim() || pasteText.trim().length < 30) {
+   360→      toast.error("Please paste at least a few sentences of your resume.");
+   361→      return;
+   362→    }
+   363→    setPasting(true);
+   364→    try {
+   365→      toast.info("AI is parsing your pasted resume — this can take 30–60s…");
+   366→      await parseAndPopulate(pasteText);
+   367→      toast.success("Resume imported and filled in!");
+   368→      setPasteOpen(false);
+   369→      setPasteText("");
+   370→    } catch (err) {
+   371→      toast.error(err instanceof Error ? err.message : "Import failed");
+   372→    } finally {
+   373→      setPasting(false);
+   374→    }
+   375→  };
+   376→
+   377→  // ---- PDF export (real PDF via @react-pdf/renderer) ----
+   378→  const handleExportPdf = async () => {
+   379→    setExportingPdf(true);
+   380→    try {
+   381→      await exportResumePdf(data, style);
+   382→      toast.success("PDF downloaded!");
+   383→    } catch (err) {
+   384→      toast.error(err instanceof Error ? err.message : "PDF export failed");
+   385→    } finally {
+   386→      setExportingPdf(false);
+   387→    }
+   388→  };
+   389→
+   390→  // ---- Word export ----
+   391→  const handleExportDocx = async () => {
+   392→    setExportingDocx(true);
+   393→    try {
+   394→      await exportResumeDocx(data, style);
+   395→      toast.success("Word document downloaded!");
+   396→    } catch (err) {
+   397→      toast.error(err instanceof Error ? err.message : "Word export failed");
+   398→    } finally {
+   399→      setExportingDocx(false);
+   400→    }
+   401→  };
+   402→
+   403→  const handleReset = () => {
+   404→    if (confirm("Reset resume to the sample data? Your edits will be lost.")) {
+   405→      reset();
+   406→      setSections(DEFAULT_SECTIONS);
+   407→      toast.success("Reset to sample resume.");
+   408→    }
+   409→  };
+   410→
+   411→  return (
+   412→    <div className="space-y-4">
+   413→      <ModuleHeader
+   414→        icon={FileText}
+   415→        title="Resume Builder"
+   416→        description="Real templates, AI editing, PDF & Word export, and resume import."
+   417→      >
+   418→        <div className="flex flex-wrap items-center gap-2">
+   419→          <input
+   420→            ref={fileInputRef}
+   421→            type="file"
+   422→            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+   423→            onChange={handleImport}
+   424→            className="hidden"
+   425→          />
+   426→          <Button
+   427→            variant="outline"
+   428→            size="sm"
+   429→            className="gap-1.5"
+   430→            onClick={() => fileInputRef.current?.click()}
+   431→            disabled={importing}
+   432→          >
+   433→            {importing ? (
+   434→              <Loader2 className="size-3.5 animate-spin" />
+   435→            ) : (
+   436→              <Upload className="size-3.5" />
+   437→            )}
+   438→            Import
+   439→          </Button>
+   440→          <Button
+   441→            variant="ghost"
+   442→            size="sm"
+   443→            className="gap-1.5"
+   444→            onClick={() => setPasteOpen(true)}
+   445→            disabled={importing || pasting}
+   446→          >
+   447→            <ClipboardPaste className="size-3.5" />
+   448→            Paste text
+   449→          </Button>
+   450→          <Button
+   451→            variant="outline"
+   452→            size="sm"
+   453→            className="gap-1.5"
+   454→            onClick={handleExportPdf}
+   455→            disabled={exportingPdf}
+   456→          >
+   457→            {exportingPdf ? (
+   458→              <Loader2 className="size-3.5 animate-spin" />
+   459→            ) : (
+   460→              <Download className="size-3.5" />
+   461→            )} PDF
+   462→          </Button>
+   463→          <Button
+   464→            size="sm"
+   465→            className="gap-1.5"
+   466→            onClick={handleExportDocx}
+   467→            disabled={exportingDocx}
+   468→          >
+   469→            {exportingDocx ? (
+   470→              <Loader2 className="size-3.5 animate-spin" />
+   471→            ) : (
+   472→              <FileType2 className="size-3.5" />
+   473→            )}
+   474→            Word
+   475→          </Button>
+   476→        </div>
+   477→      </ModuleHeader>
+   478→
+   479→      {/* Toolbar: template + font + accent + zoom + sections */}
+   480→      <Card>
+   481→        <CardContent className="flex flex-wrap items-center gap-3 p-3">
+   482→          {/* Template selector */}
+   483→          <div className="flex items-center gap-1.5">
+   484→            <span className="text-xs font-medium text-muted-foreground">Template</span>
+   485→            <DropdownMenu>
+   486→              <DropdownMenuTrigger asChild>
+   487→                <Button variant="outline" size="sm" className="gap-1.5">
+   488→                  <span className="size-3 rounded-sm" style={{ background: style.accent }} />
+   489→                  {TEMPLATE_OPTIONS.find((t) => t.id === style.template)?.name ?? "Modern"}
+   490→                  <ChevronDown className="size-3.5" />
+   491→                </Button>
+   492→              </DropdownMenuTrigger>
+   493→              <DropdownMenuContent align="start" className="w-56">
+   494→                <DropdownMenuLabel>Choose a template</DropdownMenuLabel>
+   495→                <DropdownMenuSeparator />
+   496→                {TEMPLATE_OPTIONS.map((t) => (
+   497→                  <DropdownMenuItem
+   498→                    key={t.id}
+   499→                    onClick={() => setStyle({ template: t.id, accent: t.accent })}
+   500→                    className="gap-2"
+   501→                  >
+   502→                    <span className="size-3 rounded-sm" style={{ background: t.accent }} />
+   503→                    <div className="flex-1">
+   504→                      <p className="text-sm font-medium">{t.name}</p>
+   505→                      <p className="text-xs text-muted-foreground">{t.description}</p>
+   506→                    </div>
+   507→                    {style.template === t.id && <Check className="size-3.5 text-primary" />}
+   508→                  </DropdownMenuItem>
+   509→                ))}
+   510→              </DropdownMenuContent>
+   511→            </DropdownMenu>
+   512→          </div>
+   513→
+   514→          <div className="h-5 w-px bg-border" />
+   515→
+   516→          {/* Font selector */}
+   517→          <DropdownMenu>
+   518→            <DropdownMenuTrigger asChild>
+   519→              <Button variant="outline" size="sm" className="gap-1.5">
+   520→                <TypeIcon className="size-3.5" />
+   521→                {FONT_OPTIONS.find((f) => f.id === style.font)?.name ?? "Sans"}
+   522→              </Button>
+   523→            </DropdownMenuTrigger>
+   524→            <DropdownMenuContent align="start">
+   525→              <DropdownMenuLabel>Font</DropdownMenuLabel>
+   526→              <DropdownMenuSeparator />
+   527→              {FONT_OPTIONS.map((f) => (
+   528→                <DropdownMenuItem
+   529→                  key={f.id}
+   530→                  onClick={() => setStyle({ font: f.id })}
+   531→                  style={{ fontFamily: f.stack }}
+   532→                  className="gap-2"
+   533→                >
+   534→                  <span className="flex-1">{f.name}</span>
+   535→                  {style.font === f.id && <Check className="size-3.5 text-primary" />}
+   536→                </DropdownMenuItem>
+   537→              ))}
+   538→            </DropdownMenuContent>
+   539→          </DropdownMenu>
+   540→
+   541→          {/* Accent picker */}
+   542→          <DropdownMenu>
+   543→            <DropdownMenuTrigger asChild>
+   544→              <Button variant="outline" size="sm" className="gap-1.5">
+   545→                <Palette className="size-3.5" />
+   546→                <span className="size-3 rounded-full" style={{ background: style.accent }} />
+   547→              </Button>
+   548→            </DropdownMenuTrigger>
+   549→            <DropdownMenuContent align="start">
+   550→              <DropdownMenuLabel>Accent color</DropdownMenuLabel>
+   551→              <DropdownMenuSeparator />
+   552→              <div className="grid grid-cols-4 gap-2 p-1">
+   553→                {ACCENT_OPTIONS.map((c) => (
+   554→                  <button
+   555→                    key={c}
+   556→                    onClick={() => setStyle({ accent: c })}
+   557→                    className={cn(
+   558→                      "grid size-7 place-items-center rounded-full ring-offset-2 ring-offset-background transition",
+   559→                      style.accent === c && "ring-2 ring-ring"
+   560→                    )}
+   561→                    style={{ background: c }}
+   562→                  >
+   563→                    {style.accent === c && <Check className="size-3.5 text-white" />}
+   564→                  </button>
+   565→                ))}
+   566→              </div>
+   567→            </DropdownMenuContent>
+   568→          </DropdownMenu>
+   569→
+   570→          <div className="h-5 w-px bg-border" />
+   571→
+   572→          {/* Zoom */}
+   573→          <div className="flex items-center gap-1">
+   574→            <Tooltip>
+   575→              <TooltipTrigger asChild>
+   576→                <Button
+   577→                  variant="ghost"
+   578→                  size="icon"
+   579→                  className="size-8"
+   580→                  onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.1).toFixed(2)))}
+   581→                >
+   582→                  <ZoomOut className="size-3.5" />
+   583→                </Button>
+   584→              </TooltipTrigger>
+   585→              <TooltipContent>Zoom out</TooltipContent>
+   586→            </Tooltip>
+   587→            <span className="w-10 text-center text-xs font-medium tabular-nums">
+   588→              {Math.round(zoom * 100)}%
+   589→            </span>
+   590→            <Tooltip>
+   591→              <TooltipTrigger asChild>
+   592→                <Button
+   593→                  variant="ghost"
+   594→                  size="icon"
+   595→                  className="size-8"
+   596→                  onClick={() => setZoom((z) => Math.min(1.2, +(z + 0.1).toFixed(2)))}
+   597→                >
+   598→                  <ZoomIn className="size-3.5" />
+   599→                </Button>
+   600→              </TooltipTrigger>
+   601→              <TooltipContent>Zoom in</TooltipContent>
+   602→            </Tooltip>
+   603→          </div>
+   604→
+   605→          <div className="h-5 w-px bg-border" />
+   606→
+   607→          {/* Sections toggle */}
+   608→          <DropdownMenu>
+   609→            <DropdownMenuTrigger asChild>
+   610→              <Button variant="outline" size="sm" className="gap-1.5">
+   611→                <FileText className="size-3.5" />
+   612→                Sections
+   613→              </Button>
+   614→            </DropdownMenuTrigger>
+   615→            <DropdownMenuContent align="start" className="w-52">
+   616→              <DropdownMenuLabel>Visible sections</DropdownMenuLabel>
+   617→              <DropdownMenuSeparator />
+   618→              {ALL_SECTIONS.map((s) => (
+   619→                <DropdownMenuItem
+   620→                  key={s.id}
+   621→                  onClick={() =>
+   622→                    setSections((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+   623→                  }
+   624→                  className="gap-2"
+   625→                >
+   626→                  <span
+   627→                    className={cn(
+   628→                      "grid size-4 place-items-center rounded border",
+   629→                      sections[s.id]
+   630→                        ? "border-primary bg-primary text-primary-foreground"
+   631→                        : "border-muted-foreground/30"
+   632→                    )}
+   633→                  >
+   634→                    {sections[s.id] && <Check className="size-3" />}
+   635→                  </span>
+   636→                  {s.label}
+   637→                </DropdownMenuItem>
+   638→              ))}
+   639→            </DropdownMenuContent>
+   640→          </DropdownMenu>
+   641→
+   642→          <div className="ml-auto">
+   643→            <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleReset}>
+   644→              <RotateCcw className="size-3.5" /> Reset
+   645→            </Button>
+   646→          </div>
+   647→        </CardContent>
+   648→      </Card>
+   649→
+   650→      {/* Editor + Preview */}
+   651→      <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
+   652→        {/* Editor */}
+   653→        <div className="lg:max-h-[calc(100vh-15rem)] lg:overflow-y-auto lg:pr-1 scroll-thin">
+   654→          <ResumeEditor />
+   655→        </div>
+   656→
+   657→        {/* Preview */}
+   658→        <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto scroll-thin">
+   659→          <div className="flex justify-center rounded-xl bg-muted/40 p-4 sm:p-8">
+   660→            <div
+   661→              style={{
+   662→                transform: `scale(${zoom})`,
+   663→                transformOrigin: "top center",
+   664→                transition: "transform 0.15s ease",
+   665→              }}
+   666→            >
+   667→              <ResumePreview data={data} style={style} sections={sections} />
+   668→            </div>
+   669→          </div>
+   670→        </div>
+   671→      </div>
+   672→
+   673→      {/* Live import progress overlay */}
+   674→      {importSteps.length > 0 && (
+   675→        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl border border-border bg-card/95 p-4 shadow-2xl backdrop-blur-lg">
+   676→          <div className="mb-3 flex items-center gap-2">
+   677→            <Loader2 className="size-4 animate-spin text-primary" />
+   678→            <p className="text-sm font-semibold">Importing your resume…</p>
+   679→          </div>
+   680→          {/* Progress bar */}
+   681→          <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
+   682→            <div
+   683→              className="h-full rounded-full bg-primary transition-all duration-500"
+   684→              style={{
+   685→                width: `${(importSteps.filter((s) => s.status === "done").length / importSteps.length) * 100}%`,
+   686→              }}
+   687→            />
+   688→          </div>
+   689→          {/* Step list */}
+   690→          <div className="space-y-1.5">
+   691→            {importSteps.map((step, i) => (
+   692→              <div key={i} className="flex items-center gap-2 text-xs">
+   693→                {step.status === "done" ? (
+   694→                  <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
+   695→                ) : step.status === "parsing" ? (
+   696→                  <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+   697→                ) : (
+   698→                  <div className="size-3.5 shrink-0 rounded-full border border-muted-foreground/30" />
+   699→                )}
+   700→                <span className={cn("flex-1", step.status === "done" ? "text-foreground" : step.status === "parsing" ? "text-foreground font-medium" : "text-muted-foreground")}>
+   701→                  {step.label}
+   702→                </span>
+   703→                {step.count != null && step.status === "done" && (
+   704→                  <span className="text-muted-foreground">{step.count} {step.label === "Skills" ? "skills" : step.label === "Experience" ? "jobs" : step.label === "Projects" ? "projects" : "entries"}</span>
+   705→                )}
+   706→                {step.status === "parsing" && step.count != null && (
+   707→                  <span className="text-muted-foreground">{step.count}…</span>
+   708→                )}
+   709→              </div>
+   710→            ))}
+   711→          </div>
+   712→        </div>
+   713→      )}
+   714→
+   715→      {/* Paste-text fallback dialog */}
+   716→      <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
+   717→        <DialogContent className="max-w-2xl">
+   718→          <DialogHeader>
+   719→            <DialogTitle className="flex items-center gap-2">
+   720→              <ClipboardPaste className="size-5 text-primary" />
+   721→              Paste your resume text
+   722→            </DialogTitle>
+   723→            <DialogDescription>
+   724→              If the file import timed out or failed, paste your resume text
+   725→              here and the AI will parse it. Copy the text from your PDF/DOCX
+   726→              and paste it below.
+   727→            </DialogDescription>
+   728→          </DialogHeader>
+   729→          <Textarea
+   730→            value={pasteText}
+   731→            onChange={(e) => setPasteText(e.target.value)}
+   732→            placeholder="Paste your full resume text here…"
+   733→            className="min-h-[300px] resize-none font-mono text-xs"
+   734→          />
+   735→          <div className="flex justify-end gap-2">
+   736→            <Button variant="outline" onClick={() => setPasteOpen(false)}>
+   737→              Cancel
+   738→            </Button>
+   739→            <Button
+   740→              onClick={handlePasteImport}
+   741→              disabled={pasting || pasteText.trim().length < 30}
+   742→              className="gap-1.5"
+   743→            >
+   744→              {pasting ? (
+   745→                <Loader2 className="size-4 animate-spin" />
+   746→              ) : (
+   747→                <Sparkles className="size-4" />
+   748→              )}
+   749→              Parse with AI
+   750→            </Button>
+   751→          </div>
+   752→        </DialogContent>
+   753→      </Dialog>
+   754→    </div>
+   755→  );
+   756→}
+   757→

@@ -1,0 +1,1683 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  Mail,
+     6→  Phone,
+     7→  MapPin,
+     8→  Linkedin,
+     9→  Github,
+    10→  Globe,
+    11→  type LucideIcon,
+    12→} from "lucide-react";
+    13→import {
+    14→  type ResumeData,
+    15→  type ExperienceItem,
+    16→  type ProjectItem,
+    17→  type EducationItem,
+    18→  type SimpleItem,
+    19→  type ReferenceItem,
+    20→  type TemplateStyle,
+    21→} from "@/store/resume-store";
+    22→import { cn } from "@/lib/utils";
+    23→import {
+    24→  SoftwareEngineerTemplate,
+    25→  AcademicTemplate,
+    26→  CreativeTemplate,
+    27→  WebDeveloperTemplate,
+    28→  UxDesignerTemplate,
+    29→  TeacherTemplate,
+    30→  ProductManagerTemplate,
+    31→  FinanceTemplate,
+    32→  BusinessAnalystTemplate,
+    33→} from "@/components/modules/resume-templates-extended";
+    34→
+    35→/* ============================================================
+    36→ * Catalog exports — template / font / accent option tables
+    37→ * ========================================================== */
+    38→
+    39→export const TEMPLATE_OPTIONS: {
+    40→  id: string;
+    41→  name: string;
+    42→  description: string;
+    43→  accent: string;
+    44→}[] = [
+    45→  {
+    46→    id: "modern",
+    47→    name: "Modern",
+    48→    description: "Two-column sidebar",
+    49→    accent: "#10b981",
+    50→  },
+    51→  {
+    52→    id: "ats",
+    53→    name: "ATS",
+    54→    description: "Single-column, parseable",
+    55→    accent: "#374151",
+    56→  },
+    57→  {
+    58→    id: "executive",
+    59→    name: "Executive",
+    60→    description: "Centered serif header",
+    61→    accent: "#b45309",
+    62→  },
+    63→  {
+    64→    id: "minimal",
+    65→    name: "Minimal",
+    66→    description: "Ultra-clean, airy",
+    67→    accent: "#0f172a",
+    68→  },
+    69→  {
+    70→    id: "software-engineer",
+    71→    name: "Software Engineer",
+    72→    description: "Dark sidebar + photo",
+    73→    accent: "#1e293b",
+    74→  },
+    75→  {
+    76→    id: "academic",
+    77→    name: "Academic CV",
+    78→    description: "Scholarly sidebar",
+    79→    accent: "#374151",
+    80→  },
+    81→  {
+    82→    id: "creative",
+    83→    name: "Creative Designer",
+    84→    description: "Bold + skill bars",
+    85→    accent: "#ea580c",
+    86→  },
+    87→  {
+    88→    id: "web-developer",
+    89→    name: "Web Developer",
+    90→    description: "Diagonal + skill bars",
+    91→    accent: "#f97316",
+    92→  },
+    93→  {
+    94→    id: "ux-designer",
+    95→    name: "UX Designer",
+    96→    description: "Timeline + photo",
+    97→    accent: "#1e3a5f",
+    98→  },
+    99→  {
+   100→    id: "teacher",
+   101→    name: "Teacher",
+   102→    description: "Diagonal + skill bars",
+   103→    accent: "#eab308",
+   104→  },
+   105→  {
+   106→    id: "product-manager",
+   107→    name: "Product Manager",
+   108→    description: "Green bars + photo",
+   109→    accent: "#059669",
+   110→  },
+   111→  {
+   112→    id: "finance",
+   113→    name: "Finance Executive",
+   114→    description: "Header band + 2-col",
+   115→    accent: "#1f2937",
+   116→  },
+   117→  {
+   118→    id: "business-analyst",
+   119→    name: "Business Analyst",
+   120→    description: "Navy + yellow timeline",
+   121→    accent: "#1e3a5f",
+   122→  },
+   123→];
+   124→
+   125→export const FONT_OPTIONS: { id: string; name: string; stack: string }[] = [
+   126→  {
+   127→    id: "sans",
+   128→    name: "Sans",
+   129→    stack:
+   130→      "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+   131→  },
+   132→  {
+   133→    id: "serif",
+   134→    name: "Serif",
+   135→    stack: "ui-serif, Georgia, Cambria, Times New Roman, serif",
+   136→  },
+   137→  {
+   138→    id: "mono",
+   139→    name: "Mono",
+   140→    stack: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+   141→  },
+   142→];
+   143→
+   144→export const ACCENT_OPTIONS: string[] = [
+   145→  "#10b981",
+   146→  "#0891b2",
+   147→  "#7c3aed",
+   148→  "#b45309",
+   149→  "#dc2626",
+   150→  "#0f172a",
+   151→  "#db2777",
+   152→  "#0d9488",
+   153→];
+   154→
+   155→/* ============================================================
+   156→ * Shared helpers
+   157→ * ========================================================== */
+   158→
+   159→function fontStackFor(font: string): string {
+   160→  return FONT_OPTIONS.find((f) => f.id === font)?.stack ?? FONT_OPTIONS[0].stack;
+   161→}
+   162→
+   163→/** "Start – End" using en dash. If only start present: "Start – Present". */
+   164→function formatRange(start: string, end: string): string {
+   165→  const s = (start ?? "").trim();
+   166→  const e = (end ?? "").trim();
+   167→  if (s && e) return `${s} \u2013 ${e}`;
+   168→  if (s) return `${s} \u2013 Present`;
+   169→  if (e) return e;
+   170→  return "";
+   171→}
+   172→
+   173→function nonEmptyBullets(bullets: string[]): string[] {
+   174→  return (bullets ?? []).map((b) => (b ?? "").trim()).filter(Boolean);
+   175→}
+   176→
+   177→function joinTech(tech: string[]): string {
+   178→  return (tech ?? []).map((t) => (t ?? "").trim()).filter(Boolean).join(", ");
+   179→}
+   180→
+   181→interface ContactEntry {
+   182→  icon: LucideIcon;
+   183→  value: string;
+   184→}
+   185→
+   186→function buildContact(data: ResumeData): ContactEntry[] {
+   187→  const out: ContactEntry[] = [];
+   188→  if (data.email) out.push({ icon: Mail, value: data.email });
+   189→  if (data.phone) out.push({ icon: Phone, value: data.phone });
+   190→  if (data.location) out.push({ icon: MapPin, value: data.location });
+   191→  if (data.linkedin) out.push({ icon: Linkedin, value: data.linkedin });
+   192→  if (data.github) out.push({ icon: Github, value: data.github });
+   193→  if (data.website) out.push({ icon: Globe, value: data.website });
+   194→  return out;
+   195→}
+   196→
+   197→function buildContactStrings(data: ResumeData): string[] {
+   198→  const out: string[] = [];
+   199→  if (data.email) out.push(data.email);
+   200→  if (data.phone) out.push(data.phone);
+   201→  if (data.location) out.push(data.location);
+   202→  if (data.linkedin) out.push(data.linkedin);
+   203→  if (data.github) out.push(data.github);
+   204→  if (data.website) out.push(data.website);
+   205→  return out;
+   206→}
+   207→
+   208→/** translucent accent (hex alpha suffix). Falls back gracefully. */
+   209→function alpha(hex: string, a: string): string {
+   210→  // strip any leading alpha that's already there
+   211→  const h = hex.replace(/#[0-9a-fA-F]{8}$/, (m) => m.slice(0, 7));
+   212→  return `${h}${a}`;
+   213→}
+   214→
+   215→interface TemplateProps {
+   216→  data: ResumeData;
+   217→  sections: Record<string, boolean>;
+   218→  accent: string;
+   219→}
+   220→
+   221→/* ============================================================
+   222→ * Root exported component
+   223→ * ========================================================== */
+   224→
+   225→export interface ResumePreviewProps {
+   226→  data: ResumeData;
+   227→  style: TemplateStyle;
+   228→  sections: Record<string, boolean>;
+   229→  className?: string;
+   230→}
+   231→
+   232→export function ResumePreview({
+   233→  data,
+   234→  style,
+   235→  sections,
+   236→  className,
+   237→}: ResumePreviewProps) {
+   238→  const fontStack = fontStackFor(style.font);
+   239→  const accent = style.accent || "#10b981";
+   240→  const template = style.template || "modern";
+   241→
+   242→  let body: React.ReactNode;
+   243→  if (template === "ats") {
+   244→    body = <AtsTemplate data={data} sections={sections} accent={accent} />;
+   245→  } else if (template === "executive") {
+   246→    body = (
+   247→      <ExecutiveTemplate data={data} sections={sections} accent={accent} />
+   248→    );
+   249→  } else if (template === "minimal") {
+   250→    body = <MinimalTemplate data={data} sections={sections} accent={accent} />;
+   251→  } else if (template === "software-engineer") {
+   252→    body = <SoftwareEngineerTemplate data={data} sections={sections} accent={accent} />;
+   253→  } else if (template === "academic") {
+   254→    body = <AcademicTemplate data={data} sections={sections} accent={accent} />;
+   255→  } else if (template === "creative") {
+   256→    body = <CreativeTemplate data={data} sections={sections} accent={accent} />;
+   257→  } else if (template === "web-developer") {
+   258→    body = <WebDeveloperTemplate data={data} sections={sections} accent={accent} />;
+   259→  } else if (template === "ux-designer") {
+   260→    body = <UxDesignerTemplate data={data} sections={sections} accent={accent} />;
+   261→  } else if (template === "teacher") {
+   262→    body = <TeacherTemplate data={data} sections={sections} accent={accent} />;
+   263→  } else if (template === "product-manager") {
+   264→    body = <ProductManagerTemplate data={data} sections={sections} accent={accent} />;
+   265→  } else if (template === "finance") {
+   266→    body = <FinanceTemplate data={data} sections={sections} accent={accent} />;
+   267→  } else if (template === "business-analyst") {
+   268→    body = <BusinessAnalystTemplate data={data} sections={sections} accent={accent} />;
+   269→  } else {
+   270→    body = <ModernTemplate data={data} sections={sections} accent={accent} />;
+   271→  }
+   272→
+   273→  return (
+   274→    <div
+   275→      className={cn(
+   276→        "resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl",
+   277→        className,
+   278→      )}
+   279→      style={{ fontFamily: fontStack }}
+   280→    >
+   281→      {body}
+   282→    </div>
+   283→  );
+   284→}
+   285→
+   286→/* ============================================================
+   287→ * 1) MODERN — two-column sidebar
+   288→ * ========================================================== */
+   289→
+   290→function ModernTemplate({ data, sections, accent }: TemplateProps) {
+   291→  const showPersonal = sections.personal !== false;
+   292→  const contacts = buildContact(data);
+   293→  const showContact = showPersonal && contacts.length > 0;
+   294→  const showSkills = sections.skills && data.skills.length > 0;
+   295→  const showLanguages = sections.languages && data.languages.length > 0;
+   296→  const showCerts =
+   297→    sections.certifications && data.certifications.length > 0;
+   298→  const showInterests = sections.interests && data.interests.length > 0;
+   299→  const showPubs = sections.publications && data.publications.length > 0;
+   300→
+   301→  const sidebarHasContent =
+   302→    showContact ||
+   303→    showSkills ||
+   304→    showLanguages ||
+   305→    showCerts ||
+   306→    showInterests ||
+   307→    showPubs;
+   308→
+   309→  const showSummary = sections.summary && data.summary.trim().length > 0;
+   310→  const showExperience = sections.experience && data.experience.length > 0;
+   311→  const showProjects = sections.projects && data.projects.length > 0;
+   312→  const showEducation = sections.education && data.education.length > 0;
+   313→  const showAwards = sections.awards && data.awards.length > 0;
+   314→  const showReferences = sections.references && data.references.length > 0;
+   315→
+   316→  return (
+   317→    <div className="grid grid-cols-[34%_1fr] min-h-[1123px]">
+   318→      {/* ---------- Sidebar ---------- */}
+   319→      <aside
+   320→        className="flex flex-col gap-6 p-6 text-white"
+   321→        style={{ backgroundColor: accent }}
+   322→      >
+   323→        {sidebarHasContent ? (
+   324→          <>
+   325→            {showContact && (
+   326→              <ModernSidebarSection title="Contact">
+   327→                <ul className="space-y-1.5 text-[12px]">
+   328→                  {contacts.map((c, i) => (
+   329→                    <li
+   330→                      key={i}
+   331→                      className="flex items-start gap-1.5 leading-snug"
+   332→                    >
+   333→                      <c.icon className="mt-[2px] size-3 shrink-0 opacity-85" />
+   334→                      <span className="break-words">{c.value}</span>
+   335→                    </li>
+   336→                  ))}
+   337→                </ul>
+   338→              </ModernSidebarSection>
+   339→            )}
+   340→
+   341→            {showSkills && (
+   342→              <ModernSidebarSection title="Skills">
+   343→                <ul className="flex flex-wrap gap-1.5">
+   344→                  {data.skills.map((s, i) => (
+   345→                    <li
+   346→                      key={i}
+   347→                      className="rounded px-2 py-0.5 text-[11px] font-medium"
+   348→                      style={{ backgroundColor: "rgba(255,255,255,0.18)" }}
+   349→                    >
+   350→                      {s}
+   351→                    </li>
+   352→                  ))}
+   353→                </ul>
+   354→              </ModernSidebarSection>
+   355→            )}
+   356→
+   357→            {showLanguages && (
+   358→              <ModernSidebarSection title="Languages">
+   359→                <ul className="space-y-1 text-[12px]">
+   360→                  {data.languages.map((l, i) => (
+   361→                    <li key={i} className="leading-snug">
+   362→                      {l}
+   363→                    </li>
+   364→                  ))}
+   365→                </ul>
+   366→              </ModernSidebarSection>
+   367→            )}
+   368→
+   369→            {showCerts && (
+   370→              <ModernSidebarSection title="Certifications">
+   371→                <ul className="space-y-2 text-[12px]">
+   372→                  {data.certifications.map((c) => (
+   373→                    <li key={c.id} className="leading-snug">
+   374→                      <div className="font-semibold">{c.title}</div>
+   375→                      {c.subtitle && (
+   376→                        <div className="opacity-85">{c.subtitle}</div>
+   377→                      )}
+   378→                      {c.date && (
+   379→                        <div className="opacity-70 text-[11px]">{c.date}</div>
+   380→                      )}
+   381→                    </li>
+   382→                  ))}
+   383→                </ul>
+   384→              </ModernSidebarSection>
+   385→            )}
+   386→
+   387→            {showInterests && (
+   388→              <ModernSidebarSection title="Interests">
+   389→                <ul className="flex flex-wrap gap-1.5">
+   390→                  {data.interests.map((it, i) => (
+   391→                    <li
+   392→                      key={i}
+   393→                      className="rounded px-2 py-0.5 text-[11px]"
+   394→                      style={{ backgroundColor: "rgba(255,255,255,0.14)" }}
+   395→                    >
+   396→                      {it}
+   397→                    </li>
+   398→                  ))}
+   399→                </ul>
+   400→              </ModernSidebarSection>
+   401→            )}
+   402→
+   403→            {showPubs && (
+   404→              <ModernSidebarSection title="Publications">
+   405→                <ul className="space-y-2 text-[12px]">
+   406→                  {data.publications.map((p) => (
+   407→                    <li key={p.id} className="leading-snug">
+   408→                      <div className="font-semibold">{p.title}</div>
+   409→                      {p.subtitle && (
+   410→                        <div className="opacity-85">{p.subtitle}</div>
+   411→                      )}
+   412→                      {p.date && (
+   413→                        <div className="opacity-70 text-[11px]">{p.date}</div>
+   414→                      )}
+   415→                    </li>
+   416→                  ))}
+   417→                </ul>
+   418→              </ModernSidebarSection>
+   419→            )}
+   420→          </>
+   421→        ) : null}
+   422→      </aside>
+   423→
+   424→      {/* ---------- Main ---------- */}
+   425→      <main className="flex flex-col gap-5 p-7">
+   426→        {showPersonal && (
+   427→          <header className="space-y-1">
+   428→            <h1 className="text-[32px] font-bold leading-tight tracking-tight">
+   429→              {data.name || "Your Name"}
+   430→            </h1>
+   431→            {data.title && (
+   432→              <p
+   433→                className="text-[15px] font-semibold"
+   434→                style={{ color: accent }}
+   435→              >
+   436→                {data.title}
+   437→              </p>
+   438→            )}
+   439→          </header>
+   440→        )}
+   441→
+   442→        {showSummary && (
+   443→          <ModernMainSection title="Summary" accent={accent}>
+   444→            <p className="text-[13px] leading-relaxed text-slate-700">
+   445→              {data.summary}
+   446→            </p>
+   447→          </ModernMainSection>
+   448→        )}
+   449→
+   450→        {showExperience && (
+   451→          <ModernMainSection title="Experience" accent={accent}>
+   452→            <div className="flex flex-col gap-4">
+   453→              {data.experience.map((exp) => (
+   454→                <ModernExperience key={exp.id} exp={exp} accent={accent} />
+   455→              ))}
+   456→            </div>
+   457→          </ModernMainSection>
+   458→        )}
+   459→
+   460→        {showProjects && (
+   461→          <ModernMainSection title="Projects" accent={accent}>
+   462→            <div className="flex flex-col gap-3">
+   463→              {data.projects.map((p) => (
+   464→                <ModernProject key={p.id} project={p} accent={accent} />
+   465→              ))}
+   466→            </div>
+   467→          </ModernMainSection>
+   468→        )}
+   469→
+   470→        {showEducation && (
+   471→          <ModernMainSection title="Education" accent={accent}>
+   472→            <div className="flex flex-col gap-2">
+   473→              {data.education.map((ed) => (
+   474→                <ModernEducation key={ed.id} edu={ed} />
+   475→              ))}
+   476→            </div>
+   477→          </ModernMainSection>
+   478→        )}
+   479→
+   480→        {showAwards && (
+   481→          <ModernMainSection title="Awards" accent={accent}>
+   482→            <ul className="flex flex-col gap-2">
+   483→              {data.awards.map((a) => (
+   484→                <li key={a.id} className="text-[13px] leading-snug">
+   485→                  <div className="flex items-baseline justify-between gap-3">
+   486→                    <span className="font-semibold text-slate-900">
+   487→                      {a.title}
+   488→                    </span>
+   489→                    {a.date && (
+   490→                      <span className="shrink-0 text-[11px] text-slate-500">
+   491→                        {a.date}
+   492→                      </span>
+   493→                    )}
+   494→                  </div>
+   495→                  {a.subtitle && (
+   496→                    <div className="text-slate-600">{a.subtitle}</div>
+   497→                  )}
+   498→                  {a.description && (
+   499→                    <div className="text-slate-600">{a.description}</div>
+   500→                  )}
+   501→                </li>
+   502→              ))}
+   503→            </ul>
+   504→          </ModernMainSection>
+   505→        )}
+   506→
+   507→        {showReferences && (
+   508→          <ModernMainSection title="References" accent={accent}>
+   509→            <div className="grid grid-cols-2 gap-3">
+   510→              {data.references.map((r) => (
+   511→                <div key={r.id} className="text-[12px] leading-snug">
+   512→                  <div className="font-semibold text-slate-900">{r.name}</div>
+   513→                  {r.role && <div className="text-slate-600">{r.role}</div>}
+   514→                  {r.company && (
+   515→                    <div className="text-slate-600">{r.company}</div>
+   516→                  )}
+   517→                  {r.contact && (
+   518→                    <div className="text-slate-500">{r.contact}</div>
+   519→                  )}
+   520→                </div>
+   521→              ))}
+   522→            </div>
+   523→          </ModernMainSection>
+   524→        )}
+   525→      </main>
+   526→    </div>
+   527→  );
+   528→}
+   529→
+   530→function ModernSidebarSection({
+   531→  title,
+   532→  children,
+   533→}: {
+   534→  title: string;
+   535→  children: React.ReactNode;
+   536→}) {
+   537→  return (
+   538→    <section>
+   539→      <h2 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] opacity-95">
+   540→        {title}
+   541→      </h2>
+   542→      {children}
+   543→    </section>
+   544→  );
+   545→}
+   546→
+   547→function ModernMainSection({
+   548→  title,
+   549→  accent,
+   550→  children,
+   551→}: {
+   552→  title: string;
+   553→  accent: string;
+   554→  children: React.ReactNode;
+   555→}) {
+   556→  return (
+   557→    <section>
+   558→      <h2
+   559→        className="mb-2 border-b pb-1 text-[11px] font-bold uppercase tracking-[0.16em]"
+   560→        style={{ color: accent, borderColor: alpha(accent, "33") }}
+   561→      >
+   562→        {title}
+   563→      </h2>
+   564→      {children}
+   565→    </section>
+   566→  );
+   567→}
+   568→
+   569→function ModernExperience({
+   570→  exp,
+   571→  accent,
+   572→}: {
+   573→  exp: ExperienceItem;
+   574→  accent: string;
+   575→}) {
+   576→  const bullets = nonEmptyBullets(exp.bullets);
+   577→  const range = formatRange(exp.start, exp.end);
+   578→  return (
+   579→    <div className="resume-no-break">
+   580→      <div className="flex items-baseline justify-between gap-3">
+   581→        <div>
+   582→          <div className="text-[14px] font-bold text-slate-900">{exp.role}</div>
+   583→          <div className="text-[13px] text-slate-700">
+   584→            {exp.company}
+   585→            {exp.location ? ` · ${exp.location}` : ""}
+   586→          </div>
+   587→        </div>
+   588→        {range && (
+   589→          <span className="shrink-0 text-[11px] font-medium text-slate-500">
+   590→            {range}
+   591→          </span>
+   592→        )}
+   593→      </div>
+   594→      {bullets.length > 0 && (
+   595→        <ul className="mt-1.5 space-y-1">
+   596→          {bullets.map((b, i) => (
+   597→            <li
+   598→              key={i}
+   599→              className="flex gap-2 text-[12.5px] leading-snug text-slate-700"
+   600→            >
+   601→              <span
+   602→                className="mt-[6px] size-1.5 shrink-0 rounded-full"
+   603→                style={{ backgroundColor: accent }}
+   604→              />
+   605→              <span>{b}</span>
+   606→            </li>
+   607→          ))}
+   608→        </ul>
+   609→      )}
+   610→    </div>
+   611→  );
+   612→}
+   613→
+   614→function ModernProject({
+   615→  project,
+   616→  accent,
+   617→}: {
+   618→  project: ProjectItem;
+   619→  accent: string;
+   620→}) {
+   621→  const tech = joinTech(project.tech);
+   622→  return (
+   623→    <div className="resume-no-break">
+   624→      <div className="flex items-baseline justify-between gap-3">
+   625→        <div className="text-[13.5px] font-bold text-slate-900">
+   626→          {project.name}
+   627→        </div>
+   628→        {project.link && (
+   629→          <span
+   630→            className="shrink-0 text-[11px] font-medium"
+   631→            style={{ color: accent }}
+   632→          >
+   633→            {project.link}
+   634→          </span>
+   635→        )}
+   636→      </div>
+   637→      {project.description && (
+   638→        <p className="mt-0.5 text-[12.5px] leading-snug text-slate-700">
+   639→          {project.description}
+   640→        </p>
+   641→      )}
+   642→      {tech && (
+   643→        <p className="mt-0.5 text-[11.5px] text-slate-500">
+   644→          <span className="font-medium">Tech:</span> {tech}
+   645→        </p>
+   646→      )}
+   647→    </div>
+   648→  );
+   649→}
+   650→
+   651→function ModernEducation({ edu }: { edu: EducationItem }) {
+   652→  const range = formatRange(edu.start, edu.end);
+   653→  return (
+   654→    <div className="resume-no-break">
+   655→      <div className="flex items-baseline justify-between gap-3">
+   656→        <div className="text-[13px] font-bold text-slate-900">{edu.degree}</div>
+   657→        {range && (
+   658→          <span className="shrink-0 text-[11px] text-slate-500">{range}</span>
+   659→        )}
+   660→      </div>
+   661→      <div className="text-[12.5px] text-slate-700">
+   662→        {edu.school}
+   663→        {edu.location ? ` · ${edu.location}` : ""}
+   664→      </div>
+   665→      {edu.grade && (
+   666→        <div className="text-[11.5px] text-slate-500">{edu.grade}</div>
+   667→      )}
+   668→    </div>
+   669→  );
+   670→}
+   671→
+   672→/* ============================================================
+   673→ * 2) ATS — single-column, plain, maximally parseable
+   674→ * ========================================================== */
+   675→
+   676→function AtsTemplate({ data, sections, accent }: TemplateProps) {
+   677→  const showPersonal = sections.personal !== false;
+   678→  const contacts = buildContactStrings(data);
+   679→
+   680→  const showSummary = sections.summary && data.summary.trim().length > 0;
+   681→  const showExperience = sections.experience && data.experience.length > 0;
+   682→  const showSkills = sections.skills && data.skills.length > 0;
+   683→  const showProjects = sections.projects && data.projects.length > 0;
+   684→  const showEducation = sections.education && data.education.length > 0;
+   685→  const showCerts =
+   686→    sections.certifications && data.certifications.length > 0;
+   687→  const showLanguages = sections.languages && data.languages.length > 0;
+   688→  const showAwards = sections.awards && data.awards.length > 0;
+   689→  const showPubs = sections.publications && data.publications.length > 0;
+   690→  const showInterests = sections.interests && data.interests.length > 0;
+   691→  const showReferences = sections.references && data.references.length > 0;
+   692→
+   693→  return (
+   694→    <div className="mx-auto max-w-[760px] p-10">
+   695→      {showPersonal && (
+   696→        <header className="mb-6 text-center">
+   697→          <h1 className="text-[26px] font-bold leading-tight text-slate-900">
+   698→            {data.name || "Your Name"}
+   699→          </h1>
+   700→          {data.title && (
+   701→            <p className="mt-1 text-[14px] text-slate-600">{data.title}</p>
+   702→          )}
+   703→          {contacts.length > 0 && (
+   704→            <p className="mt-2 text-[12px] text-slate-700">
+   705→              {contacts.join(" | ")}
+   706→            </p>
+   707→          )}
+   708→        </header>
+   709→      )}
+   710→
+   711→      {showSummary && (
+   712→        <AtsSection title="Summary">
+   713→          <p className="text-[13px] leading-relaxed text-slate-800">
+   714→            {data.summary}
+   715→          </p>
+   716→        </AtsSection>
+   717→      )}
+   718→
+   719→      {showExperience && (
+   720→        <AtsSection title="Experience">
+   721→          <div className="flex flex-col gap-3">
+   722→            {data.experience.map((exp) => (
+   723→              <AtsExperience key={exp.id} exp={exp} />
+   724→            ))}
+   725→          </div>
+   726→        </AtsSection>
+   727→      )}
+   728→
+   729→      {showEducation && (
+   730→        <AtsSection title="Education">
+   731→          <div className="flex flex-col gap-2">
+   732→            {data.education.map((ed) => (
+   733→              <AtsEducation key={ed.id} edu={ed} />
+   734→            ))}
+   735→          </div>
+   736→        </AtsSection>
+   737→      )}
+   738→
+   739→      {showSkills && (
+   740→        <AtsSection title="Skills">
+   741→          <p className="text-[13px] leading-relaxed text-slate-800">
+   742→            {data.skills.join(", ")}
+   743→          </p>
+   744→        </AtsSection>
+   745→      )}
+   746→
+   747→      {showProjects && (
+   748→        <AtsSection title="Projects">
+   749→          <div className="flex flex-col gap-2">
+   750→            {data.projects.map((p) => (
+   751→              <AtsProject key={p.id} project={p} />
+   752→            ))}
+   753→          </div>
+   754→        </AtsSection>
+   755→      )}
+   756→
+   757→      {showCerts && (
+   758→        <AtsSection title="Certifications">
+   759→          <ul className="flex flex-col gap-1">
+   760→            {data.certifications.map((c) => (
+   761→              <li key={c.id} className="text-[13px] text-slate-800">
+   762→                <span className="font-semibold">{c.title}</span>
+   763→                {c.subtitle ? `, ${c.subtitle}` : ""}
+   764→                {c.date ? ` (${c.date})` : ""}
+   765→              </li>
+   766→            ))}
+   767→          </ul>
+   768→        </AtsSection>
+   769→      )}
+   770→
+   771→      {showLanguages && (
+   772→        <AtsSection title="Languages">
+   773→          <p className="text-[13px] text-slate-800">
+   774→            {data.languages.join(", ")}
+   775→          </p>
+   776→        </AtsSection>
+   777→      )}
+   778→
+   779→      {showAwards && (
+   780→        <AtsSection title="Awards">
+   781→          <ul className="flex flex-col gap-1">
+   782→            {data.awards.map((a) => (
+   783→              <li key={a.id} className="text-[13px] text-slate-800">
+   784→                <span className="font-semibold">{a.title}</span>
+   785→                {a.subtitle ? `, ${a.subtitle}` : ""}
+   786→                {a.date ? ` (${a.date})` : ""}
+   787→                {a.description ? ` — ${a.description}` : ""}
+   788→              </li>
+   789→            ))}
+   790→          </ul>
+   791→        </AtsSection>
+   792→      )}
+   793→
+   794→      {showPubs && (
+   795→        <AtsSection title="Publications">
+   796→          <ul className="flex flex-col gap-1">
+   797→            {data.publications.map((p) => (
+   798→              <li key={p.id} className="text-[13px] text-slate-800">
+   799→                <span className="font-semibold">{p.title}</span>
+   800→                {p.subtitle ? `, ${p.subtitle}` : ""}
+   801→                {p.date ? ` (${p.date})` : ""}
+   802→                {p.description ? ` — ${p.description}` : ""}
+   803→              </li>
+   804→            ))}
+   805→          </ul>
+   806→        </AtsSection>
+   807→      )}
+   808→
+   809→      {showInterests && (
+   810→        <AtsSection title="Interests">
+   811→          <p className="text-[13px] text-slate-800">
+   812→            {data.interests.join(", ")}
+   813→          </p>
+   814→        </AtsSection>
+   815→      )}
+   816→
+   817→      {showReferences && (
+   818→        <AtsSection title="References">
+   819→          <div className="flex flex-col gap-1">
+   820→            {data.references.map((r) => (
+   821→              <div key={r.id} className="text-[13px] text-slate-800">
+   822→                <span className="font-semibold">{r.name}</span>
+   823→                {r.role ? `, ${r.role}` : ""}
+   824→                {r.company ? `, ${r.company}` : ""}
+   825→                {r.contact ? ` — ${r.contact}` : ""}
+   826→              </div>
+   827→            ))}
+   828→          </div>
+   829→        </AtsSection>
+   830→      )}
+   831→    </div>
+   832→  );
+   833→}
+   834→
+   835→function AtsSection({
+   836→  title,
+   837→  children,
+   838→}: {
+   839→  title: string;
+   840→  children: React.ReactNode;
+   841→}) {
+   842→  return (
+   843→    <section className="mb-5">
+   844→      <h2 className="mb-2 border-b border-slate-400 pb-1 text-[12px] font-bold uppercase tracking-[0.18em] text-slate-800">
+   845→        {title}
+   846→      </h2>
+   847→      {children}
+   848→    </section>
+   849→  );
+   850→}
+   851→
+   852→function AtsExperience({ exp }: { exp: ExperienceItem }) {
+   853→  const bullets = nonEmptyBullets(exp.bullets);
+   854→  const range = formatRange(exp.start, exp.end);
+   855→  const metaLine = [exp.company, exp.location, range]
+   856→    .filter((x) => !!x && x.trim().length > 0)
+   857→    .join(" | ");
+   858→  return (
+   859→    <div className="resume-no-break">
+   860→      <div className="text-[13.5px] font-bold text-slate-900">{exp.role}</div>
+   861→      {metaLine && (
+   862→        <div className="text-[12px] text-slate-700">{metaLine}</div>
+   863→      )}
+   864→      {bullets.length > 0 && (
+   865→        <ul className="mt-1 space-y-0.5">
+   866→          {bullets.map((b, i) => (
+   867→            <li
+   868→              key={i}
+   869→              className="pl-4 text-[12.5px] leading-snug text-slate-800"
+   870→              style={{ textIndent: "-12px" }}
+   871→            >
+   872→              • {b}
+   873→            </li>
+   874→          ))}
+   875→        </ul>
+   876→      )}
+   877→    </div>
+   878→  );
+   879→}
+   880→
+   881→function AtsEducation({ edu }: { edu: EducationItem }) {
+   882→  const range = formatRange(edu.start, edu.end);
+   883→  const meta = [edu.school, edu.location, range, edu.grade]
+   884→    .filter((x) => !!x && x.trim().length > 0)
+   885→    .join(" | ");
+   886→  return (
+   887→    <div className="resume-no-break">
+   888→      <div className="text-[13px] font-bold text-slate-900">{edu.degree}</div>
+   889→      {meta && <div className="text-[12px] text-slate-700">{meta}</div>}
+   890→    </div>
+   891→  );
+   892→}
+   893→
+   894→function AtsProject({ project }: { project: ProjectItem }) {
+   895→  const tech = joinTech(project.tech);
+   896→  return (
+   897→    <div className="resume-no-break">
+   898→      <div className="text-[13px] font-bold text-slate-900">
+   899→        {project.name}
+   900→        {project.link ? ` — ${project.link}` : ""}
+   901→      </div>
+   902→      {project.description && (
+   903→        <div className="text-[12.5px] text-slate-800">
+   904→          {project.description}
+   905→        </div>
+   906→      )}
+   907→      {tech && (
+   908→        <div className="text-[12px] text-slate-700">
+   909→          <span className="font-semibold">Tech:</span> {tech}
+   910→        </div>
+   911→      )}
+   912→    </div>
+   913→  );
+   914→}
+   915→
+   916→/* ============================================================
+   917→ * 3) EXECUTIVE — centered serif header, gold/amber accent
+   918→ * ========================================================== */
+   919→
+   920→function ExecutiveTemplate({ data, sections, accent }: TemplateProps) {
+   921→  const showPersonal = sections.personal !== false;
+   922→  const contacts = buildContactStrings(data);
+   923→
+   924→  const showSummary = sections.summary && data.summary.trim().length > 0;
+   925→  const showExperience = sections.experience && data.experience.length > 0;
+   926→  const showProjects = sections.projects && data.projects.length > 0;
+   927→  const showEducation = sections.education && data.education.length > 0;
+   928→  const showCerts =
+   929→    sections.certifications && data.certifications.length > 0;
+   930→  const showLanguages = sections.languages && data.languages.length > 0;
+   931→  const showAwards = sections.awards && data.awards.length > 0;
+   932→  const showPubs = sections.publications && data.publications.length > 0;
+   933→  const showInterests = sections.interests && data.interests.length > 0;
+   934→  const showReferences = sections.references && data.references.length > 0;
+   935→
+   936→  return (
+   937→    <div className="mx-auto max-w-[780px] p-10">
+   938→      {showPersonal && (
+   939→        <header className="mb-6 text-center">
+   940→          <h1
+   941→            className="text-[34px] font-bold leading-none"
+   942→            style={{ fontFamily: "Georgia, serif" }}
+   943→          >
+   944→            {data.name || "Your Name"}
+   945→          </h1>
+   946→          {data.title && (
+   947→            <p
+   948→              className="mt-2 text-[15px] italic"
+   949→              style={{ color: accent, fontFamily: "Georgia, serif" }}
+   950→            >
+   951→              {data.title}
+   952→            </p>
+   953→          )}
+   954→          {contacts.length > 0 && (
+   955→            <p className="mt-2 text-[12px] text-slate-700">
+   956→              {contacts.join("  \u2022  ")}
+   957→            </p>
+   958→          )}
+   959→          <div
+   960→            className="mt-4 w-full"
+   961→            style={{
+   962→              borderTop: `3px double ${accent}`,
+   963→              borderBottom: `1px solid ${accent}`,
+   964→              height: 6,
+   965→            }}
+   966→          />
+   967→        </header>
+   968→      )}
+   969→
+   970→      {showSummary && (
+   971→        <ExecSection title="Profile" accent={accent}>
+   972→          <p className="text-center text-[13px] leading-relaxed text-slate-700">
+   973→            {data.summary}
+   974→          </p>
+   975→        </ExecSection>
+   976→      )}
+   977→
+   978→      {showExperience && (
+   979→        <ExecSection title="Experience" accent={accent}>
+   980→          <div className="flex flex-col gap-3">
+   981→            {data.experience.map((exp) => (
+   982→              <ExecExperience key={exp.id} exp={exp} accent={accent} />
+   983→            ))}
+   984→          </div>
+   985→        </ExecSection>
+   986→      )}
+   987→
+   988→      {showProjects && (
+   989→        <ExecSection title="Selected Projects" accent={accent}>
+   990→          <div className="flex flex-col gap-2">
+   991→            {data.projects.map((p) => (
+   992→              <ExecProject key={p.id} project={p} accent={accent} />
+   993→            ))}
+   994→          </div>
+   995→        </ExecSection>
+   996→      )}
+   997→
+   998→      {showEducation && showCerts ? (
+   999→        <div className="mb-5 grid grid-cols-2 gap-6">
+  1000→          <ExecSection title="Education" accent={accent} flush>
+  1001→            <div className="flex flex-col gap-2">
+  1002→              {data.education.map((ed) => (
+  1003→                <ExecEducation key={ed.id} edu={ed} accent={accent} />
+  1004→              ))}
+  1005→            </div>
+  1006→          </ExecSection>
+  1007→          <ExecSection title="Certifications" accent={accent} flush>
+  1008→            <ul className="flex flex-col gap-1.5">
+  1009→              {data.certifications.map((c) => (
+  1010→                <li
+  1011→                  key={c.id}
+  1012→                  className="text-[12.5px] leading-snug text-slate-700"
+  1013→                >
+  1014→                  <span className="font-semibold text-slate-900">
+  1015→                    {c.title}
+  1016→                  </span>
+  1017→                  {c.subtitle && (
+  1018→                    <span className="italic" style={{ color: accent }}>
+  1019→                      {" "}
+  1020→                      — {c.subtitle}
+  1021→                    </span>
+  1022→                  )}
+  1023→                  {c.date && (
+  1024→                    <span className="text-slate-500"> · {c.date}</span>
+  1025→                  )}
+  1026→                </li>
+  1027→              ))}
+  1028→            </ul>
+  1029→          </ExecSection>
+  1030→        </div>
+  1031→      ) : (
+  1032→        <>
+  1033→          {showEducation && (
+  1034→            <ExecSection title="Education" accent={accent}>
+  1035→              <div className="flex flex-col gap-2">
+  1036→                {data.education.map((ed) => (
+  1037→                  <ExecEducation key={ed.id} edu={ed} accent={accent} />
+  1038→                ))}
+  1039→              </div>
+  1040→            </ExecSection>
+  1041→          )}
+  1042→          {showCerts && (
+  1043→            <ExecSection title="Certifications" accent={accent}>
+  1044→              <ul className="flex flex-col gap-1.5">
+  1045→                {data.certifications.map((c) => (
+  1046→                  <li
+  1047→                    key={c.id}
+  1048→                    className="text-[12.5px] leading-snug text-slate-700"
+  1049→                  >
+  1050→                    <span className="font-semibold text-slate-900">
+  1051→                      {c.title}
+  1052→                    </span>
+  1053→                    {c.subtitle && (
+  1054→                      <span className="italic" style={{ color: accent }}>
+  1055→                        {" "}
+  1056→                        — {c.subtitle}
+  1057→                      </span>
+  1058→                    )}
+  1059→                    {c.date && (
+  1060→                      <span className="text-slate-500"> · {c.date}</span>
+  1061→                    )}
+  1062→                  </li>
+  1063→                ))}
+  1064→              </ul>
+  1065→            </ExecSection>
+  1066→          )}
+  1067→        </>
+  1068→      )}
+  1069→
+  1070→      {showAwards && showLanguages ? (
+  1071→        <div className="mb-5 grid grid-cols-2 gap-6">
+  1072→          <ExecSection title="Awards" accent={accent} flush>
+  1073→            <ul className="flex flex-col gap-1.5">
+  1074→              {data.awards.map((a) => (
+  1075→                <li
+  1076→                  key={a.id}
+  1077→                  className="text-[12.5px] leading-snug text-slate-700"
+  1078→                >
+  1079→                  <span className="font-semibold text-slate-900">
+  1080→                    {a.title}
+  1081→                  </span>
+  1082→                  {a.subtitle && (
+  1083→                    <span className="italic" style={{ color: accent }}>
+  1084→                      {" "}
+  1085→                      — {a.subtitle}
+  1086→                    </span>
+  1087→                  )}
+  1088→                  {a.date && (
+  1089→                    <span className="text-slate-500"> · {a.date}</span>
+  1090→                  )}
+  1091→                  {a.description && (
+  1092→                    <div className="text-slate-600">{a.description}</div>
+  1093→                  )}
+  1094→                </li>
+  1095→              ))}
+  1096→            </ul>
+  1097→          </ExecSection>
+  1098→          <ExecSection title="Languages" accent={accent} flush>
+  1099→            <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-slate-700">
+  1100→              {data.languages.map((l, i) => (
+  1101→                <li key={i}>
+  1102→                  <span style={{ color: accent }}>◆</span> {l}
+  1103→                </li>
+  1104→              ))}
+  1105→            </ul>
+  1106→          </ExecSection>
+  1107→        </div>
+  1108→      ) : (
+  1109→        <>
+  1110→          {showAwards && (
+  1111→            <ExecSection title="Awards" accent={accent}>
+  1112→              <ul className="flex flex-col gap-1.5">
+  1113→                {data.awards.map((a) => (
+  1114→                  <li
+  1115→                    key={a.id}
+  1116→                    className="text-[12.5px] leading-snug text-slate-700"
+  1117→                  >
+  1118→                    <span className="font-semibold text-slate-900">
+  1119→                      {a.title}
+  1120→                    </span>
+  1121→                    {a.subtitle && (
+  1122→                      <span className="italic" style={{ color: accent }}>
+  1123→                        {" "}
+  1124→                        — {a.subtitle}
+  1125→                      </span>
+  1126→                    )}
+  1127→                    {a.date && (
+  1128→                      <span className="text-slate-500"> · {a.date}</span>
+  1129→                    )}
+  1130→                    {a.description && (
+  1131→                      <div className="text-slate-600">{a.description}</div>
+  1132→                    )}
+  1133→                  </li>
+  1134→                ))}
+  1135→              </ul>
+  1136→            </ExecSection>
+  1137→          )}
+  1138→          {showLanguages && (
+  1139→            <ExecSection title="Languages" accent={accent}>
+  1140→              <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-slate-700">
+  1141→                {data.languages.map((l, i) => (
+  1142→                  <li key={i}>
+  1143→                    <span style={{ color: accent }}>◆</span> {l}
+  1144→                  </li>
+  1145→                ))}
+  1146→              </ul>
+  1147→            </ExecSection>
+  1148→          )}
+  1149→        </>
+  1150→      )}
+  1151→
+  1152→      {showPubs && (
+  1153→        <ExecSection title="Publications" accent={accent}>
+  1154→          <ul className="flex flex-col gap-1.5">
+  1155→            {data.publications.map((p) => (
+  1156→              <li
+  1157→                key={p.id}
+  1158→                className="text-[12.5px] leading-snug text-slate-700"
+  1159→              >
+  1160→                <span className="font-semibold text-slate-900">{p.title}</span>
+  1161→                {p.subtitle && <span> — {p.subtitle}</span>}
+  1162→                {p.date && <span className="text-slate-500"> · {p.date}</span>}
+  1163→                {p.description && <div>{p.description}</div>}
+  1164→              </li>
+  1165→            ))}
+  1166→          </ul>
+  1167→        </ExecSection>
+  1168→      )}
+  1169→
+  1170→      {showInterests && (
+  1171→        <ExecSection title="Interests" accent={accent}>
+  1172→          <p className="text-[12.5px] text-slate-700">
+  1173→            {data.interests.join(" · ")}
+  1174→          </p>
+  1175→        </ExecSection>
+  1176→      )}
+  1177→
+  1178→      {showReferences && (
+  1179→        <ExecSection title="References" accent={accent}>
+  1180→          <div className="grid grid-cols-2 gap-4">
+  1181→            {data.references.map((r) => (
+  1182→              <div key={r.id} className="text-[12px] leading-snug text-slate-700">
+  1183→                <div className="font-semibold text-slate-900">{r.name}</div>
+  1184→                {r.role && <div>{r.role}</div>}
+  1185→                {r.company && <div>{r.company}</div>}
+  1186→                {r.contact && <div className="text-slate-500">{r.contact}</div>}
+  1187→              </div>
+  1188→            ))}
+  1189→          </div>
+  1190→        </ExecSection>
+  1191→      )}
+  1192→    </div>
+  1193→  );
+  1194→}
+  1195→
+  1196→function ExecSection({
+  1197→  title,
+  1198→  accent,
+  1199→  flush,
+  1200→  children,
+  1201→}: {
+  1202→  title: string;
+  1203→  accent: string;
+  1204→  flush?: boolean;
+  1205→  children: React.ReactNode;
+  1206→}) {
+  1207→  return (
+  1208→    <section className={flush ? "" : "mb-5"}>
+  1209→      <h2
+  1210→        className="mb-3 text-center text-[13px] font-bold uppercase tracking-[0.22em]"
+  1211→        style={{ color: accent, fontFamily: "Georgia, serif" }}
+  1212→      >
+  1213→        <span className="mr-2">—</span>
+  1214→        {title}
+  1215→        <span className="ml-2">—</span>
+  1216→      </h2>
+  1217→      {children}
+  1218→    </section>
+  1219→  );
+  1220→}
+  1221→
+  1222→function ExecExperience({
+  1223→  exp,
+  1224→  accent,
+  1225→}: {
+  1226→  exp: ExperienceItem;
+  1227→  accent: string;
+  1228→}) {
+  1229→  const bullets = nonEmptyBullets(exp.bullets);
+  1230→  const range = formatRange(exp.start, exp.end);
+  1231→  return (
+  1232→    <div className="resume-no-break">
+  1233→      <div className="flex items-baseline justify-between gap-4">
+  1234→        <div className="text-[14px]">
+  1235→          <span
+  1236→            className="font-bold text-slate-900"
+  1237→            style={{ fontFamily: "Georgia, serif" }}
+  1238→          >
+  1239→            {exp.role}
+  1240→          </span>
+  1241→          {exp.company && (
+  1242→            <span style={{ color: accent }}> · {exp.company}</span>
+  1243→          )}
+  1244→        </div>
+  1245→        {range && (
+  1246→          <span className="shrink-0 text-[11.5px] italic text-slate-500">
+  1247→            {range}
+  1248→          </span>
+  1249→        )}
+  1250→      </div>
+  1251→      {exp.location && (
+  1252→        <div className="text-[11.5px] italic text-slate-500">
+  1253→          {exp.location}
+  1254→        </div>
+  1255→      )}
+  1256→      {bullets.length > 0 && (
+  1257→        <ul className="mt-1 space-y-0.5">
+  1258→          {bullets.map((b, i) => (
+  1259→            <li
+  1260→              key={i}
+  1261→              className="flex gap-2 text-[12.5px] leading-snug text-slate-700"
+  1262→            >
+  1263→              <span className="shrink-0 text-[10px]" style={{ color: accent }}>
+  1264→                ◆
+  1265→              </span>
+  1266→              <span>{b}</span>
+  1267→            </li>
+  1268→          ))}
+  1269→        </ul>
+  1270→      )}
+  1271→    </div>
+  1272→  );
+  1273→}
+  1274→
+  1275→function ExecEducation({
+  1276→  edu,
+  1277→  accent,
+  1278→}: {
+  1279→  edu: EducationItem;
+  1280→  accent: string;
+  1281→}) {
+  1282→  const range = formatRange(edu.start, edu.end);
+  1283→  return (
+  1284→    <div className="resume-no-break">
+  1285→      <div
+  1286→        className="text-[13px] font-bold text-slate-900"
+  1287→        style={{ fontFamily: "Georgia, serif" }}
+  1288→      >
+  1289→        {edu.degree}
+  1290→      </div>
+  1291→      <div className="flex items-baseline justify-between gap-3">
+  1292→        <div className="text-[12px]" style={{ color: accent }}>
+  1293→          {edu.school}
+  1294→          {edu.location ? ` · ${edu.location}` : ""}
+  1295→        </div>
+  1296→        {range && (
+  1297→          <span className="shrink-0 text-[11px] italic text-slate-500">
+  1298→            {range}
+  1299→          </span>
+  1300→        )}
+  1301→      </div>
+  1302→      {edu.grade && (
+  1303→        <div className="text-[11.5px] text-slate-500">{edu.grade}</div>
+  1304→      )}
+  1305→    </div>
+  1306→  );
+  1307→}
+  1308→
+  1309→function ExecProject({
+  1310→  project,
+  1311→  accent,
+  1312→}: {
+  1313→  project: ProjectItem;
+  1314→  accent: string;
+  1315→}) {
+  1316→  const tech = joinTech(project.tech);
+  1317→  return (
+  1318→    <div className="resume-no-break">
+  1319→      <div className="flex items-baseline justify-between gap-3">
+  1320→        <div
+  1321→          className="text-[13px] font-bold text-slate-900"
+  1322→          style={{ fontFamily: "Georgia, serif" }}
+  1323→        >
+  1324→          {project.name}
+  1325→        </div>
+  1326→        {project.link && (
+  1327→          <span className="shrink-0 text-[11px] italic" style={{ color: accent }}>
+  1328→            {project.link}
+  1329→          </span>
+  1330→        )}
+  1331→      </div>
+  1332→      {project.description && (
+  1333→        <p className="text-[12.5px] leading-snug text-slate-700">
+  1334→          {project.description}
+  1335→        </p>
+  1336→      )}
+  1337→      {tech && (
+  1338→        <p className="text-[11.5px] text-slate-500">
+  1339→          <span className="italic" style={{ color: accent }}>
+  1340→            Tech:
+  1341→          </span>{" "}
+  1342→          {tech}
+  1343→        </p>
+  1344→      )}
+  1345→    </div>
+  1346→  );
+  1347→}
+  1348→
+  1349→/* ============================================================
+  1350→ * 4) MINIMAL — ultra-clean, airy, Apple-like
+  1351→ * ========================================================== */
+  1352→
+  1353→function MinimalTemplate({ data, sections, accent }: TemplateProps) {
+  1354→  const showPersonal = sections.personal !== false;
+  1355→  const contacts = buildContactStrings(data);
+  1356→
+  1357→  const showSummary = sections.summary && data.summary.trim().length > 0;
+  1358→  const showExperience = sections.experience && data.experience.length > 0;
+  1359→  const showSkills = sections.skills && data.skills.length > 0;
+  1360→  const showProjects = sections.projects && data.projects.length > 0;
+  1361→  const showEducation = sections.education && data.education.length > 0;
+  1362→  const showCerts =
+  1363→    sections.certifications && data.certifications.length > 0;
+  1364→  const showLanguages = sections.languages && data.languages.length > 0;
+  1365→  const showAwards = sections.awards && data.awards.length > 0;
+  1366→  const showPubs = sections.publications && data.publications.length > 0;
+  1367→  const showInterests = sections.interests && data.interests.length > 0;
+  1368→  const showReferences = sections.references && data.references.length > 0;
+  1369→
+  1370→  return (
+  1371→    <div className="mx-auto max-w-[760px] px-12 py-12">
+  1372→      {showPersonal && (
+  1373→        <header className="mb-10 flex items-start justify-between gap-6">
+  1374→          <div>
+  1375→            <h1 className="text-[34px] font-light leading-tight tracking-tight text-slate-900">
+  1376→              {data.name || "Your Name"}
+  1377→            </h1>
+  1378→            {data.title && (
+  1379→              <p className="mt-1 text-[14px] text-slate-500">{data.title}</p>
+  1380→            )}
+  1381→          </div>
+  1382→          {contacts.length > 0 && (
+  1383→            <address className="flex flex-col items-end gap-0.5 text-right text-[11.5px] not-italic leading-relaxed text-slate-500">
+  1384→              {contacts.map((c, i) => (
+  1385→                <span key={i} className="break-words">
+  1386→                  {c}
+  1387→                </span>
+  1388→              ))}
+  1389→            </address>
+  1390→          )}
+  1391→        </header>
+  1392→      )}
+  1393→
+  1394→      {showSummary && (
+  1395→        <MinimalSection title="Profile">
+  1396→          <p className="text-[13.5px] leading-relaxed text-slate-600">
+  1397→            {data.summary}
+  1398→          </p>
+  1399→        </MinimalSection>
+  1400→      )}
+  1401→
+  1402→      {showExperience && (
+  1403→        <MinimalSection title="Experience">
+  1404→          <div className="flex flex-col gap-6">
+  1405→            {data.experience.map((exp) => (
+  1406→              <MinimalExperience key={exp.id} exp={exp} accent={accent} />
+  1407→            ))}
+  1408→          </div>
+  1409→        </MinimalSection>
+  1410→      )}
+  1411→
+  1412→      {showProjects && (
+  1413→        <MinimalSection title="Projects">
+  1414→          <div className="flex flex-col gap-5">
+  1415→            {data.projects.map((p) => (
+  1416→              <MinimalProject key={p.id} project={p} />
+  1417→            ))}
+  1418→          </div>
+  1419→        </MinimalSection>
+  1420→      )}
+  1421→
+  1422→      {showEducation && (
+  1423→        <MinimalSection title="Education">
+  1424→          <div className="flex flex-col gap-4">
+  1425→            {data.education.map((ed) => (
+  1426→              <MinimalEducation key={ed.id} edu={ed} />
+  1427→            ))}
+  1428→          </div>
+  1429→        </MinimalSection>
+  1430→      )}
+  1431→
+  1432→      {showSkills && (
+  1433→        <MinimalSection title="Skills">
+  1434→          <ul className="flex flex-wrap gap-2">
+  1435→            {data.skills.map((s, i) => (
+  1436→              <li
+  1437→                key={i}
+  1438→                className="rounded-full border border-slate-200 px-3 py-1 text-[11.5px] text-slate-600"
+  1439→              >
+  1440→                {s}
+  1441→              </li>
+  1442→            ))}
+  1443→          </ul>
+  1444→        </MinimalSection>
+  1445→      )}
+  1446→
+  1447→      {showCerts && (
+  1448→        <MinimalSection title="Certifications">
+  1449→          <ul className="flex flex-col gap-2">
+  1450→            {data.certifications.map((c) => (
+  1451→              <li
+  1452→                key={c.id}
+  1453→                className="flex items-baseline justify-between gap-3 text-[13px] text-slate-700"
+  1454→              >
+  1455→                <span>
+  1456→                  <span className="font-medium text-slate-800">{c.title}</span>
+  1457→                  {c.subtitle ? (
+  1458→                    <span className="text-slate-500"> · {c.subtitle}</span>
+  1459→                  ) : null}
+  1460→                </span>
+  1461→                {c.date && (
+  1462→                  <span className="shrink-0 text-[11.5px] text-slate-400">
+  1463→                    {c.date}
+  1464→                  </span>
+  1465→                )}
+  1466→              </li>
+  1467→            ))}
+  1468→          </ul>
+  1469→        </MinimalSection>
+  1470→      )}
+  1471→
+  1472→      {showLanguages && (
+  1473→        <MinimalSection title="Languages">
+  1474→          <p className="text-[13px] text-slate-600">
+  1475→            {data.languages.join(" · ")}
+  1476→          </p>
+  1477→        </MinimalSection>
+  1478→      )}
+  1479→
+  1480→      {showAwards && (
+  1481→        <MinimalSection title="Awards">
+  1482→          <ul className="flex flex-col gap-3">
+  1483→            {data.awards.map((a) => (
+  1484→              <li
+  1485→                key={a.id}
+  1486→                className="flex items-baseline justify-between gap-3 text-[13px] text-slate-700"
+  1487→              >
+  1488→                <span>
+  1489→                  <span className="font-medium text-slate-800">{a.title}</span>
+  1490→                  {a.subtitle ? (
+  1491→                    <span className="text-slate-500"> · {a.subtitle}</span>
+  1492→                  ) : null}
+  1493→                  {a.description ? (
+  1494→                    <span className="text-slate-500"> — {a.description}</span>
+  1495→                  ) : null}
+  1496→                </span>
+  1497→                {a.date && (
+  1498→                  <span className="shrink-0 text-[11.5px] text-slate-400">
+  1499→                    {a.date}
+  1500→                  </span>
+  1501→                )}
+  1502→              </li>
+  1503→            ))}
+  1504→          </ul>
+  1505→        </MinimalSection>
+  1506→      )}
+  1507→
+  1508→      {showPubs && (
+  1509→        <MinimalSection title="Publications">
+  1510→          <ul className="flex flex-col gap-2">
+  1511→            {data.publications.map((p) => (
+  1512→              <li
+  1513→                key={p.id}
+  1514→                className="flex items-baseline justify-between gap-3 text-[13px] text-slate-700"
+  1515→              >
+  1516→                <span>
+  1517→                  <span className="font-medium text-slate-800">{p.title}</span>
+  1518→                  {p.subtitle ? (
+  1519→                    <span className="text-slate-500"> · {p.subtitle}</span>
+  1520→                  ) : null}
+  1521→                  {p.description ? (
+  1522→                    <span className="text-slate-500"> — {p.description}</span>
+  1523→                  ) : null}
+  1524→                </span>
+  1525→                {p.date && (
+  1526→                  <span className="shrink-0 text-[11.5px] text-slate-400">
+  1527→                    {p.date}
+  1528→                  </span>
+  1529→                )}
+  1530→              </li>
+  1531→            ))}
+  1532→          </ul>
+  1533→        </MinimalSection>
+  1534→      )}
+  1535→
+  1536→      {showInterests && (
+  1537→        <MinimalSection title="Interests">
+  1538→          <p className="text-[13px] text-slate-600">
+  1539→            {data.interests.join(" · ")}
+  1540→          </p>
+  1541→        </MinimalSection>
+  1542→      )}
+  1543→
+  1544→      {showReferences && (
+  1545→        <MinimalSection title="References">
+  1546→          <div className="grid grid-cols-2 gap-4">
+  1547→            {data.references.map((r) => (
+  1548→              <div key={r.id} className="text-[12.5px] leading-relaxed text-slate-600">
+  1549→                <div className="font-medium text-slate-800">{r.name}</div>
+  1550→                {r.role && <div>{r.role}</div>}
+  1551→                {r.company && <div>{r.company}</div>}
+  1552→                {r.contact && <div className="text-slate-400">{r.contact}</div>}
+  1553→              </div>
+  1554→            ))}
+  1555→          </div>
+  1556→        </MinimalSection>
+  1557→      )}
+  1558→    </div>
+  1559→  );
+  1560→}
+  1561→
+  1562→function MinimalSection({
+  1563→  title,
+  1564→  children,
+  1565→}: {
+  1566→  title: string;
+  1567→  children: React.ReactNode;
+  1568→}) {
+  1569→  return (
+  1570→    <section className="mb-9">
+  1571→      <h2 className="mb-4 text-[10.5px] font-medium uppercase tracking-[0.22em] text-slate-400">
+  1572→        {title}
+  1573→      </h2>
+  1574→      {children}
+  1575→    </section>
+  1576→  );
+  1577→}
+  1578→
+  1579→function MinimalExperience({
+  1580→  exp,
+  1581→  accent,
+  1582→}: {
+  1583→  exp: ExperienceItem;
+  1584→  accent: string;
+  1585→}) {
+  1586→  const bullets = nonEmptyBullets(exp.bullets);
+  1587→  const range = formatRange(exp.start, exp.end);
+  1588→  return (
+  1589→    <div className="resume-no-break">
+  1590→      <div className="flex items-baseline justify-between gap-4">
+  1591→        <div>
+  1592→          <div className="text-[15px] font-medium text-slate-900">
+  1593→            {exp.role}
+  1594→          </div>
+  1595→          {exp.company && (
+  1596→            <div className="text-[13px] text-slate-500">{exp.company}</div>
+  1597→          )}
+  1598→        </div>
+  1599→        {range && (
+  1600→          <span className="shrink-0 text-[11.5px] text-slate-400">
+  1601→            {range}
+  1602→          </span>
+  1603→        )}
+  1604→      </div>
+  1605→      {exp.location && (
+  1606→        <div className="text-[11.5px] text-slate-400">{exp.location}</div>
+  1607→      )}
+  1608→      {bullets.length > 0 && (
+  1609→        <ul className="mt-2 space-y-1.5">
+  1610→          {bullets.map((b, i) => (
+  1611→            <li
+  1612→              key={i}
+  1613→              className="flex gap-2 text-[13px] leading-relaxed text-slate-600"
+  1614→            >
+  1615→              <span
+  1616→                className="mt-[2px] shrink-0 text-[12px]"
+  1617→                style={{ color: accent }}
+  1618→              >
+  1619→                —
+  1620→              </span>
+  1621→              <span>{b}</span>
+  1622→            </li>
+  1623→          ))}
+  1624→        </ul>
+  1625→      )}
+  1626→    </div>
+  1627→  );
+  1628→}
+  1629→
+  1630→function MinimalProject({ project }: { project: ProjectItem }) {
+  1631→  const tech = joinTech(project.tech);
+  1632→  return (
+  1633→    <div className="resume-no-break">
+  1634→      <div className="flex items-baseline justify-between gap-3">
+  1635→        <div className="text-[14px] font-medium text-slate-900">
+  1636→          {project.name}
+  1637→        </div>
+  1638→        {project.link && (
+  1639→          <span className="shrink-0 text-[11.5px] text-slate-400">
+  1640→            {project.link}
+  1641→          </span>
+  1642→        )}
+  1643→      </div>
+  1644→      {project.description && (
+  1645→        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-600">
+  1646→          {project.description}
+  1647→        </p>
+  1648→      )}
+  1649→      {tech && (
+  1650→        <p className="mt-0.5 text-[11.5px] text-slate-400">{tech}</p>
+  1651→      )}
+  1652→    </div>
+  1653→  );
+  1654→}
+  1655→
+  1656→function MinimalEducation({ edu }: { edu: EducationItem }) {
+  1657→  const range = formatRange(edu.start, edu.end);
+  1658→  return (
+  1659→    <div className="resume-no-break">
+  1660→      <div className="flex items-baseline justify-between gap-3">
+  1661→        <div>
+  1662→          <div className="text-[14px] font-medium text-slate-900">
+  1663→            {edu.degree}
+  1664→          </div>
+  1665→          {edu.school && (
+  1666→            <div className="text-[13px] text-slate-500">{edu.school}</div>
+  1667→          )}
+  1668→        </div>
+  1669→        {range && (
+  1670→          <span className="shrink-0 text-[11.5px] text-slate-400">
+  1671→            {range}
+  1672→          </span>
+  1673→        )}
+  1674→      </div>
+  1675→      {(edu.location || edu.grade) && (
+  1676→        <div className="text-[11.5px] text-slate-400">
+  1677→          {[edu.location, edu.grade].filter(Boolean).join(" · ")}
+  1678→        </div>
+  1679→      )}
+  1680→    </div>
+  1681→  );
+  1682→}
+  1683→

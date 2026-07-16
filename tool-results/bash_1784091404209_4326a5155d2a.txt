@@ -1,0 +1,200 @@
+// =====================================================================
+export function MiamiTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#fb7185";
+  return (
+    <div className={PAPER} style={{ fontFamily: "system-ui, sans-serif", display: "flex" }}>
+      <aside style={{ width: 240, background: `linear-gradient(180deg, ${a}, #f43f5e)`, color: "white", padding: "24px 16px", minHeight: 1123 }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}><Avatar data={data} size={72} ring="white" ringWidth={3} /></div>
+        <h1 style={{ fontSize: 18, fontWeight: 800, textAlign: "center", margin: 0 }}>{data.name}</h1>
+        <p style={{ fontSize: 10, textAlign: "center", color: "rgba(255,255,255,0.8)", margin: "4px 0 20px" }}>{data.title}</p>
+        {visible(sections, "skills") && data.skills.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.6)", marginBottom: 6, letterSpacing: 1 }}>SKILLS</h3>{data.skills.map((s, i) => <span key={i} style={{ fontSize: 10, display: "inline-block", background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 10, marginRight: 4, marginBottom: 4 }}>{s}</span>)}</div>)}
+        {visible(sections, "languages") && data.languages.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.6)", marginBottom: 4, letterSpacing: 1 }}>LANGUAGES</h3><div style={{ fontSize: 10 }}>{data.languages.join(" · ")}</div></div>)}
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", marginTop: 20 }}>{[data.email, data.phone, data.location].filter(Boolean).map((c, i) => <div key={i} style={{ marginBottom: 3 }}>{c}</div>)}</div>
+      </aside>
+      <main style={{ flex: 1, padding: "24px 20px" }}>
+        {visible(sections, "summary") && data.summary && <div style={{ marginBottom: 16, borderLeft: `4px solid ${a}`, paddingLeft: 12 }}><p style={{ fontSize: 11, lineHeight: 1.7, color: "#475569" }}>{data.summary}</p></div>}
+        {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 14, fontWeight: 800, color: a, marginBottom: 10 }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 12, breakInside: "avoid" }}><div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{e.role}</div><div style={{ fontSize: 10, color: a, fontWeight: 600, marginBottom: 4 }}>{e.company} · {range(e.start, e.end)}</div><Bullets bullets={e.bullets} color={a} char="◆" /></div>))}</div>)}
+        {visible(sections, "projects") && data.projects.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 14, fontWeight: 800, color: a, marginBottom: 10 }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 10, marginBottom: 6, breakInside: "avoid" }}><span style={{ fontWeight: 800, color: "#1e293b" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        {visible(sections, "education") && data.education.length > 0 && (<div><h3 style={{ fontSize: 14, fontWeight: 800, color: a, marginBottom: 10 }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 10, marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 800, color: "#1e293b" }}>{ed.degree}</span> — {ed.school}</div>)}</div>)}
+        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ marginTop: 16 }}><h3 style={{ fontSize: 14, fontWeight: 800, color: a, marginBottom: 10 }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 10, marginBottom: 3 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+      </main>
+    </div>
+  );
+}
+
+// =====================================================================
+// 10. SEOUL — Engineer, dark header, green, monospace
+// =====================================================================
+export function SeoulTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#22c55e";
+  return (
+    <div className={PAPER} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      <div style={{ background: "#0f172a", padding: "20px 28px", color: "#e2e8f0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div><h1 style={{ fontSize: 22, fontWeight: 700, color: "white", margin: 0 }}>{data.name}</h1><p style={{ fontSize: 11, color: a, margin: "2px 0 0" }}>{">"} {data.title}</p></div>
+          <div style={{ fontSize: 9, color: "#64748b", textAlign: "right" }}>{[data.email, data.phone, data.location].filter(Boolean).map((c, i) => <div key={i}>{c}</div>)}</div>
+        </div>
+      </div>
+      <div style={{ padding: "20px 24px" }}>
+        {visible(sections, "summary") && data.summary && (<div style={{ marginBottom: 16, padding: "8px 12px", background: "#f8fafc", borderRadius: 4, borderLeft: `3px solid ${a}` }}><span style={{ fontSize: 9, color: "#94a3b8" }}>{"// about"}</span><p style={{ fontSize: 10, lineHeight: 1.6, color: "#475569", margin: "4px 0 0" }}>{data.summary}</p></div>)}
+        {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8 }}>{"// experience"}</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 10, breakInside: "avoid" }}><div style={{ fontSize: 11, fontWeight: 700, color: "#1e293b" }}>{e.role} <span style={{ color: a }}>@ {e.company}</span></div><div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 3 }}>{range(e.start, e.end)}</div>{e.bullets.filter(b => b?.trim()).map((b, i) => <div key={i} style={{ fontSize: 9.5, lineHeight: 1.6, color: "#475569", paddingLeft: 12, position: "relative" }}><span style={{ position: "absolute", left: 0, color: a }}>{"▸"}</span>{b}</div>)}</div>))}</div>)}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {visible(sections, "skills") && data.skills.length > 0 && (<div><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8 }}>{"// skills"}</h3>{data.skills.map((s, i) => <div key={i} style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}><span style={{ color: a }}>{"•"}</span> {s}</div>)}</div>)}
+          {visible(sections, "education") && data.education.length > 0 && (<div><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8 }}>{"// education"}</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 9, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1e293b" }}>{ed.degree}</span><br />{ed.school}</div>)}</div>)}
+        </div>
+        {visible(sections, "projects") && data.projects.length > 0 && (<div style={{ marginTop: 16 }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8 }}>{"// projects"}</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 9.5, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1e293b" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ marginTop: 16 }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8 }}>{"// "}{cs.title.toLowerCase()}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 9.5, color: "#475569", marginBottom: 2 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// 11. DUBAI — Luxury, gold on dark, serif, elegant
+// =====================================================================
+export function DubaiTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#c5a572";
+  return (
+    <div className={PAPER} style={{ fontFamily: "Georgia, serif", display: "flex" }}>
+      <aside style={{ width: 220, background: "#1a1a2e", color: "#e0d8c8", padding: "28px 18px", minHeight: 1123 }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}><Avatar data={data} size={68} ring={a} ringWidth={2} /></div>
+        <h1 style={{ fontSize: 16, fontWeight: 700, color: a, textAlign: "center", margin: 0 }}>{data.name}</h1>
+        <p style={{ fontSize: 10, textAlign: "center", color: "#8b7d6b", margin: "4px 0 20px" }}>{data.title}</p>
+        {visible(sections, "skills") && data.skills.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 9, fontWeight: 700, color: a, marginBottom: 6, letterSpacing: 2, textTransform: "uppercase" }}>Skills</h3>{data.skills.map((s, i) => <div key={i} style={{ fontSize: 10, color: "#c0b8a8", marginBottom: 3 }}>{s}</div>)}</div>)}
+        {visible(sections, "languages") && data.languages.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 9, fontWeight: 700, color: a, marginBottom: 6, letterSpacing: 2, textTransform: "uppercase" }}>Languages</h3><div style={{ fontSize: 10, color: "#c0b8a8" }}>{data.languages.join(" · ")}</div></div>)}
+        <div style={{ fontSize: 9, color: "#6b5d4b", marginTop: 20, fontStyle: "italic" }}>{[data.email, data.phone, data.location].filter(Boolean).map((c, i) => <div key={i} style={{ marginBottom: 3 }}>{c}</div>)}</div>
+      </aside>
+      <main style={{ flex: 1, padding: "28px 24px" }}>
+        {visible(sections, "summary") && data.summary && <p style={{ fontSize: 11, lineHeight: 1.9, color: "#444", marginBottom: 20, fontStyle: "italic" }}>{data.summary}</p>}
+        {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ marginBottom: 20 }}><h3 style={{ fontSize: 13, fontWeight: 700, color: a, marginBottom: 10, textTransform: "uppercase", letterSpacing: 2 }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 12, breakInside: "avoid" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a2e" }}>{e.role}</span><span style={{ fontSize: 9, color: "#8b7d6b", fontStyle: "italic" }}>{range(e.start, e.end)}</span></div><div style={{ fontSize: 11, color: a, fontStyle: "italic", marginBottom: 4 }}>{e.company}</div>{e.bullets.filter(b => b?.trim()).map((b, i) => <div key={i} style={{ fontSize: 10.5, lineHeight: 1.7, color: "#555", paddingLeft: 14, position: "relative" }}><span style={{ position: "absolute", left: 0, color: a }}>{"◆"}</span>{b}</div>)}</div>))}</div>)}
+        {visible(sections, "education") && data.education.length > 0 && (<div style={{ marginBottom: 20 }}><h3 style={{ fontSize: 13, fontWeight: 700, color: a, marginBottom: 10, textTransform: "uppercase", letterSpacing: 2 }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 10.5, color: "#444", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{ed.degree}</span> — {ed.school} ({range(ed.start, ed.end)})</div>)}</div>)}
+        {visible(sections, "projects") && data.projects.length > 0 && (<div><h3 style={{ fontSize: 13, fontWeight: 700, color: a, marginBottom: 10, textTransform: "uppercase", letterSpacing: 2 }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 10.5, color: "#444", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ marginTop: 20 }}><h3 style={{ fontSize: 13, fontWeight: 700, color: a, marginBottom: 10, textTransform: "uppercase", letterSpacing: 2 }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 10.5, color: "#444", marginBottom: 3 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+      </main>
+    </div>
+  );
+}
+
+// =====================================================================
+// 12. SINGAPORE — Modern card-based, teal, no sidebar
+// =====================================================================
+export function SingaporeTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#0891b2";
+  return (
+    <div className={PAPER} style={{ fontFamily: "system-ui, sans-serif", padding: "28px 32px", background: "#f8fafc" }}>
+      <div style={{ marginBottom: 20 }}><h1 style={{ fontSize: 28, fontWeight: 800, color: "#0f172a", margin: 0 }}>{data.name}</h1><div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}><p style={{ fontSize: 12, color: a, fontWeight: 600 }}>{data.title}</p><div style={{ fontSize: 9, color: "#64748b" }}>{[data.email, data.phone, data.location].filter(Boolean).join(" · ")}</div></div></div>
+      {visible(sections, "summary") && data.summary && <div style={{ background: "white", borderRadius: 8, padding: "12px 16px", marginBottom: 12, borderLeft: `3px solid ${a}` }}><p style={{ fontSize: 10, lineHeight: 1.6, color: "#475569", margin: 0 }}>{data.summary}</p></div>}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+        <div>
+          {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ background: "white", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}><h3 style={{ fontSize: 10, fontWeight: 800, color: a, marginBottom: 8, textTransform: "uppercase" }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 10, breakInside: "avoid" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{e.role}</span><span style={{ fontSize: 9, color: "#94a3b8" }}>{range(e.start, e.end)}</span></div><div style={{ fontSize: 10, color: a, marginBottom: 3 }}>{e.company}</div><Bullets bullets={e.bullets} color="#cbd5e1" /></div>))}</div>)}
+          {visible(sections, "projects") && data.projects.length > 0 && (<div style={{ background: "white", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}><h3 style={{ fontSize: 10, fontWeight: 800, color: a, marginBottom: 8, textTransform: "uppercase" }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 10, marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#0f172a" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        </div>
+        <div>
+          {visible(sections, "skills") && data.skills.length > 0 && (<div style={{ background: "white", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}><h3 style={{ fontSize: 10, fontWeight: 800, color: a, marginBottom: 8, textTransform: "uppercase" }}>Skills</h3>{data.skills.map((s, i) => <div key={i} style={{ fontSize: 9, color: "#475569", marginBottom: 3 }}>{s}</div>)}</div>)}
+          {visible(sections, "education") && data.education.length > 0 && (<div style={{ background: "white", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}><h3 style={{ fontSize: 10, fontWeight: 800, color: a, marginBottom: 8, textTransform: "uppercase" }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 9, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#0f172a" }}>{ed.degree}</span><br />{ed.school}</div>)}</div>)}
+        </div>
+      </div>
+      {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ background: "white", borderRadius: 8, padding: "12px 16px", marginTop: 12 }}><h3 style={{ fontSize: 10, fontWeight: 800, color: a, marginBottom: 8, textTransform: "uppercase" }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 10, color: "#475569", marginBottom: 3 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+    </div>
+  );
+}
+
+// =====================================================================
+// 13. STOCKHOLM — Nordic minimal, thin lines, light
+// =====================================================================
+export function StockholmTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#475569";
+  return (
+    <div className={PAPER} style={{ fontFamily: "system-ui, sans-serif", padding: "40px 48px" }}>
+      <div style={{ marginBottom: 24 }}><h1 style={{ fontSize: 30, fontWeight: 300, color: "#0f172a", margin: 0, letterSpacing: -0.5 }}>{data.name}</h1><p style={{ fontSize: 13, color: a, fontWeight: 400, margin: "4px 0 0" }}>{data.title}</p><div style={{ fontSize: 10, color: "#94a3b8", marginTop: 8 }}>{[data.email, data.phone, data.location, data.linkedin].filter(Boolean).join("  ·  ")}</div></div>
+      {visible(sections, "summary") && data.summary && <div style={{ marginBottom: 24 }}><p style={{ fontSize: 11, lineHeight: 1.8, color: "#475569", maxWidth: 580 }}>{data.summary}</p></div>}
+      {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ marginBottom: 24 }}><h3 style={{ fontSize: 11, fontWeight: 600, color: "#0f172a", marginBottom: 12, textTransform: "uppercase", letterSpacing: 2 }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 14, breakInside: "avoid" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{e.role}</span><span style={{ fontSize: 9, color: "#94a3b8" }}>{range(e.start, e.end)}</span></div><div style={{ fontSize: 10, color: a, marginBottom: 4 }}>{e.company}</div>{e.bullets.filter(b => b?.trim()).map((b, i) => <div key={i} style={{ fontSize: 10, lineHeight: 1.7, color: "#475569", paddingLeft: 10, position: "relative", marginBottom: 1 }}><span style={{ position: "absolute", left: 0, color: "#cbd5e1" }}>{"—"}</span>{b}</div>)}</div>))}</div>)}
+      <div style={{ display: "flex", gap: 40 }}>
+        {visible(sections, "education") && data.education.length > 0 && (<div><h3 style={{ fontSize: 11, fontWeight: 600, color: "#0f172a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 2 }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 10, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 600, color: "#0f172a" }}>{ed.degree}</span><br />{ed.school}</div>)}</div>)}
+        {visible(sections, "skills") && data.skills.length > 0 && (<div><h3 style={{ fontSize: 11, fontWeight: 600, color: "#0f172a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 2 }}>Skills</h3><div style={{ fontSize: 10, color: "#475569", lineHeight: 1.8 }}>{data.skills.join(" · ")}</div></div>)}
+      </div>
+      {visible(sections, "projects") && data.projects.length > 0 && (<div style={{ marginTop: 24 }}><h3 style={{ fontSize: 11, fontWeight: 600, color: "#0f172a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 2 }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 10, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 600, color: "#0f172a" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+      {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ marginTop: 20 }}><h3 style={{ fontSize: 11, fontWeight: 600, color: "#0f172a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 2 }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 10, color: "#475569", marginBottom: 3 }}><span style={{ fontWeight: 600 }}>{item.title}</span></div>)}</div>))}
+    </div>
+  );
+}
+
+// =====================================================================
+// 14. MUMBAI — Vibrant orange sidebar, bold, Indian professional
+// =====================================================================
+export function MumbaiTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#ea580c";
+  return (
+    <div className={PAPER} style={{ fontFamily: "system-ui, sans-serif", display: "flex" }}>
+      <aside style={{ width: 220, background: a, color: "white", padding: "24px 16px", minHeight: 1123 }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}><Avatar data={data} size={64} ring="white" /></div>
+        <h1 style={{ fontSize: 17, fontWeight: 800, textAlign: "center", margin: 0 }}>{data.name}</h1>
+        <p style={{ fontSize: 10, textAlign: "center", color: "rgba(255,255,255,0.8)", margin: "4px 0 16px" }}>{data.title}</p>
+        {visible(sections, "skills") && data.skills.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.6)", marginBottom: 6, letterSpacing: 1 }}>SKILLS</h3>{data.skills.map((s, i) => <div key={i} style={{ fontSize: 9.5, marginBottom: 2 }}>{s}</div>)}</div>)}
+        {visible(sections, "languages") && data.languages.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.6)", marginBottom: 4, letterSpacing: 1 }}>LANGUAGES</h3><div style={{ fontSize: 9.5 }}>{data.languages.join(", ")}</div></div>)}
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)", marginTop: 16 }}>{[data.email, data.phone, data.location].filter(Boolean).map((c, i) => <div key={i} style={{ marginBottom: 2 }}>{c}</div>)}</div>
+      </aside>
+      <main style={{ flex: 1, padding: "24px 20px" }}>
+        {visible(sections, "summary") && data.summary && <p style={{ fontSize: 10.5, lineHeight: 1.7, color: "#475569", marginBottom: 16 }}>{data.summary}</p>}
+        {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 13, fontWeight: 800, color: a, marginBottom: 8, borderBottom: `2px solid ${a}30`, paddingBottom: 4 }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 10, breakInside: "avoid" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, fontWeight: 700, color: "#1e293b" }}>{e.role} · {e.company}</span><span style={{ fontSize: 9, color: "#94a3b8" }}>{range(e.start, e.end)}</span></div><Bullets bullets={e.bullets} color={a} /></div>))}</div>)}
+        {visible(sections, "education") && data.education.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 13, fontWeight: 800, color: a, marginBottom: 8, borderBottom: `2px solid ${a}30`, paddingBottom: 4 }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 10, marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1e293b" }}>{ed.degree}</span> — {ed.school} ({range(ed.start, ed.end)})</div>)}</div>)}
+        {visible(sections, "projects") && data.projects.length > 0 && (<div><h3 style={{ fontSize: 13, fontWeight: 800, color: a, marginBottom: 8, borderBottom: `2px solid ${a}30`, paddingBottom: 4 }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 10, marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1e293b" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ marginTop: 16 }}><h3 style={{ fontSize: 13, fontWeight: 800, color: a, marginBottom: 8, borderBottom: `2px solid ${a}30`, paddingBottom: 4 }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 10, marginBottom: 3 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+      </main>
+    </div>
+  );
+}
+
+// =====================================================================
+// 15. TORONTO — Navy sidebar + amber accent, dual color
+// =====================================================================
+export function TorontoTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#1e40af"; const b = "#f59e0b";
+  return (
+    <div className={PAPER} style={{ fontFamily: "system-ui, sans-serif", display: "flex" }}>
+      <aside style={{ width: 200, background: a, color: "white", padding: "24px 16px", minHeight: 1123, borderTop: `4px solid ${b}` }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}><Avatar data={data} size={60} ring={b} ringWidth={2} /></div>
+        <h1 style={{ fontSize: 15, fontWeight: 800, textAlign: "center", margin: 0 }}>{data.name}</h1>
+        <p style={{ fontSize: 9, textAlign: "center", color: b, margin: "4px 0 16px" }}>{data.title}</p>
+        {visible(sections, "skills") && data.skills.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 8, fontWeight: 700, color: b, marginBottom: 6, letterSpacing: 1 }}>SKILLS</h3>{data.skills.map((s, i) => <div key={i} style={{ fontSize: 9, marginBottom: 2, color: "rgba(255,255,255,0.85)" }}>{s}</div>)}</div>)}
+        {visible(sections, "languages") && data.languages.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 8, fontWeight: 700, color: b, marginBottom: 4, letterSpacing: 1 }}>LANGUAGES</h3><div style={{ fontSize: 9, color: "rgba(255,255,255,0.85)" }}>{data.languages.join(", ")}</div></div>)}
+        <div style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", marginTop: 16 }}>{[data.email, data.phone, data.location].filter(Boolean).map((c, i) => <div key={i} style={{ marginBottom: 2 }}>{c}</div>)}</div>
+      </aside>
+      <main style={{ flex: 1, padding: "24px 20px", borderTop: `4px solid ${a}` }}>
+        {visible(sections, "summary") && data.summary && <p style={{ fontSize: 10.5, lineHeight: 1.7, color: "#475569", marginBottom: 16 }}>{data.summary}</p>}
+        {visible(sections, "experience") && data.experience.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 12, fontWeight: 800, color: a, marginBottom: 8 }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 10, breakInside: "avoid", borderLeft: `2px solid ${b}40`, paddingLeft: 10 }}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, fontWeight: 700, color: "#1e293b" }}>{e.role}</span><span style={{ fontSize: 9, color: b, fontWeight: 600 }}>{range(e.start, e.end)}</span></div><div style={{ fontSize: 10, color: a, marginBottom: 3 }}>{e.company}</div><Bullets bullets={e.bullets} color="#cbd5e1" /></div>))}</div>)}
+        {visible(sections, "education") && data.education.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 12, fontWeight: 800, color: a, marginBottom: 8 }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 10, marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700 }}>{ed.degree}</span> — {ed.school} ({range(ed.start, ed.end)})</div>)}</div>)}
+        {visible(sections, "projects") && data.projects.length > 0 && (<div><h3 style={{ fontSize: 12, fontWeight: 800, color: a, marginBottom: 8 }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 10, marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700 }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ marginTop: 16 }}><h3 style={{ fontSize: 12, fontWeight: 800, color: a, marginBottom: 8 }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 10, marginBottom: 3 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+      </main>
+    </div>
+  );
+}
+
+// =====================================================================
+// 16. SYDNEY — Fresh teal header, two-col, no sidebar
+// =====================================================================
+export function SydneyTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  const a = "#14b8a6";
+  return (
+    <div className={PAPER} style={{ fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ background: `linear-gradient(135deg, ${a}, #0d9488)`, padding: "24px 32px", color: "white" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>{data.name}</h1>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "4px 0 8px" }}>{data.title}</p>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>{[data.email, data.phone, data.location].filter(Boolean).join("  ·  ")}</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, padding: "20px" }}>
+        <div style={{ paddingRight: 20, borderRight: "1px solid #e2e8f0" }}>
+          {visible(sections, "summary") && data.summary && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 6, textTransform: "uppercase" }}>About</h3><p style={{ fontSize: 10, lineHeight: 1.7, color: "#475569" }}>{data.summary}</p></div>)}
+          {visible(sections, "experience") && data.experience.length > 0 && (<div><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8, textTransform: "uppercase" }}>Experience</h3>{data.experience.map(e => (<div key={e.id} style={{ marginBottom: 10, breakInside: "avoid" }}><div style={{ fontSize: 11, fontWeight: 700, color: "#1e293b" }}>{e.role}</div><div style={{ fontSize: 9, color: a, marginBottom: 3 }}>{e.company} · {range(e.start, e.end)}</div>{e.bullets.filter(b => b?.trim()).slice(0, 3).map((b, i) => <div key={i} style={{ fontSize: 9.5, lineHeight: 1.5, color: "#475569", paddingLeft: 8, position: "relative" }}><span style={{ position: "absolute", left: 0, color: a }}>{"•"}</span>{b}</div>)}</div>))}</div>)}
+        </div>
+        <div style={{ paddingLeft: 20 }}>
+          {visible(sections, "skills") && data.skills.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8, textTransform: "uppercase" }}>Skills</h3><div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{data.skills.map((s, i) => <span key={i} style={{ fontSize: 9, background: `${a}15`, color: "#0d9488", padding: "3px 8px", borderRadius: 10 }}>{s}</span>)}</div></div>)}
+          {visible(sections, "education") && data.education.length > 0 && (<div style={{ marginBottom: 16 }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8, textTransform: "uppercase" }}>Education</h3>{data.education.map(ed => <div key={ed.id} style={{ fontSize: 9.5, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1e293b" }}>{ed.degree}</span><br />{ed.school}</div>)}</div>)}
+          {visible(sections, "projects") && data.projects.length > 0 && (<div><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 8, textTransform: "uppercase" }}>Projects</h3>{data.projects.map(p => <div key={p.id} style={{ fontSize: 9.5, color: "#475569", marginBottom: 4, breakInside: "avoid" }}><span style={{ fontWeight: 700, color: "#1e293b" }}>{p.name}</span> — {p.description}</div>)}</div>)}
+        </div>
+      </div>
+      {data.customSections.filter(cs => cs.items.length > 0).map(cs => (<div key={cs.id} style={{ padding: "0 20px 12px" }}><h3 style={{ fontSize: 10, fontWeight: 700, color: a, marginBottom: 6, textTransform: "uppercase" }}>{cs.title}</h3>{cs.items.map(item => <div key={item.id} style={{ fontSize: 9.5, color: "#475569", marginBottom: 2 }}><span style={{ fontWeight: 700 }}>{item.title}</span></div>)}</div>))}
+    </div>
+  );
+}

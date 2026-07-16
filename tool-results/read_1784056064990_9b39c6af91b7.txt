@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  Mail,
+     6→  Phone,
+     7→  MapPin,
+     8→  Linkedin,
+     9→  Github,
+    10→  Globe,
+    11→  GraduationCap,
+    12→  Briefcase,
+    13→  Lightbulb,
+    14→  Trophy,
+    15→  ChartBar,
+    16→  User,
+    17→  type LucideIcon,
+    18→} from "lucide-react";
+    19→import type { ResumeData } from "@/store/resume-store";
+    20→
+    21→/* Paper constant shared across premium templates */
+    22→const PAPER =
+    23→  "resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl";
+    24→
+    25→/* ============================================================
+    26→ * Shared helpers (used across premium template components)
+    27→ * ========================================================== */
+    28→
+    29→const visible = (s: Record<string, boolean>, id: string) => s[id] !== false;
+    30→
+    31→function Avatar({
+    32→  data,
+    33→  size,
+    34→  ring,
+    35→  ringWidth = 3,
+    36→}: {
+    37→  data: ResumeData;
+    38→  size: number;
+    39→  ring?: string;
+    40→  ringWidth?: number;
+    41→}) {
+    42→  const borderStyle = ring ? `${ring} ${ringWidth}px solid` : undefined;
+    43→  if (data.photo)
+    44→    return (
+    45→      <img
+    46→        src={data.photo}
+    47→        alt={data.name || "Avatar"}
+    48→        style={{
+    49→          width: size,
+    50→          height: size,
+    51→          borderRadius: "50%",
+    52→          objectFit: "cover",
+    53→          border: borderStyle,
+    54→        }}
+    55→      />
+    56→    );
+    57→  const initials = data.name
+    58→    .split(" ")
+    59→    .map((n) => n[0])
+    60→    .join("")
+    61→    .slice(0, 2);
+    62→  return (
+    63→    <div
+    64→      style={{
+    65→        width: size,
+    66→        height: size,
+    67→        borderRadius: "50%",
+    68→        background: "#cbd5e1",
+    69→        color: "#475569",
+    70→        display: "flex",
+    71→        alignItems: "center",
+    72→        justifyContent: "center",
+    73→        fontSize: size * 0.35,
+    74→        fontWeight: 700,
+    75→        border: borderStyle,
+    76→      }}
+    77→    >
+    78→      {initials}
+    79→    </div>
+    80→  );
+    81→}
+    82→
+    83→function formatRange(start: string, end: string): string {
+    84→  const s = (start ?? "").trim();
+    85→  const e = (end ?? "").trim();
+    86→  if (s && e) return `${s} \u2013 ${e}`;
+    87→  if (s) return `${s} \u2013 Present`;
+    88→  if (e) return e;
+    89→  return "";
+    90→}
+    91→
+    92→function nonEmptyBullets(bullets: string[]): string[] {
+    93→  return (bullets ?? []).map((b) => (b ?? "").trim()).filter(Boolean);
+    94→}
+    95→
+    96→function joinTech(tech: string[]): string {
+    97→  return (tech ?? [])
+    98→    .map((t) => (t ?? "").trim())
+    99→    .filter(Boolean)
+   100→    .join(", ");
+   101→}
+   102→
+   103→interface ContactEntry {
+   104→  icon: LucideIcon;
+   105→  value: string;
+   106→}
+   107→
+   108→function buildContact(data: ResumeData): ContactEntry[] {
+   109→  const out: ContactEntry[] = [];
+   110→  if (data.email) out.push({ icon: Mail, value: data.email });
+   111→  if (data.phone) out.push({ icon: Phone, value: data.phone });
+   112→  if (data.location) out.push({ icon: MapPin, value: data.location });
+   113→  if (data.linkedin) out.push({ icon: Linkedin, value: data.linkedin });
+   114→  if (data.github) out.push({ icon: Github, value: data.github });
+   115→  if (data.website) out.push({ icon: Globe, value: data.website });
+   116→  return out;
+   117→}
+   118→
+   119→/* ============================================================
+   120→ * 8) FOUNDATION PURPLE — purple sidebar + hexagonal pattern
+   121→ * ========================================================== */
+   122→
+   123→export function FoundationPurpleTemplate({
+   124→  data,
+   125→  sections,
+   126→  accent,
+   127→}: {
+   128→  data: ResumeData;
+   129→  sections: Record<string, boolean>;
+   130→  accent: string;
+   131→}) {
+   132→  const purple = "#6d28d9";
+   133→  const a = accent || purple;
+   134→  const showPersonal = visible(sections, "personal");
+   135→  const showSummary =
+   136→    visible(sections, "summary") && data.summary.trim().length > 0;
+   137→  const showExperience =
+   138→    visible(sections, "experience") && data.experience.length > 0;
+   139→  const showSkills = visible(sections, "skills") && data.skills.length > 0;
+   140→  const showProjects = visible(sections, "projects") && data.projects.length > 0;
+   141→  const showEducation =
+   142→    visible(sections, "education") && data.education.length > 0;
+   143→  const showLanguages =
+   144→    visible(sections, "languages") && data.languages.length > 0;
+   145→
+   146→  const contacts = buildContact(data);
+   147→  const showContact = showPersonal && contacts.length > 0;
+   148→
+   149→  const hexShape: React.CSSProperties = {
+   150→    width: 26,
+   151→    height: 30,
+   152→    background: "rgba(109, 40, 217, 0.10)",
+   153→    clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+   154→  };
+   155→  const hexShapeSolid: React.CSSProperties = {
+   156→    width: 26,
+   157→    height: 30,
+   158→    background: "rgba(109, 40, 217, 0.22)",
+   159→    clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+   160→  };
+   161→
+   162→  return (
+   163→    <div
+   164→      className="resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl"
+   165→      style={{ display: "grid", gridTemplateColumns: "34% 66%", minHeight: 1123 }}
+   166→    >
+   167→      {/* Sidebar */}
+   168→      <aside
+   169→        style={{
+   170→          backgroundColor: purple,
+   171→          color: "white",
+   172→          padding: 28,
+   173→          display: "flex",
+   174→          flexDirection: "column",
+   175→          gap: 22,
+   176→        }}
+   177→      >
+   178→        {showPersonal && (
+   179→          <div style={{ textAlign: "center" }}>
+   180→            <div
+   181→              style={{
+   182→                display: "flex",
+   183→                justifyContent: "center",
+   184→                marginBottom: 14,
+   185→              }}
+   186→            >
+   187→              <Avatar data={data} size={85} ring="white" />
+   188→            </div>
+   189→            <h1
+   190→              style={{
+   191→                fontSize: 18,
+   192→                fontWeight: 800,
+   193→                margin: 0,
+   194→                lineHeight: 1.2,
+   195→                color: "white",
+   196→              }}
+   197→            >
+   198→              {data.name || "Your Name"}
+   199→            </h1>
+   200→            {data.title && (
+   201→              <p
+   202→                style={{
+   203→                  fontSize: 12,
+   204→                  color: "#ddd6fe",
+   205→                  margin: "4px 0 0 0",
+   206→                  lineHeight: 1.3,
+   207→                }}
+   208→              >
+   209→                {data.title}
+   210→              </p>
+   211→            )}
+   212→          </div>
+   213→        )}
+   214→
+   215→        {showContact && (
+   216→          <FpSidebarSection title="Contact">
+   217→            <ul
+   218→              style={{
+   219→                listStyle: "none",
+   220→                padding: 0,
+   221→                margin: 0,
+   222→                display: "flex",
+   223→                flexDirection: "column",
+   224→                gap: 6,
+   225→              }}
+   226→            >
+   227→              {contacts.map((c, i) => {
+   228→                const Icon = c.icon;
+   229→                return (
+   230→                  <li
+   231→                    key={i}
+   232→                    style={{
+   233→                      display: "flex",
+   234→                      alignItems: "flex-start",
+   235→                      gap: 6,
+   236→                      fontSize: 11,
+   237→                      color: "#ede9fe",
+   238→                      lineHeight: 1.3,
+   239→                    }}
+   240→                  >
+   241→                    <Icon size={12} color="white" style={{ flexShrink: 0, marginTop: 2 }} />
+   242→                    <span style={{ wordBreak: "break-word" }}>{c.value}</span>
+   243→                  </li>
+   244→                );
+   245→              })}
+   246→            </ul>
+   247→          </FpSidebarSection>
+   248→        )}
+   249→
+   250→        {showSkills && (
+   251→          <FpSidebarSection title="Skills">
+   252→            <ul
+   253→              style={{
+   254→                listStyle: "none",
+   255→                padding: 0,
+   256→                margin: 0,
+   257→                display: "flex",
+   258→                flexDirection: "column",
+   259→                gap: 5,
+   260→              }}
+   261→            >
+   262→              {data.skills.map((s, i) => (
+   263→                <li
+   264→                  key={i}
+   265→                  style={{
+   266→                    fontSize: 11,
+   267→                    color: "white",
+   268→                    lineHeight: 1.4,
+   269→                    display: "flex",
+   270→                    alignItems: "center",
+   271→                    gap: 6,
+   272→                  }}
+   273→                >
+   274→                  <span
+   275→                    style={{
+   276→                      width: 5,
+   277→                      height: 5,
+   278→                      borderRadius: "50%",
+   279→                      background: "#c4b5fd",
+   280→                      flexShrink: 0,
+   281→                    }}
+   282→                  />
+   283→                  {s}
+   284→                </li>
+   285→              ))}
+   286→            </ul>
+   287→          </FpSidebarSection>
+   288→        )}
+   289→
+   290→        {showLanguages && (
+   291→          <FpSidebarSection title="Languages">
+   292→            <ul
+   293→              style={{
+   294→                listStyle: "none",
+   295→                padding: 0,
+   296→                margin: 0,
+   297→                display: "flex",
+   298→                flexDirection: "column",
+   299→                gap: 5,
+   300→              }}
+   301→            >
+   302→              {data.languages.map((l, i) => (
+   303→                <li
+   304→                  key={i}
+   305→                  style={{
+   306→                    fontSize: 11,
+   307→                    color: "white",
+   308→                    display: "flex",
+   309→                    alignItems: "center",
+   310→                    gap: 6,
+   311→                  }}
+   312→                >
+   313→                  <span
+   314→                    style={{
+   315→                      width: 5,
+   316→                      height: 5,
+   317→                      borderRadius: "50%",
+   318→                      background: "#c4b5fd",
+   319→                      flexShrink: 0,
+   320→                    }}
+   321→                  />
+   322→                  {l}
+   323→                </li>
+   324→              ))}
+   325→            </ul>
+   326→          </FpSidebarSection>
+   327→        )}
+   328→      </aside>
+   329→
+   330→      {/* Main */}
+   331→      <main
+   332→        style={{
+   333→          backgroundColor: "white",
+   334→          padding: 28,
+   335→          color: "#1f2937",
+   336→          display: "flex",
+   337→          flexDirection: "column",
+   338→          gap: 18,
+   339→          position: "relative",
+   340→        }}
+   341→      >
+   342→        {/* Hexagonal pattern decoration in the header area */}
+   343→        <div
+   344→          aria-hidden
+   345→          style={{
+   346→            position: "absolute",
+   347→            top: 18,
+   348→            right: 22,
+   349→            display: "grid",
+   350→            gridTemplateColumns: "repeat(5, 26px)",
+   351→            gap: 6,
+   352→            pointerEvents: "none",
+   353→          }}
+   354→        >
+   355→          {Array.from({ length: 10 }).map((_, i) => (
+   356→            <div key={i} style={i % 3 === 0 ? hexShapeSolid : hexShape} />
+   357→          ))}
+   358→        </div>
+   359→
+   360→        {showSummary && (
+   361→          <FpMainSection title="Summary" accent={a}>
+   362→            <p
+   363→              style={{
+   364→                fontSize: 12,
+   365→                lineHeight: 1.5,
+   366→                margin: 0,
+   367→                color: "#374151",
+   368→              }}
+   369→            >
+   370→              {data.summary}
+   371→            </p>
+   372→          </FpMainSection>
+   373→        )}
+   374→
+   375→        {showExperience && (
+   376→          <FpMainSection title="Experience" accent={a}>
+   377→            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+   378→              {data.experience.map((exp) => {
+   379→                const bullets = nonEmptyBullets(exp.bullets);
+   380→                const range = formatRange(exp.start, exp.end);
+   381→                return (
+   382→                  <div key={exp.id} style={{ breakInside: "avoid" }}>
+   383→                    <div
+   384→                      style={{
+   385→                        display: "flex",
+   386→                        justifyContent: "space-between",
+   387→                        alignItems: "baseline",
+   388→                        gap: 8,
+   389→                      }}
+   390→                    >
+   391→                      <div>
+   392→                        <div
+   393→                          style={{
+   394→                            fontSize: 13,
+   395→                            fontWeight: 700,
+   396→                            color: "#111827",
+   397→                          }}
+   398→                        >
+   399→                          {exp.role}
+   400→                        </div>
+   401→                        <div style={{ fontSize: 12, color: a, fontWeight: 600 }}>
+   402→                          {exp.company}
+   403→                          {exp.location ? ` \u00b7 ${exp.location}` : ""}
+   404→                        </div>
+   405→                      </div>
+   406→                      {range && (
+   407→                        <span
+   408→                          style={{
+   409→                            fontSize: 11,
+   410→                            color: "#6b7280",
+   411→                            flexShrink: 0,
+   412→                          }}
+   413→                        >
+   414→                          {range}
+   415→                        </span>
+   416→                      )}
+   417→                    </div>
+   418→                    {bullets.length > 0 && (
+   419→                      <ul
+   420→                        style={{
+   421→                          margin: "6px 0 0 0",
+   422→                          padding: 0,
+   423→                          listStyle: "none",
+   424→                          display: "flex",
+   425→                          flexDirection: "column",
+   426→                          gap: 3,
+   427→                        }}
+   428→                      >
+   429→                        {bullets.map((b, i) => (
+   430→                          <li
+   431→                            key={i}
+   432→                            style={{
+   433→                              fontSize: 11.5,
+   434→                              color: "#374151",
+   435→                              paddingLeft: 12,
+   436→                              position: "relative",
+   437→                              lineHeight: 1.4,
+   438→                            }}
+   439→                          >
+   440→                            <span
+   441→                              style={{
+   442→                                position: "absolute",
+   443→                                left: 0,
+   444→                                color: a,
+   445→                              }}
+   446→                            >
+   447→                              {"\u2022"}
+   448→                            </span>
+   449→                            {b}
+   450→                          </li>
+   451→                        ))}
+   452→                      </ul>
+   453→                    )}
+   454→                  </div>
+   455→                );
+   456→              })}
+   457→            </div>
+   458→          </FpMainSection>
+   459→        )}
+   460→
+   461→        {showProjects && (
+   462→          <FpMainSection title="Projects" accent={a}>
+   463→            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+   464→              {data.projects.map((p) => {
+   465→                const tech = joinTech(p.tech);
+   466→                return (
+   467→                  <div key={p.id} style={{ breakInside: "avoid" }}>
+   468→                    <div
+   469→                      style={{
+   470→                        display: "flex",
+   471→                        justifyContent: "space-between",
+   472→                        alignItems: "baseline",
+   473→                        gap: 8,
+   474→                      }}
+   475→                    >
+   476→                      <div
+   477→                        style={{
+   478→                          fontSize: 12.5,
+   479→                          fontWeight: 700,
+   480→                          color: "#111827",
+   481→                        }}
+   482→                      >
+   483→                        {p.name}
+   484→                      </div>
+   485→                      {p.link && (
+   486→                        <span
+   487→                          style={{
+   488→                            fontSize: 10.5,
+   489→                            color: a,
+   490→                            flexShrink: 0,
+   491→                          }}
+   492→                        >
+   493→                          {p.link}
+   494→                        </span>
+   495→                      )}
+   496→                    </div>
+   497→                    {p.description && (
+   498→                      <p
+   499→                        style={{
+   500→                          margin: "2px 0 0 0",
+   501→                          fontSize: 11.5,
+   502→                          color: "#374151",
+   503→                          lineHeight: 1.4,
+   504→                        }}
+   505→                      >
+   506→                        {p.description}
+   507→                      </p>
+   508→                    )}
+   509→                    {tech && (
+   510→                      <p
+   511→                        style={{
+   512→                          margin: "2px 0 0 0",
+   513→                          fontSize: 10.5,
+   514→                          color: "#6b7280",
+   515→                        }}
+   516→                      >
+   517→                        <span style={{ fontWeight: 600 }}>Tech:</span> {tech}
+   518→                      </p>
+   519→                    )}
+   520→                  </div>
+   521→                );
+   522→              })}
+   523→            </div>
+   524→          </FpMainSection>
+   525→        )}
+   526→
+   527→        {showEducation && (
+   528→          <FpMainSection title="Education" accent={a}>
+   529→            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+   530→              {data.education.map((ed) => {
+   531→                const range = formatRange(ed.start, ed.end);
+   532→                return (
+   533→                  <div key={ed.id} style={{ breakInside: "avoid" }}>
+   534→                    <div
+   535→                      style={{
+   536→                        display: "flex",
+   537→                        justifyContent: "space-between",
+   538→                        alignItems: "baseline",
+   539→                        gap: 8,
+   540→                      }}
+   541→                    >
+   542→                      <div
+   543→                        style={{
+   544→                          fontSize: 12.5,
+   545→                          fontWeight: 700,
+   546→                          color: "#111827",
+   547→                        }}
+   548→                      >
+   549→                        {ed.degree}
+   550→                      </div>
+   551→                      {range && (
+   552→                        <span
+   553→                          style={{
+   554→                            fontSize: 11,
+   555→                            color: "#6b7280",
+   556→                            flexShrink: 0,
+   557→                          }}
+   558→                        >
+   559→                          {range}
+   560→                        </span>
+   561→                      )}
+   562→                    </div>
+   563→                    <div style={{ fontSize: 11.5, color: "#374151" }}>
+   564→                      {ed.school}
+   565→                      {ed.location ? ` \u00b7 ${ed.location}` : ""}
+   566→                    </div>
+   567→                    {ed.grade && (
+   568→                      <div style={{ fontSize: 11, color: "#6b7280" }}>
+   569→                        {ed.grade}
+   570→                      </div>
+   571→                    )}
+   572→                  </div>
+   573→                );
+   574→              })}
+   575→            </div>
+   576→          </FpMainSection>
+   577→        )}
+   578→      </main>
+   579→    </div>
+   580→  );
+   581→}
+   582→
+   583→function FpSidebarSection({
+   584→  title,
+   585→  children,
+   586→}: {
+   587→  title: string;
+   588→  children: React.ReactNode;
+   589→}) {
+   590→  return (
+   591→    <section>
+   592→      <h2
+   593→        style={{
+   594→          fontSize: 11,
+   595→          fontWeight: 700,
+   596→          letterSpacing: "0.16em",
+   597→          textTransform: "uppercase",
+   598→          margin: "0 0 8px 0",
+   599→          color: "white",
+   600→          opacity: 0.95,
+   601→        }}
+   602→      >
+   603→        {title}
+   604→      </h2>
+   605→      {children}
+   606→    </section>
+   607→  );
+   608→}
+   609→
+   610→function FpMainSection({
+   611→  title,
+   612→  accent,
+   613→  children,
+   614→}: {
+   615→  title: string;
+   616→  accent: string;
+   617→  children: React.ReactNode;
+   618→}) {
+   619→  return (
+   620→    <section>
+   621→      <h2
+   622→        style={{
+   623→          fontSize: 12,
+   624→          fontWeight: 800,
+   625→          letterSpacing: "0.14em",
+   626→          textTransform: "uppercase",
+   627→          color: accent,
+   628→          margin: "0 0 10px 0",
+   629→          paddingBottom: 4,
+   630→          borderBottom: `2px solid ${accent}`,
+   631→        }}
+   632→      >
+   633→        {title}
+   634→      </h2>
+   635→      {children}
+   636→    </section>
+   637→  );
+   638→}
+   639→
+   640→/* ============================================================
+   641→ * 9) BLUE SIDEBAR PRO — clean corporate blue sidebar
+   642→ * ========================================================== */
+   643→
+   644→export function BlueSidebarProTemplate({
+   645→  data,
+   646→  sections,
+   647→  accent,
+   648→}: {
+   649→  data: ResumeData;
+   650→  sections: Record<string, boolean>;
+   651→  accent: string;
+   652→}) {
+   653→  const blue = "#1d4ed8";
+   654→  const a = accent || blue;
+   655→  const showPersonal = visible(sections, "personal");
+   656→  const showSummary =
+   657→    visible(sections, "summary") && data.summary.trim().length > 0;
+   658→  const showExperience =
+   659→    visible(sections, "experience") && data.experience.length > 0;
+   660→  const showSkills = visible(sections, "skills") && data.skills.length > 0;
+   661→  const showProjects = visible(sections, "projects") && data.projects.length > 0;
+   662→  const showEducation =
+   663→    visible(sections, "education") && data.education.length > 0;
+   664→  const showLanguages =
+   665→    visible(sections, "languages") && data.languages.length > 0;
+   666→
+   667→  const contacts = buildContact(data);
+   668→  const showContact = showPersonal && contacts.length > 0;
+   669→
+   670→  return (
+   671→    <div
+   672→      className="resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl"
+   673→      style={{ display: "grid", gridTemplateColumns: "33% 67%", minHeight: 1123 }}
+   674→    >
+   675→      {/* Sidebar */}
+   676→      <aside
+   677→        style={{
+   678→          backgroundColor: blue,
+   679→          color: "white",
+   680→          padding: 28,
+   681→          display: "flex",
+   682→          flexDirection: "column",
+   683→          gap: 22,
+   684→        }}
+   685→      >
+   686→        {showPersonal && (
+   687→          <div style={{ textAlign: "center" }}>
+   688→            <div
+   689→              style={{
+   690→                display: "flex",
+   691→                justifyContent: "center",
+   692→                marginBottom: 14,
+   693→              }}
+   694→            >
+   695→              <Avatar data={data} size={90} ring="white" />
+   696→            </div>
+   697→            <h1
+   698→              style={{
+   699→                fontSize: 18,
+   700→                fontWeight: 800,
+   701→                margin: 0,
+   702→                lineHeight: 1.2,
+   703→                color: "white",
+   704→              }}
+   705→            >
+   706→              {data.name || "Your Name"}
+   707→            </h1>
+   708→            {data.title && (
+   709→              <p
+   710→                style={{
+   711→                  fontSize: 12,
+   712→                  color: "#bfdbfe",
+   713→                  margin: "4px 0 0 0",
+   714→                  lineHeight: 1.3,
+   715→                }}
+   716→              >
+   717→                {data.title}
+   718→              </p>
+   719→            )}
+   720→          </div>
+   721→        )}
+   722→
+   723→        {showContact && (
+   724→          <BsSidebarSection title="Contact">
+   725→            <ul
+   726→              style={{
+   727→                listStyle: "none",
+   728→                padding: 0,
+   729→                margin: 0,
+   730→                display: "flex",
+   731→                flexDirection: "column",
+   732→                gap: 6,
+   733→              }}
+   734→            >
+   735→              {contacts.map((c, i) => {
+   736→                const Icon = c.icon;
+   737→                return (
+   738→                  <li
+   739→                    key={i}
+   740→                    style={{
+   741→                      display: "flex",
+   742→                      alignItems: "flex-start",
+   743→                      gap: 6,
+   744→                      fontSize: 11,
+   745→                      color: "#dbeafe",
+   746→                      lineHeight: 1.3,
+   747→                    }}
+   748→                  >
+   749→                    <Icon size={12} color="white" style={{ flexShrink: 0, marginTop: 2 }} />
+   750→                    <span style={{ wordBreak: "break-word" }}>{c.value}</span>
+   751→                  </li>
+   752→                );
+   753→              })}
+   754→            </ul>
+   755→          </BsSidebarSection>
+   756→        )}
+   757→
+   758→        {showSkills && (
+   759→          <BsSidebarSection title="Skills">
+   760→            <ul
+   761→              style={{
+   762→                listStyle: "none",
+   763→                padding: 0,
+   764→                margin: 0,
+   765→                display: "flex",
+   766→                flexDirection: "column",
+   767→                gap: 5,
+   768→              }}
+   769→            >
+   770→              {data.skills.map((s, i) => (
+   771→                <li
+   772→                  key={i}
+   773→                  style={{
+   774→                    fontSize: 11,
+   775→                    color: "white",
+   776→                    lineHeight: 1.4,
+   777→                    display: "flex",
+   778→                    alignItems: "center",
+   779→                    gap: 6,
+   780→                  }}
+   781→                >
+   782→                  <span
+   783→                    style={{
+   784→                      width: 5,
+   785→                      height: 5,
+   786→                      borderRadius: "50%",
+   787→                      background: "#93c5fd",
+   788→                      flexShrink: 0,
+   789→                    }}
+   790→                  />
+   791→                  {s}
+   792→                </li>
+   793→              ))}
+   794→            </ul>
+   795→          </BsSidebarSection>
+   796→        )}
+   797→
+   798→        {showLanguages && (
+   799→          <BsSidebarSection title="Languages">
+   800→            <ul
+   801→              style={{
+   802→                listStyle: "none",
+   803→                padding: 0,
+   804→                margin: 0,
+   805→                display: "flex",
+   806→                flexDirection: "column",
+   807→                gap: 5,
+   808→              }}
+   809→            >
+   810→              {data.languages.map((l, i) => (
+   811→                <li
+   812→                  key={i}
+   813→                  style={{
+   814→                    fontSize: 11,
+   815→                    color: "white",
+   816→                    display: "flex",
+   817→                    alignItems: "center",
+   818→                    gap: 6,
+   819→                  }}
+   820→                >
+   821→                  <span
+   822→                    style={{
+   823→                      width: 5,
+   824→                      height: 5,
+   825→                      borderRadius: "50%",
+   826→                      background: "#93c5fd",
+   827→                      flexShrink: 0,
+   828→                    }}
+   829→                  />
+   830→                  {l}
+   831→                </li>
+   832→              ))}
+   833→            </ul>
+   834→          </BsSidebarSection>
+   835→        )}
+   836→      </aside>
+   837→
+   838→      {/* Main */}
+   839→      <main
+   840→        style={{
+   841→          backgroundColor: "white",
+   842→          padding: 28,
+   843→          color: "#1e293b",
+   844→          display: "flex",
+   845→          flexDirection: "column",
+   846→          gap: 18,
+   847→        }}
+   848→      >
+   849→        {showSummary && (
+   850→          <BsMainSection title="Summary" accent={a}>
+   851→            <p
+   852→              style={{
+   853→                fontSize: 12,
+   854→                lineHeight: 1.5,
+   855→                margin: 0,
+   856→                color: "#334155",
+   857→              }}
+   858→            >
+   859→              {data.summary}
+   860→            </p>
+   861→          </BsMainSection>
+   862→        )}
+   863→
+   864→        {showExperience && (
+   865→          <BsMainSection title="Experience" accent={a}>
+   866→            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+   867→              {data.experience.map((exp) => {
+   868→                const bullets = nonEmptyBullets(exp.bullets);
+   869→                const range = formatRange(exp.start, exp.end);
+   870→                return (
+   871→                  <div key={exp.id} style={{ breakInside: "avoid" }}>
+   872→                    <div
+   873→                      style={{
+   874→                        display: "flex",
+   875→                        justifyContent: "space-between",
+   876→                        alignItems: "baseline",
+   877→                        gap: 8,
+   878→                      }}
+   879→                    >
+   880→                      <div>
+   881→                        <div
+   882→                          style={{
+   883→                            fontSize: 13,
+   884→                            fontWeight: 700,
+   885→                            color: "#0f172a",
+   886→                          }}
+   887→                        >
+   888→                          {exp.role}
+   889→                        </div>
+   890→                        <div style={{ fontSize: 12, color: a, fontWeight: 600 }}>
+   891→                          {exp.company}
+   892→                          {exp.location ? ` \u00b7 ${exp.location}` : ""}
+   893→                        </div>
+   894→                      </div>
+   895→                      {range && (
+   896→                        <span
+   897→                          style={{
+   898→                            fontSize: 11,
+   899→                            color: "#64748b",
+   900→                            flexShrink: 0,
+   901→                          }}
+   902→                        >
+   903→                          {range}
+   904→                        </span>
+   905→                      )}
+   906→                    </div>
+   907→                    {bullets.length > 0 && (
+   908→                      <ul
+   909→                        style={{
+   910→                          margin: "6px 0 0 0",
+   911→                          padding: 0,
+   912→                          listStyle: "none",
+   913→                          display: "flex",
+   914→                          flexDirection: "column",
+   915→                          gap: 3,
+   916→                        }}
+   917→                      >
+   918→                        {bullets.map((b, i) => (
+   919→                          <li
+   920→                            key={i}
+   921→                            style={{
+   922→                              fontSize: 11.5,
+   923→                              color: "#334155",
+   924→                              paddingLeft: 12,
+   925→                              position: "relative",
+   926→                              lineHeight: 1.4,
+   927→                            }}
+   928→                          >
+   929→                            <span
+   930→                              style={{
+   931→                                position: "absolute",
+   932→                                left: 0,
+   933→                                color: a,
+   934→                                fontSize: 14,
+   935→                                top: -2,
+   936→                              }}
+   937→                            >
+   938→                              {"\u2022"}
+   939→                            </span>
+   940→                            {b}
+   941→                          </li>
+   942→                        ))}
+   943→                      </ul>
+   944→                    )}
+   945→                  </div>
+   946→                );
+   947→              })}
+   948→            </div>
+   949→          </BsMainSection>
+   950→        )}
+   951→
+   952→        {showEducation && (
+   953→          <BsMainSection title="Education" accent={a}>
+   954→            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+   955→              {data.education.map((ed) => {
+   956→                const range = formatRange(ed.start, ed.end);
+   957→                return (
+   958→                  <div key={ed.id} style={{ breakInside: "avoid" }}>
+   959→                    <div
+   960→                      style={{
+   961→                        display: "flex",
+   962→                        justifyContent: "space-between",
+   963→                        alignItems: "baseline",
+   964→                        gap: 8,
+   965→                      }}
+   966→                    >
+   967→                      <div
+   968→                        style={{
+   969→                          fontSize: 12.5,
+   970→                          fontWeight: 700,
+   971→                          color: "#0f172a",
+   972→                        }}
+   973→                      >
+   974→                        {ed.degree}
+   975→                      </div>
+   976→                      {range && (
+   977→                        <span
+   978→                          style={{
+   979→                            fontSize: 11,
+   980→                            color: "#64748b",
+   981→                            flexShrink: 0,
+   982→                          }}
+   983→                        >
+   984→                          {range}
+   985→                        </span>
+   986→                      )}
+   987→                    </div>
+   988→                    <div style={{ fontSize: 11.5, color: "#334155" }}>
+   989→                      {ed.school}
+   990→                      {ed.location ? ` \u00b7 ${ed.location}` : ""}
+   991→                    </div>
+   992→                    {ed.grade && (
+   993→                      <div style={{ fontSize: 11, color: "#64748b" }}>
+   994→                        {ed.grade}
+   995→                      </div>
+   996→                    )}
+   997→                  </div>
+   998→                );
+   999→              })}
+  1000→            </div>
+  1001→          </BsMainSection>
+  1002→        )}
+  1003→
+  1004→        {showProjects && (
+  1005→          <BsMainSection title="Projects" accent={a}>
+  1006→            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  1007→              {data.projects.map((p) => {
+  1008→                const tech = joinTech(p.tech);
+  1009→                return (
+  1010→                  <div key={p.id} style={{ breakInside: "avoid" }}>
+  1011→                    <div
+  1012→                      style={{
+  1013→                        display: "flex",
+  1014→                        justifyContent: "space-between",
+  1015→                        alignItems: "baseline",
+  1016→                        gap: 8,
+  1017→                      }}
+  1018→                    >
+  1019→                      <div
+  1020→                        style={{
+  1021→                          fontSize: 12.5,
+  1022→                          fontWeight: 700,
+  1023→                          color: "#0f172a",
+  1024→                        }}
+  1025→                      >
+  1026→                        {p.name}
+  1027→                      </div>
+  1028→                      {p.link && (
+  1029→                        <span
+  1030→                          style={{
+  1031→                            fontSize: 10.5,
+  1032→                            color: a,
+  1033→                            flexShrink: 0,
+  1034→                          }}
+  1035→                        >
+  1036→                          {p.link}
+  1037→                        </span>
+  1038→                      )}
+  1039→                    </div>
+  1040→                    {p.description && (
+  1041→                      <p
+  1042→                        style={{
+  1043→                          margin: "2px 0 0 0",
+  1044→                          fontSize: 11.5,
+  1045→                          color: "#334155",
+  1046→                          lineHeight: 1.4,
+  1047→                        }}
+  1048→                      >
+  1049→                        {p.description}
+  1050→                      </p>
+  1051→                    )}
+  1052→                    {tech && (
+  1053→                      <p
+  1054→                        style={{
+  1055→                          margin: "2px 0 0 0",
+  1056→                          fontSize: 10.5,
+  1057→                          color: "#64748b",
+  1058→                        }}
+  1059→                      >
+  1060→                        <span style={{ fontWeight: 600 }}>Tech:</span> {tech}
+  1061→                      </p>
+  1062→                    )}
+  1063→                  </div>
+  1064→                );
+  1065→              })}
+  1066→            </div>
+  1067→          </BsMainSection>
+  1068→        )}
+  1069→      </main>
+  1070→    </div>
+  1071→  );
+  1072→}
+  1073→
+  1074→function BsSidebarSection({
+  1075→  title,
+  1076→  children,
+  1077→}: {
+  1078→  title: string;
+  1079→  children: React.ReactNode;
+  1080→}) {
+  1081→  return (
+  1082→    <section>
+  1083→      <h2
+  1084→        style={{
+  1085→          fontSize: 11,
+  1086→          fontWeight: 700,
+  1087→          letterSpacing: "0.16em",
+  1088→          textTransform: "uppercase",
+  1089→          margin: "0 0 8px 0",
+  1090→          color: "white",
+  1091→          opacity: 0.95,
+  1092→        }}
+  1093→      >
+  1094→        {title}
+  1095→      </h2>
+  1096→      {children}
+  1097→    </section>
+  1098→  );
+  1099→}
+  1100→
+  1101→function BsMainSection({
+  1102→  title,
+  1103→  accent,
+  1104→  children,
+  1105→}: {
+  1106→  title: string;
+  1107→  accent: string;
+  1108→  children: React.ReactNode;
+  1109→}) {
+  1110→  return (
+  1111→    <section>
+  1112→      <h2
+  1113→        style={{
+  1114→          fontSize: 12,
+  1115→          fontWeight: 800,
+  1116→          letterSpacing: "0.14em",
+  1117→          textTransform: "uppercase",
+  1118→          color: accent,
+  1119→          margin: "0 0 10px 0",
+  1120→          paddingBottom: 4,
+  1121→          borderBottom: `1px solid ${accent}`,
+  1122→        }}
+  1123→      >
+  1124→        {title}
+  1125→      </h2>
+  1126→      {children}
+  1127→    </section>
+  1128→  );
+  1129→}
+  1130→
+  1131→/* ============================================================
+  1132→ * 10) ASPIRE TEAL — main + right gray sidebar with teal accents
+  1133→ * ========================================================== */
+  1134→
+  1135→export function AspireTealTemplate({
+  1136→  data,
+  1137→  sections,
+  1138→  accent,
+  1139→}: {
+  1140→  data: ResumeData;
+  1141→  sections: Record<string, boolean>;
+  1142→  accent: string;
+  1143→}) {
+  1144→  const teal = "#0d9488";
+  1145→  const a = accent || teal;
+  1146→  const showPersonal = visible(sections, "personal");
+  1147→  const showSummary =
+  1148→    visible(sections, "summary") && data.summary.trim().length > 0;
+  1149→  const showExperience =
+  1150→    visible(sections, "experience") && data.experience.length > 0;
+  1151→  const showSkills = visible(sections, "skills") && data.skills.length > 0;
+  1152→  const showProjects = visible(sections, "projects") && data.projects.length > 0;
+  1153→  const showEducation =
+  1154→    visible(sections, "education") && data.education.length > 0;
+  1155→  const showLanguages =
+  1156→    visible(sections, "languages") && data.languages.length > 0;
+  1157→  const showCerts =
+  1158→    visible(sections, "certifications") && data.certifications.length > 0;
+  1159→
+  1160→  const contacts = buildContact(data);
+  1161→  const showContact = showPersonal && contacts.length > 0;
+  1162→
+  1163→  return (
+  1164→    <div
+  1165→      className="resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl"
+  1166→      style={{
+  1167→        display: "grid",
+  1168→        gridTemplateColumns: "68% 32%",
+  1169→        minHeight: 1123,
+  1170→      }}
+  1171→    >
+  1172→      {/* Main */}
+  1173→      <main
+  1174→        style={{
+  1175→          backgroundColor: "white",
+  1176→          padding: 32,
+  1177→          color: "#1f2937",
+  1178→          display: "flex",
+  1179→          flexDirection: "column",
+  1180→          gap: 20,
+  1181→          borderRight: `3px solid ${teal}`,
+  1182→        }}
+  1183→      >
+  1184→        {showPersonal && (
+  1185→          <header style={{ marginBottom: 4 }}>
+  1186→            <h1
+  1187→              style={{
+  1188→                fontSize: 30,
+  1189→                fontWeight: 800,
+  1190→                margin: 0,
+  1191→                lineHeight: 1.1,
+  1192→                color: "#111827",
+  1193→                letterSpacing: "-0.01em",
+  1194→              }}
+  1195→            >
+  1196→              {data.name || "Your Name"}
+  1197→            </h1>
+  1198→            {data.title && (
+  1199→              <p
+  1200→                style={{
+  1201→                  fontSize: 14,
+  1202→                  color: a,
+  1203→                  margin: "4px 0 0 0",
+  1204→                  fontWeight: 600,
+  1205→                  letterSpacing: "0.02em",
+  1206→                }}
+  1207→              >
+  1208→                {data.title}
+  1209→              </p>
+  1210→            )}
+  1211→          </header>
+  1212→        )}
+  1213→
+  1214→        {showSummary && (
+  1215→          <AsMainSection title="Summary" accent={a}>
+  1216→            <p
+  1217→              style={{
+  1218→                fontSize: 12,
+  1219→                lineHeight: 1.5,
+  1220→                margin: 0,
+  1221→                color: "#374151",
+  1222→              }}
+  1223→            >
+  1224→              {data.summary}
+  1225→            </p>
+  1226→          </AsMainSection>
+  1227→        )}
+  1228→
+  1229→        {showExperience && (
+  1230→          <AsMainSection title="Experience" accent={a}>
+  1231→            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+  1232→              {data.experience.map((exp) => {
+  1233→                const bullets = nonEmptyBullets(exp.bullets);
+  1234→                const range = formatRange(exp.start, exp.end);
+  1235→                return (
+  1236→                  <div key={exp.id} style={{ breakInside: "avoid" }}>
+  1237→                    <div
+  1238→                      style={{
+  1239→                        display: "flex",
+  1240→                        justifyContent: "space-between",
+  1241→                        alignItems: "baseline",
+  1242→                        gap: 8,
+  1243→                      }}
+  1244→                    >
+  1245→                      <div>
+  1246→                        <div
+  1247→                          style={{
+  1248→                            fontSize: 13,
+  1249→                            fontWeight: 700,
+  1250→                            color: "#111827",
+  1251→                          }}
+  1252→                        >
+  1253→                          {exp.role}
+  1254→                        </div>
+  1255→                        <div style={{ fontSize: 12, color: a, fontWeight: 600 }}>
+  1256→                          {exp.company}
+  1257→                          {exp.location ? ` \u00b7 ${exp.location}` : ""}
+  1258→                        </div>
+  1259→                      </div>
+  1260→                      {range && (
+  1261→                        <span
+  1262→                          style={{
+  1263→                            fontSize: 11,
+  1264→                            color: "#6b7280",
+  1265→                            flexShrink: 0,
+  1266→                          }}
+  1267→                        >
+  1268→                          {range}
+  1269→                        </span>
+  1270→                      )}
+  1271→                    </div>
+  1272→                    {bullets.length > 0 && (
+  1273→                      <ul
+  1274→                        style={{
+  1275→                          margin: "6px 0 0 0",
+  1276→                          padding: 0,
+  1277→                          listStyle: "none",
+  1278→                          display: "flex",
+  1279→                          flexDirection: "column",
+  1280→                          gap: 3,
+  1281→                        }}
+  1282→                      >
+  1283→                        {bullets.map((b, i) => (
+  1284→                          <li
+  1285→                            key={i}
+  1286→                            style={{
+  1287→                              fontSize: 11.5,
+  1288→                              color: "#374151",
+  1289→                              paddingLeft: 12,
+  1290→                              position: "relative",
+  1291→                              lineHeight: 1.4,
+  1292→                            }}
+  1293→                          >
+  1294→                            <span
+  1295→                              style={{
+  1296→                                position: "absolute",
+  1297→                                left: 0,
+  1298→                                color: a,
+  1299→                              }}
+  1300→                            >
+  1301→                              {"\u2022"}
+  1302→                            </span>
+  1303→                            {b}
+  1304→                          </li>
+  1305→                        ))}
+  1306→                      </ul>
+  1307→                    )}
+  1308→                  </div>
+  1309→                );
+  1310→              })}
+  1311→            </div>
+  1312→          </AsMainSection>
+  1313→        )}
+  1314→
+  1315→        {showEducation && (
+  1316→          <AsMainSection title="Education" accent={a}>
+  1317→            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+  1318→              {data.education.map((ed) => {
+  1319→                const range = formatRange(ed.start, ed.end);
+  1320→                return (
+  1321→                  <div key={ed.id} style={{ breakInside: "avoid" }}>
+  1322→                    <div
+  1323→                      style={{
+  1324→                        display: "flex",
+  1325→                        justifyContent: "space-between",
+  1326→                        alignItems: "baseline",
+  1327→                        gap: 8,
+  1328→                      }}
+  1329→                    >
+  1330→                      <div
+  1331→                        style={{
+  1332→                          fontSize: 12.5,
+  1333→                          fontWeight: 700,
+  1334→                          color: "#111827",
+  1335→                        }}
+  1336→                      >
+  1337→                        {ed.degree}
+  1338→                      </div>
+  1339→                      {range && (
+  1340→                        <span
+  1341→                          style={{
+  1342→                            fontSize: 11,
+  1343→                            color: "#6b7280",
+  1344→                            flexShrink: 0,
+  1345→                          }}
+  1346→                        >
+  1347→                          {range}
+  1348→                        </span>
+  1349→                      )}
+  1350→                    </div>
+  1351→                    <div style={{ fontSize: 11.5, color: "#374151" }}>
+  1352→                      {ed.school}
+  1353→                      {ed.location ? ` \u00b7 ${ed.location}` : ""}
+  1354→                    </div>
+  1355→                    {ed.grade && (
+  1356→                      <div style={{ fontSize: 11, color: "#6b7280" }}>
+  1357→                        {ed.grade}
+  1358→                      </div>
+  1359→                    )}
+  1360→                  </div>
+  1361→                );
+  1362→              })}
+  1363→            </div>
+  1364→          </AsMainSection>
+  1365→        )}
+  1366→
+  1367→        {showProjects && (
+  1368→          <AsMainSection title="Projects" accent={a}>
+  1369→            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  1370→              {data.projects.map((p) => {
+  1371→                const tech = joinTech(p.tech);
+  1372→                return (
+  1373→                  <div key={p.id} style={{ breakInside: "avoid" }}>
+  1374→                    <div
+  1375→                      style={{
+  1376→                        display: "flex",
+  1377→                        justifyContent: "space-between",
+  1378→                        alignItems: "baseline",
+  1379→                        gap: 8,
+  1380→                      }}
+  1381→                    >
+  1382→                      <div
+  1383→                        style={{
+  1384→                          fontSize: 12.5,
+  1385→                          fontWeight: 700,
+  1386→                          color: "#111827",
+  1387→                        }}
+  1388→                      >
+  1389→                        {p.name}
+  1390→                      </div>
+  1391→                      {p.link && (
+  1392→                        <span
+  1393→                          style={{
+  1394→                            fontSize: 10.5,
+  1395→                            color: a,
+  1396→                            flexShrink: 0,
+  1397→                          }}
+  1398→                        >
+  1399→                          {p.link}
+  1400→                        </span>
+  1401→                      )}
+  1402→                    </div>
+  1403→                    {p.description && (
+  1404→                      <p
+  1405→                        style={{
+  1406→                          margin: "2px 0 0 0",
+  1407→                          fontSize: 11.5,
+  1408→                          color: "#374151",
+  1409→                          lineHeight: 1.4,
+  1410→                        }}
+  1411→                      >
+  1412→                        {p.description}
+  1413→                      </p>
+  1414→                    )}
+  1415→                    {tech && (
+  1416→                      <p
+  1417→                        style={{
+  1418→                          margin: "2px 0 0 0",
+  1419→                          fontSize: 10.5,
+  1420→                          color: "#6b7280",
+  1421→                        }}
+  1422→                      >
+  1423→                        <span style={{ fontWeight: 600 }}>Tech:</span> {tech}
+  1424→                      </p>
+  1425→                    )}
+  1426→                  </div>
+  1427→                );
+  1428→              })}
+  1429→            </div>
+  1430→          </AsMainSection>
+  1431→        )}
+  1432→      </main>
+  1433→
+  1434→      {/* Sidebar */}
+  1435→      <aside
+  1436→        style={{
+  1437→          backgroundColor: "#f3f4f6",
+  1438→          padding: 28,
+  1439→          display: "flex",
+  1440→          flexDirection: "column",
+  1441→          gap: 20,
+  1442→        }}
+  1443→      >
+  1444→        {showContact && (
+  1445→          <AsSidebarSection title="Contact" accent={a}>
+  1446→            <ul
+  1447→              style={{
+  1448→                listStyle: "none",
+  1449→                padding: 0,
+  1450→                margin: 0,
+  1451→                display: "flex",
+  1452→                flexDirection: "column",
+  1453→                gap: 6,
+  1454→              }}
+  1455→            >
+  1456→              {contacts.map((c, i) => {
+  1457→                const Icon = c.icon;
+  1458→                return (
+  1459→                  <li
+  1460→                    key={i}
+  1461→                    style={{
+  1462→                      display: "flex",
+  1463→                      alignItems: "flex-start",
+  1464→                      gap: 6,
+  1465→                      fontSize: 11,
+  1466→                      color: "#374151",
+  1467→                      lineHeight: 1.3,
+  1468→                    }}
+  1469→                  >
+  1470→                    <Icon size={12} color={a} style={{ flexShrink: 0, marginTop: 2 }} />
+  1471→                    <span style={{ wordBreak: "break-word" }}>{c.value}</span>
+  1472→                  </li>
+  1473→                );
+  1474→              })}
+  1475→            </ul>
+  1476→          </AsSidebarSection>
+  1477→        )}
+  1478→
+  1479→        {showSkills && (
+  1480→          <AsSidebarSection title="Skills" accent={a}>
+  1481→            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+  1482→              {data.skills.map((s, i) => (
+  1483→                <span
+  1484→                  key={i}
+  1485→                  style={{
+  1486→                    fontSize: 10.5,
+  1487→                    padding: "3px 8px",
+  1488→                    background: "white",
+  1489→                    color: a,
+  1490→                    border: `1px solid ${a}55`,
+  1491→                    borderRadius: 999,
+  1492→                    fontWeight: 600,
+  1493→                    lineHeight: 1.3,
+  1494→                  }}
+  1495→                >
+  1496→                  {s}
+  1497→                </span>
+  1498→              ))}
+  1499→            </div>
+  1500→          </AsSidebarSection>
+  1501→        )}
+  1502→
+  1503→        {showLanguages && (
+  1504→          <AsSidebarSection title="Languages" accent={a}>
+  1505→            <ul
+  1506→              style={{
+  1507→                listStyle: "none",
+  1508→                padding: 0,
+  1509→                margin: 0,
+  1510→                display: "flex",
+  1511→                flexDirection: "column",
+  1512→                gap: 4,
+  1513→              }}
+  1514→            >
+  1515→              {data.languages.map((l, i) => (
+  1516→                <li key={i} style={{ fontSize: 11, color: "#374151" }}>
+  1517→                  {l}
+  1518→                </li>
+  1519→              ))}
+  1520→            </ul>
+  1521→          </AsSidebarSection>
+  1522→        )}
+  1523→
+  1524→        {showCerts && (
+  1525→          <AsSidebarSection title="Certifications" accent={a}>
+  1526→            <ul
+  1527→              style={{
+  1528→                listStyle: "none",
+  1529→                padding: 0,
+  1530→                margin: 0,
+  1531→                display: "flex",
+  1532→                flexDirection: "column",
+  1533→                gap: 6,
+  1534→              }}
+  1535→            >
+  1536→              {data.certifications.map((c) => (
+  1537→                <li key={c.id} style={{ breakInside: "avoid" }}>
+  1538→                  <div
+  1539→                    style={{
+  1540→                      fontSize: 11.5,
+  1541→                      fontWeight: 700,
+  1542→                      color: "#111827",
+  1543→                    }}
+  1544→                  >
+  1545→                    {c.title}
+  1546→                  </div>
+  1547→                  {c.subtitle && (
+  1548→                    <div style={{ fontSize: 10.5, color: a }}>{c.subtitle}</div>
+  1549→                  )}
+  1550→                  {c.date && (
+  1551→                    <div style={{ fontSize: 10, color: "#6b7280" }}>{c.date}</div>
+  1552→                  )}
+  1553→                </li>
+  1554→              ))}
+  1555→            </ul>
+  1556→          </AsSidebarSection>
+  1557→        )}
+  1558→      </aside>
+  1559→    </div>
+  1560→  );
+  1561→}
+  1562→
+  1563→function AsMainSection({
+  1564→  title,
+  1565→  accent,
+  1566→  children,
+  1567→}: {
+  1568→  title: string;
+  1569→  accent: string;
+  1570→  children: React.ReactNode;
+  1571→}) {
+  1572→  return (
+  1573→    <section>
+  1574→      <h2
+  1575→        style={{
+  1576→          fontSize: 12,
+  1577→          fontWeight: 800,
+  1578→          letterSpacing: "0.12em",
+  1579→          textTransform: "uppercase",
+  1580→          color: "#111827",
+  1581→          margin: "0 0 10px 0",
+  1582→          display: "flex",
+  1583→          alignItems: "center",
+  1584→          gap: 8,
+  1585→        }}
+  1586→      >
+  1587→        <span
+  1588→          style={{
+  1589→            display: "inline-block",
+  1590→            width: 4,
+  1591→            height: 16,
+  1592→            background: accent,
+  1593→            borderRadius: 2,
+  1594→            flexShrink: 0,
+  1595→          }}
+  1596→        />
+  1597→        {title}
+  1598→      </h2>
+  1599→      {children}
+  1600→    </section>
+  1601→  );
+  1602→}
+  1603→
+  1604→function AsSidebarSection({
+  1605→  title,
+  1606→  accent,
+  1607→  children,
+  1608→}: {
+  1609→  title: string;
+  1610→  accent: string;
+  1611→  children: React.ReactNode;
+  1612→}) {
+  1613→  return (
+  1614→    <section>
+  1615→      <h2
+  1616→        style={{
+  1617→          fontSize: 11,
+  1618→          fontWeight: 800,
+  1619→          letterSpacing: "0.14em",
+  1620→          textTransform: "uppercase",
+  1621→          color: accent,
+  1622→          margin: "0 0 8px 0",
+  1623→          paddingBottom: 4,
+  1624→          borderBottom: `1px solid ${accent}33`,
+  1625→        }}
+  1626→      >
+  1627→        {title}
+  1628→      </h2>
+  1629→      {children}
+  1630→    </section>
+  1631→  );
+  1632→}
+  1633→
+  1634→/* ============================================================
+  1635→ * 11) CANVA PINK BLUE — pink sidebar + light blue main, pill badges
+  1636→ * ========================================================== */
+  1637→
+  1638→export function CanvaPinkBlueTemplate({
+  1639→  data,
+  1640→  sections,
+  1641→  accent,
+  1642→}: {
+  1643→  data: ResumeData;
+  1644→  sections: Record<string, boolean>;
+  1645→  accent: string;
+  1646→}) {
+  1647→  const pink = "#e11d48";
+  1648→  const a = accent || pink;
+  1649→  const showPersonal = visible(sections, "personal");
+  1650→  const showSummary =
+  1651→    visible(sections, "summary") && data.summary.trim().length > 0;
+  1652→  const showExperience =
+  1653→    visible(sections, "experience") && data.experience.length > 0;
+  1654→  const showSkills = visible(sections, "skills") && data.skills.length > 0;
+  1655→  const showProjects = visible(sections, "projects") && data.projects.length > 0;
+  1656→  const showEducation =
+  1657→    visible(sections, "education") && data.education.length > 0;
+  1658→  const showLanguages =
+  1659→    visible(sections, "languages") && data.languages.length > 0;
+  1660→
+  1661→  const contacts = buildContact(data);
+  1662→  const showContact = showPersonal && contacts.length > 0;
+  1663→
+  1664→  return (
+  1665→    <div
+  1666→      className="resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl"
+  1667→      style={{ display: "grid", gridTemplateColumns: "35% 65%", minHeight: 1123 }}
+  1668→    >
+  1669→      {/* Sidebar */}
+  1670→      <aside
+  1671→        style={{
+  1672→          backgroundColor: pink,
+  1673→          color: "white",
+  1674→          padding: 28,
+  1675→          display: "flex",
+  1676→          flexDirection: "column",
+  1677→          gap: 22,
+  1678→        }}
+  1679→      >
+  1680→        {showPersonal && (
+  1681→          <div style={{ textAlign: "center" }}>
+  1682→            <div
+  1683→              style={{
+  1684→                display: "flex",
+  1685→                justifyContent: "center",
+  1686→                marginBottom: 14,
+  1687→              }}
+  1688→            >
+  1689→              <Avatar data={data} size={80} ring="white" />
+  1690→            </div>
+  1691→            <h1
+  1692→              style={{
+  1693→                fontSize: 18,
+  1694→                fontWeight: 800,
+  1695→                margin: 0,
+  1696→                lineHeight: 1.2,
+  1697→                color: "white",
+  1698→              }}
+  1699→            >
+  1700→              {data.name || "Your Name"}
+  1701→            </h1>
+  1702→            {data.title && (
+  1703→              <p
+  1704→                style={{
+  1705→                  fontSize: 12,
+  1706→                  color: "#fecdd3",
+  1707→                  margin: "4px 0 0 0",
+  1708→                  lineHeight: 1.3,
+  1709→                }}
+  1710→              >
+  1711→                {data.title}
+  1712→              </p>
+  1713→            )}
+  1714→          </div>
+  1715→        )}
+  1716→
+  1717→        {showContact && (
+  1718→          <CvSidebarSection title="Contact">
+  1719→            <ul
+  1720→              style={{
+  1721→                listStyle: "none",
+  1722→                padding: 0,
+  1723→                margin: 0,
+  1724→                display: "flex",
+  1725→                flexDirection: "column",
+  1726→                gap: 6,
+  1727→              }}
+  1728→            >
+  1729→              {contacts.map((c, i) => {
+  1730→                const Icon = c.icon;
+  1731→                return (
+  1732→                  <li
+  1733→                    key={i}
+  1734→                    style={{
+  1735→                      display: "flex",
+  1736→                      alignItems: "flex-start",
+  1737→                      gap: 6,
+  1738→                      fontSize: 11,
+  1739→                      color: "white",
+  1740→                      lineHeight: 1.3,
+  1741→                    }}
+  1742→                  >
+  1743→                    <Icon size={12} color="white" style={{ flexShrink: 0, marginTop: 2 }} />
+  1744→                    <span style={{ wordBreak: "break-word" }}>{c.value}</span>
+  1745→                  </li>
+  1746→                );
+  1747→              })}
+  1748→            </ul>
+  1749→          </CvSidebarSection>
+  1750→        )}
+  1751→
+  1752→        {showSkills && (
+  1753→          <CvSidebarSection title="Skills">
+  1754→            <ul
+  1755→              style={{
+  1756→                listStyle: "none",
+  1757→                padding: 0,
+  1758→                margin: 0,
+  1759→                display: "flex",
+  1760→                flexDirection: "column",
+  1761→                gap: 5,
+  1762→              }}
+  1763→            >
+  1764→              {data.skills.map((s, i) => (
+  1765→                <li
+  1766→                  key={i}
+  1767→                  style={{
+  1768→                    fontSize: 11,
+  1769→                    color: "white",
+  1770→                    lineHeight: 1.4,
+  1771→                    display: "flex",
+  1772→                    alignItems: "center",
+  1773→                    gap: 6,
+  1774→                  }}
+  1775→                >
+  1776→                  <span
+  1777→                    style={{
+  1778→                      width: 5,
+  1779→                      height: 5,
+  1780→                      borderRadius: "50%",
+  1781→                      background: "#fda4af",
+  1782→                      flexShrink: 0,
+  1783→                    }}
+  1784→                  />
+  1785→                  {s}
+  1786→                </li>
+  1787→              ))}
+  1788→            </ul>
+  1789→          </CvSidebarSection>
+  1790→        )}
+  1791→
+  1792→        {showLanguages && (
+  1793→          <CvSidebarSection title="Languages">
+  1794→            <ul
+  1795→              style={{
+  1796→                listStyle: "none",
+  1797→                padding: 0,
+  1798→                margin: 0,
+  1799→                display: "flex",
+  1800→                flexDirection: "column",
+  1801→                gap: 5,
+  1802→              }}
+  1803→            >
+  1804→              {data.languages.map((l, i) => (
+  1805→                <li
+  1806→                  key={i}
+  1807→                  style={{
+  1808→                    fontSize: 11,
+  1809→                    color: "white",
+  1810→                    display: "flex",
+  1811→                    alignItems: "center",
+  1812→                    gap: 6,
+  1813→                  }}
+  1814→                >
+  1815→                  <span
+  1816→                    style={{
+  1817→                      width: 5,
+  1818→                      height: 5,
+  1819→                      borderRadius: "50%",
+  1820→                      background: "#fda4af",
+  1821→                      flexShrink: 0,
+  1822→                    }}
+  1823→                  />
+  1824→                  {l}
+  1825→                </li>
+  1826→              ))}
+  1827→            </ul>
+  1828→          </CvSidebarSection>
+  1829→        )}
+  1830→      </aside>
+  1831→
+  1832→      {/* Main */}
+  1833→      <main
+  1834→        style={{
+  1835→          backgroundColor: "#f0f9ff",
+  1836→          padding: 28,
+  1837→          color: "#1f2937",
+  1838→          display: "flex",
+  1839→          flexDirection: "column",
+  1840→          gap: 18,
+  1841→        }}
+  1842→      >
+  1843→        {showPersonal && (
+  1844→          <header style={{ marginBottom: 2 }}>
+  1845→            <h1
+  1846→              style={{
+  1847→                fontSize: 26,
+  1848→                fontWeight: 800,
+  1849→                margin: 0,
+  1850→                lineHeight: 1.1,
+  1851→                color: "#0f172a",
+  1852→                letterSpacing: "-0.01em",
+  1853→              }}
+  1854→            >
+  1855→              {data.name || "Your Name"}
+  1856→            </h1>
+  1857→            {data.title && (
+  1858→              <p
+  1859→                style={{
+  1860→                  fontSize: 13,
+  1861→                  color: a,
+  1862→                  margin: "4px 0 0 0",
+  1863→                  fontWeight: 600,
+  1864→                }}
+  1865→              >
+  1866→                {data.title}
+  1867→              </p>
+  1868→            )}
+  1869→          </header>
+  1870→        )}
+  1871→
+  1872→        {showSummary && (
+  1873→          <CvMainSection title="Summary" accent={a}>
+  1874→            <p
+  1875→              style={{
+  1876→                fontSize: 12,
+  1877→                lineHeight: 1.5,
+  1878→                margin: 0,
+  1879→                color: "#374151",
+  1880→              }}
+  1881→            >
+  1882→              {data.summary}
+  1883→            </p>
+  1884→          </CvMainSection>
+  1885→        )}
+  1886→
+  1887→        {showExperience && (
+  1888→          <CvMainSection title="Experience" accent={a}>
+  1889→            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+  1890→              {data.experience.map((exp) => {
+  1891→                const bullets = nonEmptyBullets(exp.bullets);
+  1892→                const range = formatRange(exp.start, exp.end);
+  1893→                return (
+  1894→                  <div key={exp.id} style={{ breakInside: "avoid" }}>
+  1895→                    <div
+  1896→                      style={{
+  1897→                        display: "flex",
+  1898→                        justifyContent: "space-between",
+  1899→                        alignItems: "baseline",
+  1900→                        gap: 8,
+  1901→                      }}
+  1902→                    >
+  1903→                      <div>
+  1904→                        <div
+  1905→                          style={{
+  1906→                            fontSize: 13,
+  1907→                            fontWeight: 700,
+  1908→                            color: "#0f172a",
+  1909→                          }}
+  1910→                        >
+  1911→                          {exp.role}
+  1912→                        </div>
+  1913→                        <div style={{ fontSize: 12, color: a, fontWeight: 600 }}>
+  1914→                          {exp.company}
+  1915→                          {exp.location ? ` \u00b7 ${exp.location}` : ""}
+  1916→                        </div>
+  1917→                      </div>
+  1918→                      {range && (
+  1919→                        <span
+  1920→                          style={{
+  1921→                            fontSize: 11,
+  1922→                            color: "#64748b",
+  1923→                            flexShrink: 0,
+  1924→                          }}
+  1925→                        >
+  1926→                          {range}
+  1927→                        </span>
+  1928→                      )}
+  1929→                    </div>
+  1930→                    {bullets.length > 0 && (
+  1931→                      <ul
+  1932→                        style={{
+  1933→                          margin: "6px 0 0 0",
+  1934→                          padding: 0,
+  1935→                          listStyle: "none",
+  1936→                          display: "flex",
+  1937→                          flexDirection: "column",
+  1938→                          gap: 3,
+  1939→                        }}
+  1940→                      >
+  1941→                        {bullets.map((b, i) => (
+  1942→                          <li
+  1943→                            key={i}
+  1944→                            style={{
+  1945→                              fontSize: 11.5,
+  1946→                              color: "#374151",
+  1947→                              paddingLeft: 12,
+  1948→                              position: "relative",
+  1949→                              lineHeight: 1.4,
+  1950→                            }}
+  1951→                          >
+  1952→                            <span
+  1953→                              style={{
+  1954→                                position: "absolute",
+  1955→                                left: 0,
+  1956→                                color: a,
+  1957→                                fontSize: 14,
+  1958→                                top: -2,
+  1959→                              }}
+  1960→                            >
+  1961→                              {"\u2022"}
+  1962→                            </span>
+  1963→                            {b}
+  1964→                          </li>
+  1965→                        ))}
+  1966→                      </ul>
+  1967→                    )}
+  1968→                  </div>
+  1969→                );
+  1970→              })}
+  1971→            </div>
+  1972→          </CvMainSection>
+  1973→        )}
+  1974→
+  1975→        {showProjects && (
+  1976→          <CvMainSection title="Projects" accent={a}>
+  1977→            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  1978→              {data.projects.map((p) => {
+  1979→                const tech = joinTech(p.tech);
+  1980→                return (
+  1981→                  <div key={p.id} style={{ breakInside: "avoid" }}>
+  1982→                    <div
+  1983→                      style={{
+  1984→                        display: "flex",
+  1985→                        justifyContent: "space-between",
+  1986→                        alignItems: "baseline",
+  1987→                        gap: 8,
+  1988→                      }}
+  1989→                    >
+  1990→                      <div
+  1991→                        style={{
+  1992→                          fontSize: 12.5,
+  1993→                          fontWeight: 700,
+  1994→                          color: "#0f172a",
+  1995→                        }}
+  1996→                      >
+  1997→                        {p.name}
+  1998→                      </div>
+  1999→                      {p.link && (
+  2000→                        <span
+
+[showing lines 1-2000 of 7582; use offset=2001 with limit to continue reading]

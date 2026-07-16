@@ -1,0 +1,952 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  FileText,
+     6→  Download,
+     7→  Upload,
+     8→  Sparkles,
+     9→  ZoomIn,
+    10→  ZoomOut,
+    11→  RotateCcw,
+    12→  FileType2,
+    13→  Loader2,
+    14→  Palette,
+    15→  Type as TypeIcon,
+    16→  Check,
+    17→  CheckCircle2,
+    18→  Circle,
+    19→  ClipboardPaste,
+    20→  ChevronDown,
+    21→} from "lucide-react";
+    22→import { toast } from "sonner";
+    23→import { Card, CardContent } from "@/components/ui/card";
+    24→import { Button } from "@/components/ui/button";
+    25→import {
+    26→  Tooltip,
+    27→  TooltipTrigger,
+    28→  TooltipContent,
+    29→} from "@/components/ui/tooltip";
+    30→import {
+    31→  DropdownMenu,
+    32→  DropdownMenuTrigger,
+    33→  DropdownMenuContent,
+    34→  DropdownMenuItem,
+    35→  DropdownMenuLabel,
+    36→  DropdownMenuSeparator,
+    37→} from "@/components/ui/dropdown-menu";
+    38→import {
+    39→  Dialog,
+    40→  DialogContent,
+    41→  DialogDescription,
+    42→  DialogFooter,
+    43→  DialogHeader,
+    44→  DialogTitle,
+    45→} from "@/components/ui/dialog";
+    46→import { Textarea } from "@/components/ui/textarea";
+    47→import { Progress } from "@/components/ui/progress";
+    48→import { ModuleHeader } from "@/components/shared/blocks";
+    49→import { useResumeStore, type ResumeData, type SectionId } from "@/store/resume-store";
+    50→import { ResumeEditor } from "@/components/modules/resume-editor";
+    51→import {
+    52→  ResumePreview,
+    53→  TEMPLATE_OPTIONS,
+    54→  FONT_OPTIONS,
+    55→  ACCENT_OPTIONS,
+    56→} from "@/components/modules/resume-templates";
+    57→import { extractTextFromFile } from "@/lib/resume/extract";
+    58→import { exportResumeDocx } from "@/lib/resume/export-docx";
+    59→import { exportResumePdf } from "@/lib/resume/export-pdf";
+    60→import {
+    61→  splitResumeIntoSections,
+    62→  splitIntoChunks,
+    63→  type SectionType,
+    64→} from "@/lib/resume/section-splitter";
+    65→import { cn } from "@/lib/utils";
+    66→
+    67→const ALL_SECTIONS: { id: SectionId; label: string }[] = [
+    68→  { id: "personal", label: "Personal Info" },
+    69→  { id: "summary", label: "Summary" },
+    70→  { id: "experience", label: "Experience" },
+    71→  { id: "skills", label: "Skills" },
+    72→  { id: "projects", label: "Projects" },
+    73→  { id: "education", label: "Education" },
+    74→  { id: "certifications", label: "Certifications" },
+    75→  { id: "languages", label: "Languages" },
+    76→  { id: "awards", label: "Awards" },
+    77→  { id: "publications", label: "Publications" },
+    78→  { id: "interests", label: "Interests" },
+    79→  { id: "references", label: "References" },
+    80→];
+    81→
+    82→const DEFAULT_SECTIONS: Record<string, boolean> = {
+    83→  personal: true,
+    84→  summary: true,
+    85→  experience: true,
+    86→  skills: true,
+    87→  projects: true,
+    88→  education: true,
+    89→  certifications: true,
+    90→  languages: true,
+    91→  awards: false,
+    92→  publications: false,
+    93→  interests: false,
+    94→  references: false,
+    95→};
+    96→
+    97→type StepStatus = "pending" | "parsing" | "done";
+    98→
+    99→interface ImportStep {
+   100→  id: string;
+   101→  label: string;
+   102→  status: StepStatus;
+   103→  count?: number;
+   104→}
+   105→
+   106→const INITIAL_STEPS: ImportStep[] = [
+   107→  { id: "contact", label: "Contact & Name", status: "pending" },
+   108→  { id: "summary", label: "Summary", status: "pending" },
+   109→  { id: "skills", label: "Skills", status: "pending" },
+   110→  { id: "experience", label: "Experience", status: "pending" },
+   111→  { id: "projects", label: "Projects", status: "pending" },
+   112→  { id: "education", label: "Education", status: "pending" },
+   113→];
+   114→
+   115→const SECTION_ORDER: SectionType[] = [
+   116→  "contact",
+   117→  "summary",
+   118→  "skills",
+   119→  "experience",
+   120→  "projects",
+   121→  "education",
+   122→];
+   123→
+   124→const SECTION_LABEL: Record<SectionType, string> = {
+   125→  contact: "Contact",
+   126→  summary: "Summary",
+   127→  skills: "Skills",
+   128→  experience: "Experience",
+   129→  projects: "Projects",
+   130→  education: "Education",
+   131→};
+   132→
+   133→// ---------- module-scope helpers (pure) ----------
+   134→
+   135→const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+   136→const uid = () => Math.random().toString(36).slice(2, 10);
+   137→
+   138→type SectionResult = Record<string, unknown>;
+   139→
+   140→/**
+   141→ * Call the chunked parser with retry logic.
+   142→ * - Retries up to 3 times on 429 / 5xx (with 2s, 4s backoff).
+   143→ * - Returns null on hard failure (non-retryable error or after retries exhausted).
+   144→ */
+   145→async function callChunkedApi(
+   146→  section: SectionType,
+   147→  text: string
+   148→): Promise<SectionResult | null> {
+   149→  for (let attempt = 0; attempt < 3; attempt++) {
+   150→    try {
+   151→      const res = await fetch("/api/ai/parse-resume-chunked", {
+   152→        method: "POST",
+   153→        headers: { "Content-Type": "application/json" },
+   154→        body: JSON.stringify({ text, section }),
+   155→      });
+   156→
+   157→      if (res.status === 429 || res.status >= 500) {
+   158→        if (attempt < 2) await sleep(attempt === 0 ? 2000 : 4000);
+   159→        continue;
+   160→      }
+   161→
+   162→      if (!res.ok) {
+   163→        // Hard error (e.g. 400 — bad input). Don't retry.
+   164→        return null;
+   165→      }
+   166→
+   167→      return (await res.json()) as SectionResult;
+   168→    } catch {
+   169→      // Network error → retry with backoff
+   170→      if (attempt < 2) await sleep(attempt === 0 ? 2000 : 4000);
+   171→    }
+   172→  }
+   173→  return null;
+   174→}
+   175→
+   176→/** A section result is "empty" if it has no usable items. */
+   177→function isEmptyResult(section: SectionType, result: SectionResult | null): boolean {
+   178→  if (!result) return true;
+   179→  if (section === "contact") {
+   180→    return !result.name && !result.email && !result.phone;
+   181→  }
+   182→  if (section === "summary") return !result.summary;
+   183→  if (section === "skills") {
+   184→    return !Array.isArray(result.skills) || result.skills.length === 0;
+   185→  }
+   186→  if (section === "experience") {
+   187→    return !Array.isArray(result.experience) || result.experience.length === 0;
+   188→  }
+   189→  if (section === "projects") {
+   190→    return !Array.isArray(result.projects) || result.projects.length === 0;
+   191→  }
+   192→  if (section === "education") {
+   193→    const edu = Array.isArray(result.education) ? result.education.length : 0;
+   194→    const cert = Array.isArray(result.certifications)
+   195→      ? result.certifications.length
+   196→      : 0;
+   197→    return edu + cert === 0;
+   198→  }
+   199→  return false;
+   200→}
+   201→
+   202→/**
+   203→ * Parse a large experience or projects section by sub-chunking it into
+   204→ * ~2,000-char pieces at paragraph boundaries. Sequential execution.
+   205→ *
+   206→ * If a sub-chunk returns empty after 3 retries, re-split it into
+   207→ * 1,000-char pieces and try once more.
+   208→ */
+   209→async function parseLargeSection(
+   210→  section: SectionType,
+   211→  text: string
+   212→): Promise<SectionResult | null> {
+   213→  const chunks = splitIntoChunks(text, 2000);
+   214→  const listKey = section; // "experience" | "projects"
+   215→  const merged: SectionResult =
+   216→    section === "experience" ? { experience: [] } : { projects: [] };
+   217→
+   218→  for (const chunk of chunks) {
+   219→    let result = await callChunkedApi(section, chunk);
+   220→
+   221→    if (isEmptyResult(section, result)) {
+   222→      // Sub-chunk failed → re-split into 1000-char pieces and retry once more
+   223→      const subChunks = splitIntoChunks(chunk, 1000);
+   224→      for (const sub of subChunks) {
+   225→        const r = await callChunkedApi(section, sub);
+   226→        if (r && Array.isArray(r[listKey])) {
+   227→          const arr = merged[listKey] as unknown[];
+   228→          arr.push(...(r[listKey] as unknown[]));
+   229→        }
+   230→      }
+   231→    } else if (result && Array.isArray(result[listKey])) {
+   232→      const arr = merged[listKey] as unknown[];
+   233→      arr.push(...(result[listKey] as unknown[]));
+   234→    }
+   235→  }
+   236→
+   237→  return merged;
+   238→}
+   239→
+   240→function countItems(section: SectionType, result: SectionResult | null): number {
+   241→  if (!result) return 0;
+   242→  if (section === "contact") return result.name ? 1 : 0;
+   243→  if (section === "summary") return result.summary ? 1 : 0;
+   244→  if (section === "skills")
+   245→    return Array.isArray(result.skills) ? result.skills.length : 0;
+   246→  if (section === "experience")
+   247→    return Array.isArray(result.experience) ? result.experience.length : 0;
+   248→  if (section === "projects")
+   249→    return Array.isArray(result.projects) ? result.projects.length : 0;
+   250→  if (section === "education") {
+   251→    const edu = Array.isArray(result.education) ? result.education.length : 0;
+   252→    const cert = Array.isArray(result.certifications)
+   253→      ? result.certifications.length
+   254→      : 0;
+   255→    return edu + cert;
+   256→  }
+   257→  return 0;
+   258→}
+   259→
+   260→function formatCount(id: string, count: number): string {
+   261→  if (id === "skills") return `${count} skill${count === 1 ? "" : "s"}`;
+   262→  if (id === "experience") return `${count} job${count === 1 ? "" : "s"}`;
+   263→  if (id === "projects") return `${count} project${count === 1 ? "" : "s"}`;
+   264→  if (id === "education") return `${count} entr${count === 1 ? "y" : "ies"}`;
+   265→  return `${count}`;
+   266→}
+   267→
+   268→/** Merge a section's parsed result into the accumulator (generates fresh IDs). */
+   269→function mergeSectionResult(
+   270→  partial: Partial<ResumeData>,
+   271→  section: SectionType,
+   272→  result: SectionResult
+   273→) {
+   274→  if (section === "contact") {
+   275→    if (result.name) partial.name = result.name as string;
+   276→    if (result.title) partial.title = result.title as string;
+   277→    if (result.email) partial.email = result.email as string;
+   278→    if (result.phone) partial.phone = result.phone as string;
+   279→    if (result.location) partial.location = result.location as string;
+   280→    if (result.linkedin) partial.linkedin = result.linkedin as string;
+   281→    if (result.github) partial.github = result.github as string;
+   282→    if (result.website) partial.website = result.website as string;
+   283→    // Contact parser may also pick up a summary if no Summary section exists
+   284→    if (result.summary && !partial.summary)
+   285→      partial.summary = result.summary as string;
+   286→  } else if (section === "summary") {
+   287→    if (result.summary) partial.summary = result.summary as string;
+   288→  } else if (section === "skills") {
+   289→    if (Array.isArray(result.skills)) {
+   290→      const existing = partial.skills ?? [];
+   291→      const set = new Set<string>([...existing, ...(result.skills as string[])]);
+   292→      partial.skills = Array.from(set);
+   293→    }
+   294→  } else if (section === "experience") {
+   295→    if (Array.isArray(result.experience)) {
+   296→      const existing = partial.experience ?? [];
+   297→      const incoming = (result.experience as Omit<
+   298→        ResumeData["experience"][number],
+   299→        "id"
+   300→      >[]).map((e) => ({ ...e, id: uid() }));
+   301→      partial.experience = [...existing, ...incoming];
+   302→    }
+   303→  } else if (section === "projects") {
+   304→    if (Array.isArray(result.projects)) {
+   305→      const existing = partial.projects ?? [];
+   306→      const incoming = (result.projects as Omit<
+   307→        ResumeData["projects"][number],
+   308→        "id"
+   309→      >[]).map((p) => ({ ...p, id: uid() }));
+   310→      partial.projects = [...existing, ...incoming];
+   311→    }
+   312→  } else if (section === "education") {
+   313→    if (Array.isArray(result.education)) {
+   314→      const existing = partial.education ?? [];
+   315→      const incoming = (result.education as Omit<
+   316→        ResumeData["education"][number],
+   317→        "id"
+   318→      >[]).map((e) => ({ ...e, id: uid() }));
+   319→      partial.education = [...existing, ...incoming];
+   320→    }
+   321→    if (Array.isArray(result.certifications)) {
+   322→      const existing = partial.certifications ?? [];
+   323→      const incoming = (result.certifications as Omit<
+   324→        ResumeData["certifications"][number],
+   325→        "id"
+   326→      >[]).map((c) => ({ ...c, id: uid() }));
+   327→      partial.certifications = [...existing, ...incoming];
+   328→    }
+   329→  }
+   330→}
+   331→
+   332→// ---------- component ----------
+   333→
+   334→export function ResumeBuilderModule() {
+   335→  const data = useResumeStore((s) => s.data);
+   336→  const style = useResumeStore((s) => s.style);
+   337→  const setStyle = useResumeStore((s) => s.setStyle);
+   338→  const hydrate = useResumeStore((s) => s.hydrate);
+   339→  const setData = useResumeStore((s) => s.setData);
+   340→  const reset = useResumeStore((s) => s.reset);
+   341→
+   342→  const [sections, setSections] = React.useState<Record<string, boolean>>(
+   343→    DEFAULT_SECTIONS
+   344→  );
+   345→  const [zoom, setZoom] = React.useState(0.75);
+   346→  const [importing, setImporting] = React.useState(false);
+   347→  const [exportingDocx, setExportingDocx] = React.useState(false);
+   348→  const [exportingPdf, setExportingPdf] = React.useState(false);
+   349→  const fileInputRef = React.useRef<HTMLInputElement>(null);
+   350→
+   351→  // Paste-text dialog
+   352→  const [pasteOpen, setPasteOpen] = React.useState(false);
+   353→  const [pasteText, setPasteText] = React.useState("");
+   354→
+   355→  // Live-streaming import progress overlay
+   356→  const [importProgress, setImportProgress] = React.useState<{
+   357→    visible: boolean;
+   358→    fadingOut: boolean;
+   359→    current: number;
+   360→    total: number;
+   361→    steps: ImportStep[];
+   362→  }>({ visible: false, fadingOut: false, current: 0, total: 6, steps: [] });
+   363→
+   364→  React.useEffect(() => {
+   365→    hydrate();
+   366→  }, [hydrate]);
+   367→
+   368→  // ---- progress-overlay helpers ----
+   369→  const markStep = React.useCallback(
+   370→    (id: string, patch: Partial<ImportStep>) => {
+   371→      setImportProgress((p) => ({
+   372→        ...p,
+   373→        steps: p.steps.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+   374→      }));
+   375→    },
+   376→    []
+   377→  );
+   378→
+   379→  const incrementCurrent = React.useCallback(() => {
+   380→    setImportProgress((p) => ({ ...p, current: p.current + 1 }));
+   381→  }, []);
+   382→
+   383→  // ---- chunked import with live streaming ----
+   384→  const parseAndPopulate = React.useCallback(
+   385→    async (text: string) => {
+   386→      if (!text || text.trim().length < 30) {
+   387→        toast.error("Couldn't read enough text from this file.");
+   388→        return;
+   389→      }
+   390→
+   391→      // 1. Split into 6 typed sections (pure regex, no AI)
+   392→      const split = splitResumeIntoSections(text);
+   393→
+   394→      // 2. Reset progress overlay
+   395→      setImportProgress({
+   396→        visible: true,
+   397→        fadingOut: false,
+   398→        current: 0,
+   399→        total: 6,
+   400→        steps: INITIAL_STEPS.map((s) => ({ ...s })),
+   401→      });
+   402→
+   403→      // 3. Accumulator for parsed data — fed live into the store
+   404→      const partial: Partial<ResumeData> = {};
+   405→      const BATCH_SIZE = 2;
+   406→
+   407→      // 4. Process the 6 base sections in batches of 2 (avoid 429s).
+   408→      //    Experience/projects sub-chunks are processed sequentially inside parseLargeSection.
+   409→      for (let i = 0; i < SECTION_ORDER.length; i += BATCH_SIZE) {
+   410→        const batch = SECTION_ORDER.slice(i, i + BATCH_SIZE);
+   411→
+   412→        await Promise.all(
+   413→          batch.map(async (secId) => {
+   414→            markStep(secId, { status: "parsing" });
+   415→
+   416→            const sectionText = split[secId];
+   417→            let result: SectionResult | null = null;
+   418→
+   419→            try {
+   420→              if (!sectionText || sectionText.trim().length < 10) {
+   421→                // No text for this section — skip silently (no warning)
+   422→                result = null;
+   423→              } else if (
+   424→                (secId === "experience" || secId === "projects") &&
+   425→                sectionText.length > 2000
+   426→              ) {
+   427→                // Large section → sub-chunk it
+   428→                result = await parseLargeSection(secId, sectionText);
+   429→              } else {
+   430→                // Single focused call
+   431→                result = await callChunkedApi(secId, sectionText);
+   432→              }
+   433→            } catch {
+   434→              result = null;
+   435→            }
+   436→
+   437→            if (isEmptyResult(secId, result)) {
+   438→              // Failed — mark done with 0
+   439→              markStep(secId, { status: "done", count: 0 });
+   440→              // Only warn if there was actually text to parse
+   441→              if (sectionText && sectionText.trim().length >= 10) {
+   442→                toast.warning(
+   443→                  `${SECTION_LABEL[secId]}: 0 captured (parsing failed for this section — try pasting text manually)`
+   444→                );
+   445→              }
+   446→            } else {
+   447→              // Success — merge into partial & live-update the preview
+   448→              mergeSectionResult(partial, secId, result as SectionResult);
+   449→              const count = countItems(secId, result);
+   450→              markStep(secId, { status: "done", count });
+   451→              const current = useResumeStore.getState().data;
+   452→              setData({ ...current, ...partial });
+   453→            }
+   454→
+   455→            incrementCurrent();
+   456→          })
+   457→        );
+   458→      }
+   459→
+   460→      // 5. Enable sections that have content
+   461→      setSections((prev) => ({
+   462→        ...prev,
+   463→        summary: Boolean(partial.summary) || prev.summary,
+   464→        skills: Boolean(partial.skills?.length) || prev.skills,
+   465→        experience: Boolean(partial.experience?.length) || prev.experience,
+   466→        projects: Boolean(partial.projects?.length) || prev.projects,
+   467→        education: Boolean(partial.education?.length) || prev.education,
+   468→        certifications: Boolean(partial.certifications?.length) || prev.certifications,
+   469→        awards: Boolean(partial.awards?.length) || prev.awards,
+   470→        publications: Boolean(partial.publications?.length) || prev.publications,
+   471→      }));
+   472→
+   473→      // 6. Fade out the overlay 1.5s after completion
+   474→      setTimeout(() => {
+   475→        setImportProgress((p) => ({ ...p, fadingOut: true }));
+   476→        setTimeout(() => {
+   477→          setImportProgress((p) => ({ ...p, visible: false, fadingOut: false }));
+   478→        }, 500);
+   479→      }, 1500);
+   480→
+   481→      toast.success("Resume import complete!");
+   482→    },
+   483→    [setData, markStep, incrementCurrent]
+   484→  );
+   485→
+   486→  // ---- File upload import ----
+   487→  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   488→    const file = e.target.files?.[0];
+   489→    if (!file) return;
+   490→    setImporting(true);
+   491→    try {
+   492→      toast.info(`Extracting text from ${file.name}…`);
+   493→      const text = await extractTextFromFile(file);
+   494→      if (!text || text.length < 30) {
+   495→        throw new Error("Couldn't read enough text from this file.");
+   496→      }
+   497→      await parseAndPopulate(text);
+   498→    } catch (err) {
+   499→      toast.error(err instanceof Error ? err.message : "Import failed");
+   500→      setImportProgress({
+   501→        visible: false,
+   502→        fadingOut: false,
+   503→        current: 0,
+   504→        total: 6,
+   505→        steps: [],
+   506→      });
+   507→    } finally {
+   508→      setImporting(false);
+   509→      if (fileInputRef.current) fileInputRef.current.value = "";
+   510→    }
+   511→  };
+   512→
+   513→  // ---- Paste-text import ----
+   514→  const handlePasteImport = async () => {
+   515→    if (!pasteText.trim()) {
+   516→      toast.error("Paste some resume text first.");
+   517→      return;
+   518→    }
+   519→    setPasteOpen(false);
+   520→    setImporting(true);
+   521→    try {
+   522→      await parseAndPopulate(pasteText);
+   523→    } catch (err) {
+   524→      toast.error(err instanceof Error ? err.message : "Import failed");
+   525→      setImportProgress({
+   526→        visible: false,
+   527→        fadingOut: false,
+   528→        current: 0,
+   529→        total: 6,
+   530→        steps: [],
+   531→      });
+   532→    } finally {
+   533→      setImporting(false);
+   534→      setPasteText("");
+   535→    }
+   536→  };
+   537→
+   538→  // ---- PDF export (real PDF via @react-pdf/renderer) ----
+   539→  const handleExportPdf = async () => {
+   540→    setExportingPdf(true);
+   541→    try {
+   542→      await exportResumePdf(data, style);
+   543→      toast.success("PDF downloaded!");
+   544→    } catch (err) {
+   545→      toast.error(err instanceof Error ? err.message : "PDF export failed");
+   546→    } finally {
+   547→      setExportingPdf(false);
+   548→    }
+   549→  };
+   550→
+   551→  // ---- Word export ----
+   552→  const handleExportDocx = async () => {
+   553→    setExportingDocx(true);
+   554→    try {
+   555→      await exportResumeDocx(data, style);
+   556→      toast.success("Word document downloaded!");
+   557→    } catch (err) {
+   558→      toast.error(err instanceof Error ? err.message : "Word export failed");
+   559→    } finally {
+   560→      setExportingDocx(false);
+   561→    }
+   562→  };
+   563→
+   564→  const handleReset = () => {
+   565→    if (confirm("Reset resume to the sample data? Your edits will be lost.")) {
+   566→      reset();
+   567→      setSections(DEFAULT_SECTIONS);
+   568→      toast.success("Reset to sample resume.");
+   569→    }
+   570→  };
+   571→
+   572→  return (
+   573→    <div className="space-y-4">
+   574→      <ModuleHeader
+   575→        icon={FileText}
+   576→        title="Resume Builder"
+   577→        description="Real templates, AI editing, PDF & Word export, and resume import."
+   578→      >
+   579→        <div className="flex flex-wrap items-center gap-2">
+   580→          <input
+   581→            ref={fileInputRef}
+   582→            type="file"
+   583→            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+   584→            onChange={handleImport}
+   585→            className="hidden"
+   586→          />
+   587→          <Button
+   588→            variant="outline"
+   589→            size="sm"
+   590→            className="gap-1.5"
+   591→            onClick={() => fileInputRef.current?.click()}
+   592→            disabled={importing}
+   593→          >
+   594→            {importing ? (
+   595→              <Loader2 className="size-3.5 animate-spin" />
+   596→            ) : (
+   597→              <Upload className="size-3.5" />
+   598→            )}
+   599→            Import
+   600→          </Button>
+   601→          <Button
+   602→            variant="outline"
+   603→            size="sm"
+   604→            className="gap-1.5"
+   605→            onClick={() => setPasteOpen(true)}
+   606→            disabled={importing}
+   607→          >
+   608→            <ClipboardPaste className="size-3.5" />
+   609→            Paste Text
+   610→          </Button>
+   611→          <Button
+   612→            variant="outline"
+   613→            size="sm"
+   614→            className="gap-1.5"
+   615→            onClick={handleExportPdf}
+   616→            disabled={exportingPdf}
+   617→          >
+   618→            {exportingPdf ? (
+   619→              <Loader2 className="size-3.5 animate-spin" />
+   620→            ) : (
+   621→              <Download className="size-3.5" />
+   622→            )}{" "}
+   623→            PDF
+   624→          </Button>
+   625→          <Button
+   626→            size="sm"
+   627→            className="gap-1.5"
+   628→            onClick={handleExportDocx}
+   629→            disabled={exportingDocx}
+   630→          >
+   631→            {exportingDocx ? (
+   632→              <Loader2 className="size-3.5 animate-spin" />
+   633→            ) : (
+   634→              <FileType2 className="size-3.5" />
+   635→            )}
+   636→            Word
+   637→          </Button>
+   638→        </div>
+   639→      </ModuleHeader>
+   640→
+   641→      {/* Toolbar: template + font + accent + zoom + sections */}
+   642→      <Card>
+   643→        <CardContent className="flex flex-wrap items-center gap-3 p-3">
+   644→          {/* Template selector */}
+   645→          <div className="flex items-center gap-1.5">
+   646→            <span className="text-xs font-medium text-muted-foreground">Template</span>
+   647→            <DropdownMenu>
+   648→              <DropdownMenuTrigger asChild>
+   649→                <Button variant="outline" size="sm" className="gap-1.5">
+   650→                  <span className="size-3 rounded-sm" style={{ background: style.accent }} />
+   651→                  {TEMPLATE_OPTIONS.find((t) => t.id === style.template)?.name ?? "Modern"}
+   652→                  <ChevronDown className="size-3.5" />
+   653→                </Button>
+   654→              </DropdownMenuTrigger>
+   655→              <DropdownMenuContent align="start" className="w-56">
+   656→                <DropdownMenuLabel>Choose a template</DropdownMenuLabel>
+   657→                <DropdownMenuSeparator />
+   658→                {TEMPLATE_OPTIONS.map((t) => (
+   659→                  <DropdownMenuItem
+   660→                    key={t.id}
+   661→                    onClick={() => setStyle({ template: t.id, accent: t.accent })}
+   662→                    className="gap-2"
+   663→                  >
+   664→                    <span className="size-3 rounded-sm" style={{ background: t.accent }} />
+   665→                    <div className="flex-1">
+   666→                      <p className="text-sm font-medium">{t.name}</p>
+   667→                      <p className="text-xs text-muted-foreground">{t.description}</p>
+   668→                    </div>
+   669→                    {style.template === t.id && <Check className="size-3.5 text-primary" />}
+   670→                  </DropdownMenuItem>
+   671→                ))}
+   672→              </DropdownMenuContent>
+   673→            </DropdownMenu>
+   674→          </div>
+   675→
+   676→          <div className="h-5 w-px bg-border" />
+   677→
+   678→          {/* Font selector */}
+   679→          <DropdownMenu>
+   680→            <DropdownMenuTrigger asChild>
+   681→              <Button variant="outline" size="sm" className="gap-1.5">
+   682→                <TypeIcon className="size-3.5" />
+   683→                {FONT_OPTIONS.find((f) => f.id === style.font)?.name ?? "Sans"}
+   684→              </Button>
+   685→            </DropdownMenuTrigger>
+   686→            <DropdownMenuContent align="start">
+   687→              <DropdownMenuLabel>Font</DropdownMenuLabel>
+   688→              <DropdownMenuSeparator />
+   689→              {FONT_OPTIONS.map((f) => (
+   690→                <DropdownMenuItem
+   691→                  key={f.id}
+   692→                  onClick={() => setStyle({ font: f.id })}
+   693→                  style={{ fontFamily: f.stack }}
+   694→                  className="gap-2"
+   695→                >
+   696→                  <span className="flex-1">{f.name}</span>
+   697→                  {style.font === f.id && <Check className="size-3.5 text-primary" />}
+   698→                </DropdownMenuItem>
+   699→              ))}
+   700→            </DropdownMenuContent>
+   701→          </DropdownMenu>
+   702→
+   703→          {/* Accent picker */}
+   704→          <DropdownMenu>
+   705→            <DropdownMenuTrigger asChild>
+   706→              <Button variant="outline" size="sm" className="gap-1.5">
+   707→                <Palette className="size-3.5" />
+   708→                <span className="size-3 rounded-full" style={{ background: style.accent }} />
+   709→              </Button>
+   710→            </DropdownMenuTrigger>
+   711→            <DropdownMenuContent align="start">
+   712→              <DropdownMenuLabel>Accent color</DropdownMenuLabel>
+   713→              <DropdownMenuSeparator />
+   714→              <div className="grid grid-cols-4 gap-2 p-1">
+   715→                {ACCENT_OPTIONS.map((c) => (
+   716→                  <button
+   717→                    key={c}
+   718→                    onClick={() => setStyle({ accent: c })}
+   719→                    className={cn(
+   720→                      "grid size-7 place-items-center rounded-full ring-offset-2 ring-offset-background transition",
+   721→                      style.accent === c && "ring-2 ring-ring"
+   722→                    )}
+   723→                    style={{ background: c }}
+   724→                  >
+   725→                    {style.accent === c && <Check className="size-3.5 text-white" />}
+   726→                  </button>
+   727→                ))}
+   728→              </div>
+   729→            </DropdownMenuContent>
+   730→          </DropdownMenu>
+   731→
+   732→          <div className="h-5 w-px bg-border" />
+   733→
+   734→          {/* Zoom */}
+   735→          <div className="flex items-center gap-1">
+   736→            <Tooltip>
+   737→              <TooltipTrigger asChild>
+   738→                <Button
+   739→                  variant="ghost"
+   740→                  size="icon"
+   741→                  className="size-8"
+   742→                  onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.1).toFixed(2)))}
+   743→                >
+   744→                  <ZoomOut className="size-3.5" />
+   745→                </Button>
+   746→              </TooltipTrigger>
+   747→              <TooltipContent>Zoom out</TooltipContent>
+   748→            </Tooltip>
+   749→            <span className="w-10 text-center text-xs font-medium tabular-nums">
+   750→              {Math.round(zoom * 100)}%
+   751→            </span>
+   752→            <Tooltip>
+   753→              <TooltipTrigger asChild>
+   754→                <Button
+   755→                  variant="ghost"
+   756→                  size="icon"
+   757→                  className="size-8"
+   758→                  onClick={() => setZoom((z) => Math.min(1.2, +(z + 0.1).toFixed(2)))}
+   759→                >
+   760→                  <ZoomIn className="size-3.5" />
+   761→                </Button>
+   762→              </TooltipTrigger>
+   763→              <TooltipContent>Zoom in</TooltipContent>
+   764→            </Tooltip>
+   765→          </div>
+   766→
+   767→          <div className="h-5 w-px bg-border" />
+   768→
+   769→          {/* Sections toggle */}
+   770→          <DropdownMenu>
+   771→            <DropdownMenuTrigger asChild>
+   772→              <Button variant="outline" size="sm" className="gap-1.5">
+   773→                <FileText className="size-3.5" />
+   774→                Sections
+   775→              </Button>
+   776→            </DropdownMenuTrigger>
+   777→            <DropdownMenuContent align="start" className="w-52">
+   778→              <DropdownMenuLabel>Visible sections</DropdownMenuLabel>
+   779→              <DropdownMenuSeparator />
+   780→              {ALL_SECTIONS.map((s) => (
+   781→                <DropdownMenuItem
+   782→                  key={s.id}
+   783→                  onClick={() =>
+   784→                    setSections((prev) => ({ ...prev, [s.id]: !prev[s.id] }))
+   785→                  }
+   786→                  className="gap-2"
+   787→                >
+   788→                  <span
+   789→                    className={cn(
+   790→                      "grid size-4 place-items-center rounded border",
+   791→                      sections[s.id]
+   792→                        ? "border-primary bg-primary text-primary-foreground"
+   793→                        : "border-muted-foreground/30"
+   794→                    )}
+   795→                  >
+   796→                    {sections[s.id] && <Check className="size-3" />}
+   797→                  </span>
+   798→                  {s.label}
+   799→                </DropdownMenuItem>
+   800→              ))}
+   801→            </DropdownMenuContent>
+   802→          </DropdownMenu>
+   803→
+   804→          <div className="ml-auto">
+   805→            <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleReset}>
+   806→              <RotateCcw className="size-3.5" /> Reset
+   807→            </Button>
+   808→          </div>
+   809→        </CardContent>
+   810→      </Card>
+   811→
+   812→      {/* Editor + Preview */}
+   813→      <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
+   814→        {/* Editor */}
+   815→        <div className="lg:max-h-[calc(100vh-15rem)] lg:overflow-y-auto lg:pr-1 scroll-thin">
+   816→          <ResumeEditor />
+   817→        </div>
+   818→
+   819→        {/* Preview */}
+   820→        <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto scroll-thin">
+   821→          <div className="flex justify-center rounded-xl bg-muted/40 p-4 sm:p-8">
+   822→            <div
+   823→              style={{
+   824→                transform: `scale(${zoom})`,
+   825→                transformOrigin: "top center",
+   826→                transition: "transform 0.15s ease",
+   827→              }}
+   828→            >
+   829→              <ResumePreview data={data} style={style} sections={sections} />
+   830→            </div>
+   831→          </div>
+   832→        </div>
+   833→      </div>
+   834→
+   835→      {/* Paste-text import dialog */}
+   836→      <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
+   837→        <DialogContent className="sm:max-w-2xl">
+   838→          <DialogHeader>
+   839→            <DialogTitle className="flex items-center gap-2">
+   840→              <ClipboardPaste className="size-4 text-primary" />
+   841→              Paste resume text
+   842→            </DialogTitle>
+   843→            <DialogDescription>
+   844→              Paste your resume content as plain text. We&apos;ll split it into
+   845→              6 sections and parse each one with AI in chunks — no timeouts on
+   846→              long resumes.
+   847→            </DialogDescription>
+   848→          </DialogHeader>
+   849→          <Textarea
+   850→            placeholder="Paste your full resume text here…"
+   851→            className="min-h-[320px] font-mono text-xs"
+   852→            value={pasteText}
+   853→            onChange={(e) => setPasteText(e.target.value)}
+   854→          />
+   855→          <DialogFooter>
+   856→            <Button
+   857→              variant="outline"
+   858→              onClick={() => setPasteOpen(false)}
+   859→              disabled={importing}
+   860→            >
+   861→              Cancel
+   862→            </Button>
+   863→            <Button
+   864→              onClick={handlePasteImport}
+   865→              disabled={importing || !pasteText.trim()}
+   866→              className="gap-1.5"
+   867→            >
+   868→              {importing ? (
+   869→                <Loader2 className="size-3.5 animate-spin" />
+   870→              ) : (
+   871→                <Sparkles className="size-3.5" />
+   872→              )}
+   873→              Parse &amp; Import
+   874→            </Button>
+   875→          </DialogFooter>
+   876→        </DialogContent>
+   877→      </Dialog>
+   878→
+   879→      {/* Live-streaming import progress overlay (fixed bottom-right, z-50) */}
+   880→      {importProgress.visible && (
+   881→        <div
+   882→          className={cn(
+   883→            "fixed bottom-4 right-4 z-50 w-80 transition-opacity duration-500",
+   884→            importProgress.fadingOut && "opacity-0 pointer-events-none"
+   885→          )}
+   886→          role="status"
+   887→          aria-live="polite"
+   888→          aria-label="Resume import progress"
+   889→        >
+   890→          <Card className="shadow-2xl border-border/60">
+   891→            <CardContent className="p-4 space-y-3">
+   892→              <div className="flex items-center gap-2">
+   893→                <FileText className="size-4 text-primary" />
+   894→                <span className="text-sm font-medium">
+   895→                  {importProgress.current >= importProgress.total
+   896→                    ? "Resume imported!"
+   897→                    : "Importing your resume…"}
+   898→                </span>
+   899→              </div>
+   900→
+   901→              <Progress
+   902→                value={(importProgress.current / importProgress.total) * 100}
+   903→                className="h-2"
+   904→              />
+   905→              <div className="flex justify-end text-xs text-muted-foreground -mt-1 tabular-nums">
+   906→                {importProgress.current} of {importProgress.total}
+   907→              </div>
+   908→
+   909→              <div className="space-y-1.5">
+   910→                {importProgress.steps.map((step) => (
+   911→                  <div
+   912→                    key={step.id}
+   913→                    className="flex items-center gap-2 text-sm"
+   914→                  >
+   915→                    {step.status === "done" ? (
+   916→                      <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+   917→                    ) : step.status === "parsing" ? (
+   918→                      <Loader2 className="size-4 text-primary animate-spin shrink-0" />
+   919→                    ) : (
+   920→                      <Circle className="size-4 text-muted-foreground shrink-0" />
+   921→                    )}
+   922→                    <span
+   923→                      className={cn(
+   924→                        "flex-1 truncate",
+   925→                        step.status === "done"
+   926→                          ? "text-foreground"
+   927→                          : "text-muted-foreground"
+   928→                      )}
+   929→                    >
+   930→                      {step.label}
+   931→                    </span>
+   932→                    {step.status === "parsing" && (
+   933→                      <span className="text-xs text-muted-foreground">…</span>
+   934→                    )}
+   935→                    {step.status === "done" &&
+   936→                      step.count !== undefined &&
+   937→                      step.count > 0 && (
+   938→                        <span className="text-xs text-muted-foreground tabular-nums">
+   939→                          {formatCount(step.id, step.count)}
+   940→                        </span>
+   941→                      )}
+   942→                  </div>
+   943→                ))}
+   944→              </div>
+   945→            </CardContent>
+   946→          </Card>
+   947→        </div>
+   948→      )}
+   949→    </div>
+   950→  );
+   951→}
+   952→

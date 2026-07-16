@@ -1,0 +1,1389 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  User,
+     6→  FileText,
+     7→  Briefcase,
+     8→  Sparkles,
+     9→  FolderGit2,
+    10→  GraduationCap,
+    11→  Award,
+    12→  Globe,
+    13→  Trophy,
+    14→  BookOpen,
+    15→  Heart,
+    16→  Users,
+    17→  Plus,
+    18→  Trash2,
+    19→  Copy,
+    20→  ChevronDown,
+    21→  Minimize2,
+    22→  Maximize2,
+    23→  Wand2,
+    24→  Loader2,
+    25→  X,
+    26→  Upload,
+    27→  Layers,
+    28→} from "lucide-react";
+    29→import { toast } from "sonner";
+    30→import {
+    31→  Collapsible,
+    32→  CollapsibleTrigger,
+    33→  CollapsibleContent,
+    34→} from "@/components/ui/collapsible";
+    35→import { Input } from "@/components/ui/input";
+    36→import { Textarea } from "@/components/ui/textarea";
+    37→import { Button } from "@/components/ui/button";
+    38→import { Label } from "@/components/ui/label";
+    39→import { Separator } from "@/components/ui/separator";
+    40→import {
+    41→  Dialog,
+    42→  DialogContent,
+    43→  DialogFooter,
+    44→  DialogHeader,
+    45→  DialogTitle,
+    46→} from "@/components/ui/dialog";
+    47→import {
+    48→  useResumeStore,
+    49→  type ResumeData,
+    50→  type ExperienceItem,
+    51→  type ProjectItem,
+    52→  type EducationItem,
+    53→  type SimpleItem,
+    54→  type ReferenceItem,
+    55→  type CustomSection,
+    56→  type SectionId,
+    57→} from "@/store/resume-store";
+    58→import { cn } from "@/lib/utils";
+    59→
+    60→type IconType = React.ComponentType<{ className?: string }>;
+    61→type RewriteAction = "improve" | "shorten" | "expand" | "rewrite";
+    62→type SimpleKey = "certifications" | "awards" | "publications";
+    63→type TagKey = "languages" | "interests";
+    64→
+    65→const AI_ACTIONS: { key: RewriteAction; icon: IconType; label: string }[] = [
+    66→  { key: "improve", icon: Sparkles, label: "Improve" },
+    67→  { key: "shorten", icon: Minimize2, label: "Shorten" },
+    68→  { key: "expand", icon: Maximize2, label: "Expand" },
+    69→  { key: "rewrite", icon: Wand2, label: "Rewrite" },
+    70→];
+    71→
+    72→// ---------- Reusable helpers ----------
+    73→
+    74→function SectionCard({
+    75→  id,
+    76→  icon: Icon,
+    77→  title,
+    78→  count,
+    79→  defaultOpen = false,
+    80→  children,
+    81→}: {
+    82→  id: SectionId | "custom";
+    83→  icon: IconType;
+    84→  title: string;
+    85→  count?: number;
+    86→  defaultOpen?: boolean;
+    87→  children: React.ReactNode;
+    88→}) {
+    89→  return (
+    90→    <Collapsible
+    91→      data-section={id}
+    92→      defaultOpen={defaultOpen}
+    93→      className="group rounded-xl border bg-card"
+    94→    >
+    95→      <CollapsibleTrigger asChild>
+    96→        <button
+    97→          type="button"
+    98→          className="flex w-full items-center gap-2.5 rounded-xl p-3 text-left transition-colors hover:bg-accent/40"
+    99→        >
+   100→          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+   101→            <Icon className="size-4" />
+   102→          </span>
+   103→          <span className="flex-1 text-sm font-semibold">{title}</span>
+   104→          {typeof count === "number" && count > 0 && (
+   105→            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold tabular-nums text-primary">
+   106→              {count}
+   107→            </span>
+   108→          )}
+   109→          <ChevronDown
+   110→            className={cn(
+   111→              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+   112→              "group-data-[state=open]:rotate-180"
+   113→            )}
+   114→          />
+   115→        </button>
+   116→      </CollapsibleTrigger>
+   117→      <CollapsibleContent>
+   118→        <Separator />
+   119→        <div className="space-y-3 p-3">{children}</div>
+   120→      </CollapsibleContent>
+   121→    </Collapsible>
+   122→  );
+   123→}
+   124→
+   125→function Field({
+   126→  label,
+   127→  children,
+   128→  className,
+   129→}: {
+   130→  label: string;
+   131→  children: React.ReactNode;
+   132→  className?: string;
+   133→}) {
+   134→  return (
+   135→    <div className={cn("space-y-1", className)}>
+   136→      <Label className="text-xs font-medium text-muted-foreground">
+   137→        {label}
+   138→      </Label>
+   139→      {children}
+   140→    </div>
+   141→  );
+   142→}
+   143→
+   144→function TagInput({
+   145→  values,
+   146→  onChange,
+   147→  placeholder,
+   148→}: {
+   149→  values: string[];
+   150→  onChange: (next: string[]) => void;
+   151→  placeholder?: string;
+   152→}) {
+   153→  const [input, setInput] = React.useState("");
+   154→
+   155→  const commit = React.useCallback(
+   156→    (raw: string) => {
+   157→      const parts = raw
+   158→        .split(",")
+   159→        .map((s) => s.trim())
+   160→        .filter(Boolean);
+   161→      if (parts.length === 0) return;
+   162→      const seen = new Set(values.map((v) => v.toLowerCase()));
+   163→      const next = [...values];
+   164→      for (const p of parts) {
+   165→        if (!seen.has(p.toLowerCase())) {
+   166→          next.push(p);
+   167→          seen.add(p.toLowerCase());
+   168→        }
+   169→      }
+   170→      onChange(next);
+   171→      setInput("");
+   172→    },
+   173→    [values, onChange]
+   174→  );
+   175→
+   176→  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+   177→    if (e.key === "Enter" || e.key === ",") {
+   178→      e.preventDefault();
+   179→      commit(input);
+   180→    } else if (e.key === "Backspace" && input === "" && values.length > 0) {
+   181→      onChange(values.slice(0, -1));
+   182→    }
+   183→  };
+   184→
+   185→  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+   186→    const text = e.clipboardData.getData("text");
+   187→    if (text.includes(",")) {
+   188→      e.preventDefault();
+   189→      commit(text);
+   190→    }
+   191→  };
+   192→
+   193→  return (
+   194→    <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-background px-1.5 py-1.5">
+   195→      {values.map((v, i) => (
+   196→        <span
+   197→          key={`${v}-${i}`}
+   198→          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
+   199→        >
+   200→          {v}
+   201→          <button
+   202→            type="button"
+   203→            onClick={() => onChange(values.filter((_, idx) => idx !== i))}
+   204→            className="text-primary/60 transition-colors hover:text-primary"
+   205→            aria-label={`Remove ${v}`}
+   206→          >
+   207→            <X className="size-3" />
+   208→          </button>
+   209→        </span>
+   210→      ))}
+   211→      <input
+   212→        value={input}
+   213→        onChange={(e) => setInput(e.target.value)}
+   214→        onKeyDown={handleKeyDown}
+   215→        onPaste={handlePaste}
+   216→        onBlur={() => {
+   217→          if (input.trim()) commit(input);
+   218→        }}
+   219→        placeholder={values.length === 0 ? placeholder : "Add…"}
+   220→        className="min-w-[80px] flex-1 border-0 bg-transparent p-1 text-xs outline-none placeholder:text-muted-foreground"
+   221→      />
+   222→    </div>
+   223→  );
+   224→}
+   225→
+   226→function AIActionButtons({
+   227→  text,
+   228→  context,
+   229→  onResult,
+   230→  onMultiResult,
+   231→}: {
+   232→  text: string;
+   233→  context?: string;
+   234→  onResult: (result: string) => void;
+   235→  onMultiResult?: (lines: string[]) => void;
+   236→}) {
+   237→  const [loading, setLoading] = React.useState<RewriteAction | null>(null);
+   238→
+   239→  const run = async (action: RewriteAction) => {
+   240→    if (loading) return;
+   241→    if (!text.trim()) {
+   242→      toast.error("Nothing to rewrite");
+   243→      return;
+   244→    }
+   245→    setLoading(action);
+   246→    try {
+   247→      const res = await fetch("/api/ai/rewrite", {
+   248→        method: "POST",
+   249→        headers: { "Content-Type": "application/json" },
+   250→        body: JSON.stringify({ text, action, context }),
+   251→      });
+   252→      const json = (await res.json()) as { result?: string; error?: string };
+   253→      if (!res.ok) throw new Error(json.error || "AI request failed");
+   254→      const result = (json.result ?? "").trim();
+   255→      if (!result) {
+   256→        toast.error("AI returned empty content");
+   257→        return;
+   258→      }
+   259→      if (action === "expand" && onMultiResult) {
+   260→        const lines = result
+   261→          .split(/\r?\n/)
+   262→          .map((l) => l.trim())
+   263→          .filter(Boolean);
+   264→        if (lines.length === 0) {
+   265→          toast.error("AI returned no content");
+   266→          return;
+   267→        }
+   268→        onMultiResult(lines);
+   269→      } else {
+   270→        onResult(result);
+   271→      }
+   272→      toast.success(`${action[0].toUpperCase()}${action.slice(1)}d`);
+   273→    } catch (e) {
+   274→      toast.error(e instanceof Error ? e.message : "AI rewrite failed");
+   275→    } finally {
+   276→      setLoading(null);
+   277→    }
+   278→  };
+   279→
+   280→  return (
+   281→    <div className="flex items-center gap-0.5">
+   282→      <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+   283→        AI
+   284→      </span>
+   285→      {AI_ACTIONS.map(({ key, icon: Icon, label }) => (
+   286→        <Button
+   287→          key={key}
+   288→          type="button"
+   289→          variant="ghost"
+   290→          size="icon"
+   291→          className="size-7 text-primary hover:bg-primary/10"
+   292→          onClick={() => run(key)}
+   293→          disabled={!!loading}
+   294→          aria-label={label}
+   295→          title={label}
+   296→        >
+   297→          {loading === key ? (
+   298→            <Loader2 className="size-3.5 animate-spin" />
+   299→          ) : (
+   300→            <Icon className="size-3.5" />
+   301→          )}
+   302→        </Button>
+   303→      ))}
+   304→    </div>
+   305→  );
+   306→}
+   307→
+   308→function IconButtonRow({
+   309→  onDuplicate,
+   310→  onDelete,
+   311→  duplicateLabel = "Duplicate",
+   312→  deleteLabel = "Delete",
+   313→}: {
+   314→  onDuplicate?: () => void;
+   315→  onDelete: () => void;
+   316→  duplicateLabel?: string;
+   317→  deleteLabel?: string;
+   318→}) {
+   319→  return (
+   320→    <div className="flex items-center gap-1">
+   321→      {onDuplicate && (
+   322→        <Button
+   323→          type="button"
+   324→          variant="ghost"
+   325→          size="sm"
+   326→          className="gap-1 text-muted-foreground hover:bg-accent"
+   327→          onClick={onDuplicate}
+   328→        >
+   329→          <Copy className="size-3.5" /> {duplicateLabel}
+   330→        </Button>
+   331→      )}
+   332→      <Button
+   333→        type="button"
+   334→        variant="ghost"
+   335→        size="sm"
+   336→        className="gap-1 text-destructive hover:bg-destructive/10"
+   337→        onClick={onDelete}
+   338→      >
+   339→        <Trash2 className="size-3.5" /> {deleteLabel}
+   340→      </Button>
+   341→    </div>
+   342→  );
+   343→}
+   344→
+   345→function AddButton({
+   346→  onClick,
+   347→  label,
+   348→}: {
+   349→  onClick: () => void;
+   350→  label: string;
+   351→}) {
+   352→  return (
+   353→    <Button
+   354→      variant="outline"
+   355→      size="sm"
+   356→      className="w-full gap-1.5 border-dashed"
+   357→      onClick={onClick}
+   358→    >
+   359→      <Plus className="size-3.5" /> {label}
+   360→    </Button>
+   361→  );
+   362→}
+   363→
+   364→// ---------- Entry cards ----------
+   365→
+   366→function ExperienceEntryCard({ exp }: { exp: ExperienceItem }) {
+   367→  const updateBullet = useResumeStore((s) => s.updateBullet);
+   368→  const addBullet = useResumeStore((s) => s.addBullet);
+   369→  const removeBullet = useResumeStore((s) => s.removeBullet);
+   370→  const updateExperience = useResumeStore((s) => s.updateExperience);
+   371→  const removeExperience = useResumeStore((s) => s.removeExperience);
+   372→  const duplicateExperience = useResumeStore((s) => s.duplicateExperience);
+   373→
+   374→  const handleMultiBullet = (idx: number, lines: string[]) => {
+   375→    const next = [...exp.bullets];
+   376→    next.splice(idx, 1, ...lines);
+   377→    updateExperience(exp.id, { bullets: next });
+   378→  };
+   379→
+   380→  return (
+   381→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   382→      <div className="grid grid-cols-2 gap-2">
+   383→        <Field label="Role">
+   384→          <Input
+   385→            className="h-9 text-sm"
+   386→            value={exp.role}
+   387→            onChange={(e) => updateExperience(exp.id, { role: e.target.value })}
+   388→            placeholder="Senior Engineer"
+   389→          />
+   390→        </Field>
+   391→        <Field label="Company">
+   392→          <Input
+   393→            className="h-9 text-sm"
+   394→            value={exp.company}
+   395→            onChange={(e) =>
+   396→              updateExperience(exp.id, { company: e.target.value })
+   397→            }
+   398→            placeholder="Acme Inc."
+   399→          />
+   400→        </Field>
+   401→      </div>
+   402→      <div className="grid grid-cols-3 gap-2">
+   403→        <Field label="Location">
+   404→          <Input
+   405→            className="h-9 text-sm"
+   406→            value={exp.location}
+   407→            onChange={(e) =>
+   408→              updateExperience(exp.id, { location: e.target.value })
+   409→            }
+   410→            placeholder="Bengaluru"
+   411→          />
+   412→        </Field>
+   413→        <Field label="Start">
+   414→          <Input
+   415→            className="h-9 text-sm"
+   416→            value={exp.start}
+   417→            onChange={(e) =>
+   418→              updateExperience(exp.id, { start: e.target.value })
+   419→            }
+   420→            placeholder="2022"
+   421→          />
+   422→        </Field>
+   423→        <Field label="End">
+   424→          <Input
+   425→            className="h-9 text-sm"
+   426→            value={exp.end}
+   427→            onChange={(e) => updateExperience(exp.id, { end: e.target.value })}
+   428→            placeholder="Present"
+   429→          />
+   430→        </Field>
+   431→      </div>
+   432→
+   433→      <div className="space-y-1.5">
+   434→        <Label className="text-xs font-medium text-muted-foreground">
+   435→          Bullets
+   436→        </Label>
+   437→        <div className="space-y-2">
+   438→          {exp.bullets.length === 0 && (
+   439→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+   440→              No bullets yet — add your first achievement.
+   441→            </p>
+   442→          )}
+   443→          {exp.bullets.map((b, idx) => (
+   444→            <div
+   445→              key={`${exp.id}-b-${idx}`}
+   446→              className="space-y-1.5 rounded-md border bg-card p-2"
+   447→            >
+   448→              <Textarea
+   449→                rows={2}
+   450→                value={b}
+   451→                onChange={(e) => updateBullet(exp.id, idx, e.target.value)}
+   452→                className="min-h-[52px] resize-none text-sm"
+   453→                placeholder="What did you achieve?"
+   454→              />
+   455→              <div className="flex items-center justify-between">
+   456→                <AIActionButtons
+   457→                  text={b}
+   458→                  context={`${exp.role} at ${exp.company}`}
+   459→                  onResult={(r) => updateBullet(exp.id, idx, r)}
+   460→                  onMultiResult={(lines) => handleMultiBullet(idx, lines)}
+   461→                />
+   462→                <Button
+   463→                  type="button"
+   464→                  variant="ghost"
+   465→                  size="icon"
+   466→                  className="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+   467→                  onClick={() => removeBullet(exp.id, idx)}
+   468→                  aria-label="Remove bullet"
+   469→                >
+   470→                  <Trash2 className="size-3.5" />
+   471→                </Button>
+   472→              </div>
+   473→            </div>
+   474→          ))}
+   475→        </div>
+   476→      </div>
+   477→
+   478→      <div className="flex items-center justify-between pt-0.5">
+   479→        <Button
+   480→          type="button"
+   481→          variant="ghost"
+   482→          size="sm"
+   483→          className="gap-1 text-primary hover:bg-primary/10"
+   484→          onClick={() => addBullet(exp.id)}
+   485→        >
+   486→          <Plus className="size-3.5" /> Add bullet
+   487→        </Button>
+   488→        <IconButtonRow
+   489→          onDuplicate={() => duplicateExperience(exp.id)}
+   490→          onDelete={() => removeExperience(exp.id)}
+   491→        />
+   492→      </div>
+   493→    </div>
+   494→  );
+   495→}
+   496→
+   497→function ProjectEntryCard({ project }: { project: ProjectItem }) {
+   498→  const updateProject = useResumeStore((s) => s.updateProject);
+   499→  const removeProject = useResumeStore((s) => s.removeProject);
+   500→  const update = useResumeStore((s) => s.update);
+   501→  const projects = useResumeStore((s) => s.data.projects);
+   502→
+   503→  const duplicate = () => {
+   504→    const idx = projects.findIndex((p) => p.id === project.id);
+   505→    if (idx === -1) return;
+   506→    const copy: ProjectItem = {
+   507→      ...project,
+   508→      id: Math.random().toString(36).slice(2, 10),
+   509→      tech: [...project.tech],
+   510→    };
+   511→    const next = [...projects];
+   512→    next.splice(idx + 1, 0, copy);
+   513→    update({ projects: next });
+   514→    toast.success("Project duplicated");
+   515→  };
+   516→
+   517→  return (
+   518→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   519→      <div className="grid grid-cols-2 gap-2">
+   520→        <Field label="Project name">
+   521→          <Input
+   522→            className="h-9 text-sm"
+   523→            value={project.name}
+   524→            onChange={(e) =>
+   525→              updateProject(project.id, { name: e.target.value })
+   526→            }
+   527→            placeholder="DevMetrics"
+   528→          />
+   529→        </Field>
+   530→        <Field label="Link">
+   531→          <Input
+   532→            className="h-9 text-sm"
+   533→            value={project.link}
+   534→            onChange={(e) =>
+   535→              updateProject(project.id, { link: e.target.value })
+   536→            }
+   537→            placeholder="github.com/…"
+   538→          />
+   539→        </Field>
+   540→      </div>
+   541→      <Field label="Description">
+   542→        <Textarea
+   543→          rows={2}
+   544→          value={project.description}
+   545→          onChange={(e) =>
+   546→            updateProject(project.id, { description: e.target.value })
+   547→          }
+   548→          className="min-h-[52px] resize-none text-sm"
+   549→          placeholder="What it does and your impact."
+   550→        />
+   551→        <AIActionButtons
+   552→          text={project.description}
+   553→          onResult={(r) => updateProject(project.id, { description: r })}
+   554→          onMultiResult={(lines) =>
+   555→            updateProject(project.id, { description: lines.join("\n") })
+   556→          }
+   557→        />
+   558→      </Field>
+   559→      <Field label="Tech stack">
+   560→        <TagInput
+   561→          values={project.tech}
+   562→          onChange={(t) => updateProject(project.id, { tech: t })}
+   563→          placeholder="React, Next.js…"
+   564→        />
+   565→      </Field>
+   566→      <div className="flex justify-end pt-0.5">
+   567→        <IconButtonRow
+   568→          onDuplicate={duplicate}
+   569→          onDelete={() => removeProject(project.id)}
+   570→        />
+   571→      </div>
+   572→    </div>
+   573→  );
+   574→}
+   575→
+   576→function EducationEntryCard({ edu }: { edu: EducationItem }) {
+   577→  const updateEducation = useResumeStore((s) => s.updateEducation);
+   578→  const removeEducation = useResumeStore((s) => s.removeEducation);
+   579→
+   580→  return (
+   581→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   582→      <div className="grid grid-cols-2 gap-2">
+   583→        <Field label="Degree" className="col-span-2">
+   584→          <Input
+   585→            className="h-9 text-sm"
+   586→            value={edu.degree}
+   587→            onChange={(e) => updateEducation(edu.id, { degree: e.target.value })}
+   588→            placeholder="B.Tech, Computer Science"
+   589→          />
+   590→        </Field>
+   591→        <Field label="School">
+   592→          <Input
+   593→            className="h-9 text-sm"
+   594→            value={edu.school}
+   595→            onChange={(e) =>
+   596→              updateEducation(edu.id, { school: e.target.value })
+   597→            }
+   598→            placeholder="BITS Pilani"
+   599→          />
+   600→        </Field>
+   601→        <Field label="Location">
+   602→          <Input
+   603→            className="h-9 text-sm"
+   604→            value={edu.location}
+   605→            onChange={(e) =>
+   606→              updateEducation(edu.id, { location: e.target.value })
+   607→            }
+   608→            placeholder="Pilani"
+   609→          />
+   610→        </Field>
+   611→        <Field label="Start">
+   612→          <Input
+   613→            className="h-9 text-sm"
+   614→            value={edu.start}
+   615→            onChange={(e) => updateEducation(edu.id, { start: e.target.value })}
+   616→            placeholder="2015"
+   617→          />
+   618→        </Field>
+   619→        <Field label="End">
+   620→          <Input
+   621→            className="h-9 text-sm"
+   622→            value={edu.end}
+   623→            onChange={(e) => updateEducation(edu.id, { end: e.target.value })}
+   624→            placeholder="2019"
+   625→          />
+   626→        </Field>
+   627→        <Field label="Grade" className="col-span-2">
+   628→          <Input
+   629→            className="h-9 text-sm"
+   630→            value={edu.grade}
+   631→            onChange={(e) => updateEducation(edu.id, { grade: e.target.value })}
+   632→            placeholder="8.7 CGPA"
+   633→          />
+   634→        </Field>
+   635→      </div>
+   636→      <div className="flex justify-end pt-0.5">
+   637→        <IconButtonRow onDelete={() => removeEducation(edu.id)} />
+   638→      </div>
+   639→    </div>
+   640→  );
+   641→}
+   642→
+   643→function SimpleEntryCard({
+   644→  item,
+   645→  keyName,
+   646→  subtitleLabel,
+   647→}: {
+   648→  item: SimpleItem;
+   649→  keyName: SimpleKey;
+   650→  subtitleLabel: string;
+   651→}) {
+   652→  const updateSimple = useResumeStore((s) => s.updateSimple);
+   653→  const removeSimple = useResumeStore((s) => s.removeSimple);
+   654→
+   655→  return (
+   656→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   657→      <div className="grid grid-cols-2 gap-2">
+   658→        <Field label="Title">
+   659→          <Input
+   660→            className="h-9 text-sm"
+   661→            value={item.title}
+   662→            onChange={(e) =>
+   663→              updateSimple(keyName, item.id, { title: e.target.value })
+   664→            }
+   665→            placeholder="Title"
+   666→          />
+   667→        </Field>
+   668→        <Field label={subtitleLabel}>
+   669→          <Input
+   670→            className="h-9 text-sm"
+   671→            value={item.subtitle}
+   672→            onChange={(e) =>
+   673→              updateSimple(keyName, item.id, { subtitle: e.target.value })
+   674→            }
+   675→            placeholder={subtitleLabel}
+   676→          />
+   677→        </Field>
+   678→      </div>
+   679→      <Field label="Date">
+   680→        <Input
+   681→          className="h-9 text-sm"
+   682→          value={item.date}
+   683→          onChange={(e) =>
+   684→            updateSimple(keyName, item.id, { date: e.target.value })
+   685→          }
+   686→          placeholder="2024"
+   687→        />
+   688→      </Field>
+   689→      <Field label="Description">
+   690→        <Textarea
+   691→          rows={2}
+   692→          value={item.description}
+   693→          onChange={(e) =>
+   694→            updateSimple(keyName, item.id, { description: e.target.value })
+   695→          }
+   696→          className="min-h-[52px] resize-none text-sm"
+   697→          placeholder="Optional description."
+   698→        />
+   699→      </Field>
+   700→      <div className="flex justify-end pt-0.5">
+   701→        <IconButtonRow onDelete={() => removeSimple(keyName, item.id)} />
+   702→      </div>
+   703→    </div>
+   704→  );
+   705→}
+   706→
+   707→function ReferenceEntryCard({
+   708→  reference,
+   709→}: {
+   710→  reference: ReferenceItem;
+   711→}) {
+   712→  const updateReference = useResumeStore((s) => s.updateReference);
+   713→  const removeReference = useResumeStore((s) => s.removeReference);
+   714→
+   715→  return (
+   716→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   717→      <div className="grid grid-cols-2 gap-2">
+   718→        <Field label="Name">
+   719→          <Input
+   720→            className="h-9 text-sm"
+   721→            value={reference.name}
+   722→            onChange={(e) =>
+   723→              updateReference(reference.id, { name: e.target.value })
+   724→            }
+   725→            placeholder="Jane Doe"
+   726→          />
+   727→        </Field>
+   728→        <Field label="Role">
+   729→          <Input
+   730→            className="h-9 text-sm"
+   731→            value={reference.role}
+   732→            onChange={(e) =>
+   733→              updateReference(reference.id, { role: e.target.value })
+   734→            }
+   735→            placeholder="Engineering Manager"
+   736→          />
+   737→        </Field>
+   738→        <Field label="Company">
+   739→          <Input
+   740→            className="h-9 text-sm"
+   741→            value={reference.company}
+   742→            onChange={(e) =>
+   743→              updateReference(reference.id, { company: e.target.value })
+   744→            }
+   745→            placeholder="Acme Inc."
+   746→          />
+   747→        </Field>
+   748→        <Field label="Contact">
+   749→          <Input
+   750→            className="h-9 text-sm"
+   751→            value={reference.contact}
+   752→            onChange={(e) =>
+   753→              updateReference(reference.id, { contact: e.target.value })
+   754→            }
+   755→            placeholder="email / phone"
+   756→          />
+   757→        </Field>
+   758→      </div>
+   759→      <div className="flex justify-end pt-0.5">
+   760→        <IconButtonRow onDelete={() => removeReference(reference.id)} />
+   761→      </div>
+   762→    </div>
+   763→  );
+   764→}
+   765→
+   766→function CustomItemEntryCard({
+   767→  sectionId,
+   768→  item,
+   769→}: {
+   770→  sectionId: string;
+   771→  item: SimpleItem;
+   772→}) {
+   773→  const updateCustomItem = useResumeStore((s) => s.updateCustomItem);
+   774→  const removeCustomItem = useResumeStore((s) => s.removeCustomItem);
+   775→
+   776→  return (
+   777→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   778→      <div className="grid grid-cols-2 gap-2">
+   779→        <Field label="Title">
+   780→          <Input
+   781→            className="h-9 text-sm"
+   782→            value={item.title}
+   783→            onChange={(e) =>
+   784→              updateCustomItem(sectionId, item.id, { title: e.target.value })
+   785→            }
+   786→            placeholder="Title"
+   787→          />
+   788→        </Field>
+   789→        <Field label="Subtitle">
+   790→          <Input
+   791→            className="h-9 text-sm"
+   792→            value={item.subtitle}
+   793→            onChange={(e) =>
+   794→              updateCustomItem(sectionId, item.id, {
+   795→                subtitle: e.target.value,
+   796→              })
+   797→            }
+   798→            placeholder="Subtitle"
+   799→          />
+   800→        </Field>
+   801→      </div>
+   802→      <Field label="Date">
+   803→        <Input
+   804→          className="h-9 text-sm"
+   805→          value={item.date}
+   806→          onChange={(e) =>
+   807→            updateCustomItem(sectionId, item.id, { date: e.target.value })
+   808→          }
+   809→          placeholder="2024"
+   810→        />
+   811→      </Field>
+   812→      <Field label="Description">
+   813→        <Textarea
+   814→          rows={2}
+   815→          value={item.description}
+   816→          onChange={(e) =>
+   817→            updateCustomItem(sectionId, item.id, {
+   818→              description: e.target.value,
+   819→            })
+   820→          }
+   821→          className="min-h-[52px] resize-none text-sm"
+   822→          placeholder="Optional description."
+   823→        />
+   824→      </Field>
+   825→      <div className="flex justify-end pt-0.5">
+   826→        <IconButtonRow
+   827→          onDelete={() => removeCustomItem(sectionId, item.id)}
+   828→        />
+   829→      </div>
+   830→    </div>
+   831→  );
+   832→}
+   833→
+   834→function CustomSectionEntryCard({ section }: { section: CustomSection }) {
+   835→  const updateCustomSection = useResumeStore((s) => s.updateCustomSection);
+   836→  const removeCustomSection = useResumeStore((s) => s.removeCustomSection);
+   837→  const addCustomItem = useResumeStore((s) => s.addCustomItem);
+   838→
+   839→  return (
+   840→    <div className="space-y-2.5 rounded-lg border bg-background/60 p-3">
+   841→      <div className="flex items-center gap-2">
+   842→        <Field label="Section title" className="flex-1">
+   843→          <Input
+   844→            className="h-9 text-sm font-medium"
+   845→            value={section.title}
+   846→            onChange={(e) =>
+   847→              updateCustomSection(section.id, { title: e.target.value })
+   848→            }
+   849→            placeholder="Section title"
+   850→          />
+   851→        </Field>
+   852→        <Button
+   853→          type="button"
+   854→          variant="ghost"
+   855→          size="sm"
+   856→          className="mt-5 shrink-0 gap-1 text-destructive hover:bg-destructive/10"
+   857→          onClick={() => removeCustomSection(section.id)}
+   858→        >
+   859→          <Trash2 className="size-3.5" /> Delete section
+   860→        </Button>
+   861→      </div>
+   862→
+   863→      <div className="space-y-2">
+   864→        {section.items.length === 0 && (
+   865→          <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+   866→            No items yet — add your first entry.
+   867→          </p>
+   868→        )}
+   869→        {section.items.map((item) => (
+   870→          <CustomItemEntryCard
+   871→            key={item.id}
+   872→            sectionId={section.id}
+   873→            item={item}
+   874→          />
+   875→        ))}
+   876→      </div>
+   877→
+   878→      <AddButton
+   879→        onClick={() => addCustomItem(section.id)}
+   880→        label="Add item"
+   881→      />
+   882→    </div>
+   883→  );
+   884→}
+   885→
+   886→// ---------- Main ----------
+   887→
+   888→export function ResumeEditor() {
+   889→  const data: ResumeData = useResumeStore((s) => s.data);
+   890→  const update = useResumeStore((s) => s.update);
+   891→  const updateSummary = useResumeStore((s) => s.updateSummary);
+   892→  const addExperience = useResumeStore((s) => s.addExperience);
+   893→  const addProject = useResumeStore((s) => s.addProject);
+   894→  const addEducation = useResumeStore((s) => s.addEducation);
+   895→  const addSimple = useResumeStore((s) => s.addSimple);
+   896→  const setSkills = useResumeStore((s) => s.setSkills);
+   897→  const setTagList = useResumeStore((s) => s.setTagList);
+   898→  const addReference = useResumeStore((s) => s.addReference);
+   899→  const addCustomSection = useResumeStore((s) => s.addCustomSection);
+   900→  const setPhoto = useResumeStore((s) => s.setPhoto);
+   901→  const setSkillLevel = useResumeStore((s) => s.setSkillLevel);
+   902→  const photoInputRef = React.useRef<HTMLInputElement>(null);
+   903→  const [customDialogOpen, setCustomDialogOpen] = React.useState(false);
+   904→  const [customTitle, setCustomTitle] = React.useState("");
+   905→
+   906→  const handleAddCustomSection = () => {
+   907→    const trimmed = customTitle.trim();
+   908→    if (!trimmed) {
+   909→      toast.error("Section title is required");
+   910→      return;
+   911→    }
+   912→    addCustomSection(trimmed);
+   913→    setCustomTitle("");
+   914→    setCustomDialogOpen(false);
+   915→    toast.success("Custom section added");
+   916→  };
+   917→
+   918→  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+   919→    const file = e.target.files?.[0];
+   920→    if (!file) return;
+   921→    if (file.size > 2 * 1024 * 1024) {
+   922→      toast.error("Photo must be under 2MB.");
+   923→      return;
+   924→    }
+   925→    const reader = new FileReader();
+   926→    reader.onload = () => setPhoto(reader.result as string);
+   927→    reader.readAsDataURL(file);
+   928→  };
+   929→
+   930→  return (
+   931→    <div className="space-y-3">
+   932→      {/* 1. Personal Info */}
+   933→      <SectionCard
+   934→        id="personal"
+   935→        icon={User}
+   936→        title="Personal Info"
+   937→        defaultOpen
+   938→      >
+   939→        {/* Photo upload */}
+   940→        <div className="mb-3 flex items-center gap-3">
+   941→          <input
+   942→            ref={photoInputRef}
+   943→            type="file"
+   944→            accept="image/*"
+   945→            onChange={handlePhotoUpload}
+   946→            className="hidden"
+   947→          />
+   948→          {data.photo ? (
+   949→            <img
+   950→              src={data.photo}
+   951→              alt="Profile"
+   952→              className="size-16 rounded-full object-cover ring-2 ring-border"
+   953→            />
+   954→          ) : (
+   955→            <div className="grid size-16 place-items-center rounded-full bg-muted text-muted-foreground">
+   956→              <User className="size-6" />
+   957→            </div>
+   958→          )}
+   959→          <div className="flex flex-col gap-1.5">
+   960→            <Button
+   961→              type="button"
+   962→              variant="outline"
+   963→              size="sm"
+   964→              className="h-7 gap-1.5 text-xs"
+   965→              onClick={() => photoInputRef.current?.click()}
+   966→            >
+   967→              <Upload className="size-3" />
+   968→              {data.photo ? "Change photo" : "Upload photo"}
+   969→            </Button>
+   970→            {data.photo && (
+   971→              <Button
+   972→                type="button"
+   973→                variant="ghost"
+   974→                size="sm"
+   975→                className="h-7 gap-1.5 text-xs text-destructive"
+   976→                onClick={() => setPhoto("")}
+   977→              >
+   978→                <Trash2 className="size-3" /> Remove
+   979→              </Button>
+   980→            )}
+   981→            <p className="text-[10px] text-muted-foreground">
+   982→              For photo templates (Engineer, UX, etc.)
+   983→            </p>
+   984→          </div>
+   985→        </div>
+   986→        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+   987→          <Field label="Full name">
+   988→            <Input
+   989→              className="h-9 text-sm"
+   990→              value={data.name}
+   991→              onChange={(e) => update({ name: e.target.value })}
+   992→              placeholder="Deepak Sharma"
+   993→            />
+   994→          </Field>
+   995→          <Field label="Title">
+   996→            <Input
+   997→              className="h-9 text-sm"
+   998→              value={data.title}
+   999→              onChange={(e) => update({ title: e.target.value })}
+  1000→              placeholder="Senior Frontend Engineer"
+  1001→            />
+  1002→          </Field>
+  1003→          <Field label="Email">
+  1004→            <Input
+  1005→              type="email"
+  1006→              className="h-9 text-sm"
+  1007→              value={data.email}
+  1008→              onChange={(e) => update({ email: e.target.value })}
+  1009→              placeholder="you@email.com"
+  1010→            />
+  1011→          </Field>
+  1012→          <Field label="Phone">
+  1013→            <Input
+  1014→              className="h-9 text-sm"
+  1015→              value={data.phone}
+  1016→              onChange={(e) => update({ phone: e.target.value })}
+  1017→              placeholder="+91 98765 43210"
+  1018→            />
+  1019→          </Field>
+  1020→          <Field label="Location">
+  1021→            <Input
+  1022→              className="h-9 text-sm"
+  1023→              value={data.location}
+  1024→              onChange={(e) => update({ location: e.target.value })}
+  1025→              placeholder="Bengaluru, India"
+  1026→            />
+  1027→          </Field>
+  1028→          <Field label="LinkedIn">
+  1029→            <Input
+  1030→              className="h-9 text-sm"
+  1031→              value={data.linkedin}
+  1032→              onChange={(e) => update({ linkedin: e.target.value })}
+  1033→              placeholder="linkedin.com/in/…"
+  1034→            />
+  1035→          </Field>
+  1036→          <Field label="GitHub">
+  1037→            <Input
+  1038→              className="h-9 text-sm"
+  1039→              value={data.github}
+  1040→              onChange={(e) => update({ github: e.target.value })}
+  1041→              placeholder="github.com/…"
+  1042→            />
+  1043→          </Field>
+  1044→          <Field label="Website">
+  1045→            <Input
+  1046→              className="h-9 text-sm"
+  1047→              value={data.website}
+  1048→              onChange={(e) => update({ website: e.target.value })}
+  1049→              placeholder="yourname.dev"
+  1050→            />
+  1051→          </Field>
+  1052→        </div>
+  1053→      </SectionCard>
+  1054→
+  1055→      {/* 2. Summary */}
+  1056→      <SectionCard id="summary" icon={FileText} title="Summary" defaultOpen>
+  1057→        <Field label="Professional summary">
+  1058→          <Textarea
+  1059→            rows={4}
+  1060→            value={data.summary}
+  1061→            onChange={(e) => updateSummary(e.target.value)}
+  1062→            className="resize-none text-sm"
+  1063→            placeholder="A short pitch that captures your impact and skills."
+  1064→          />
+  1065→        </Field>
+  1066→        <AIActionButtons
+  1067→          text={data.summary}
+  1068→          onResult={(r) => updateSummary(r)}
+  1069→          onMultiResult={(lines) => updateSummary(lines.join("\n"))}
+  1070→        />
+  1071→      </SectionCard>
+  1072→
+  1073→      {/* 3. Experience */}
+  1074→      <SectionCard
+  1075→        id="experience"
+  1076→        icon={Briefcase}
+  1077→        title="Experience"
+  1078→        count={data.experience.length}
+  1079→        defaultOpen
+  1080→      >
+  1081→        <div className="space-y-3">
+  1082→          {data.experience.map((exp) => (
+  1083→            <ExperienceEntryCard key={exp.id} exp={exp} />
+  1084→          ))}
+  1085→          {data.experience.length === 0 && (
+  1086→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1087→              No experience entries yet.
+  1088→            </p>
+  1089→          )}
+  1090→          <AddButton onClick={addExperience} label="Add experience" />
+  1091→        </div>
+  1092→      </SectionCard>
+  1093→
+  1094→      {/* 4. Skills */}
+  1095→      <SectionCard
+  1096→        id="skills"
+  1097→        icon={Sparkles}
+  1098→        title="Skills"
+  1099→        count={data.skills.length}
+  1100→      >
+  1101→        <Field label="Skills">
+  1102→          <TagInput
+  1103→            values={data.skills}
+  1104→            onChange={setSkills}
+  1105→            placeholder="Add a skill (Enter or comma)"
+  1106→          />
+  1107→        </Field>
+  1108→        {data.skills.length > 0 && (
+  1109→          <div className="mt-3 space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+  1110→            <p className="text-xs font-medium text-muted-foreground">
+  1111→              Skill levels (for bar templates)
+  1112→            </p>
+  1113→            {data.skills.map((sk) => (
+  1114→              <div key={sk} className="flex items-center gap-2">
+  1115→                <span className="w-28 shrink-0 truncate text-xs">{sk}</span>
+  1116→                <input
+  1117→                  type="range"
+  1118→                  min={0}
+  1119→                  max={100}
+  1120→                  value={data.skillLevels[sk] ?? 80}
+  1121→                  onChange={(e) =>
+  1122→                    setSkillLevel(sk, parseInt(e.target.value))
+  1123→                  }
+  1124→                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+  1125→                />
+  1126→                <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+  1127→                  {data.skillLevels[sk] ?? 80}%
+  1128→                </span>
+  1129→              </div>
+  1130→            ))}
+  1131→          </div>
+  1132→        )}
+  1133→      </SectionCard>
+  1134→
+  1135→      {/* 5. Projects */}
+  1136→      <SectionCard
+  1137→        id="projects"
+  1138→        icon={FolderGit2}
+  1139→        title="Projects"
+  1140→        count={data.projects.length}
+  1141→      >
+  1142→        <div className="space-y-3">
+  1143→          {data.projects.map((p) => (
+  1144→            <ProjectEntryCard key={p.id} project={p} />
+  1145→          ))}
+  1146→          {data.projects.length === 0 && (
+  1147→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1148→              No projects yet.
+  1149→            </p>
+  1150→          )}
+  1151→          <AddButton onClick={addProject} label="Add project" />
+  1152→        </div>
+  1153→      </SectionCard>
+  1154→
+  1155→      {/* 6. Education */}
+  1156→      <SectionCard
+  1157→        id="education"
+  1158→        icon={GraduationCap}
+  1159→        title="Education"
+  1160→        count={data.education.length}
+  1161→      >
+  1162→        <div className="space-y-3">
+  1163→          {data.education.map((ed) => (
+  1164→            <EducationEntryCard key={ed.id} edu={ed} />
+  1165→          ))}
+  1166→          {data.education.length === 0 && (
+  1167→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1168→              No education entries yet.
+  1169→            </p>
+  1170→          )}
+  1171→          <AddButton onClick={addEducation} label="Add education" />
+  1172→        </div>
+  1173→      </SectionCard>
+  1174→
+  1175→      {/* 7. Certifications */}
+  1176→      <SectionCard
+  1177→        id="certifications"
+  1178→        icon={Award}
+  1179→        title="Certifications"
+  1180→        count={data.certifications.length}
+  1181→      >
+  1182→        <div className="space-y-3">
+  1183→          {data.certifications.map((c) => (
+  1184→            <SimpleEntryCard
+  1185→              key={c.id}
+  1186→              item={c}
+  1187→              keyName="certifications"
+  1188→              subtitleLabel="Issuer"
+  1189→            />
+  1190→          ))}
+  1191→          {data.certifications.length === 0 && (
+  1192→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1193→              No certifications yet.
+  1194→            </p>
+  1195→          )}
+  1196→          <AddButton
+  1197→            onClick={() => addSimple("certifications")}
+  1198→            label="Add certification"
+  1199→          />
+  1200→        </div>
+  1201→      </SectionCard>
+  1202→
+  1203→      {/* 8. Languages */}
+  1204→      <SectionCard
+  1205→        id="languages"
+  1206→        icon={Globe}
+  1207→        title="Languages"
+  1208→        count={data.languages.length}
+  1209→      >
+  1210→        <Field label="Languages">
+  1211→          <TagInput
+  1212→            values={data.languages}
+  1213→            onChange={(v) => setTagList("languages", v)}
+  1214→            placeholder="English, Hindi…"
+  1215→          />
+  1216→        </Field>
+  1217→      </SectionCard>
+  1218→
+  1219→      {/* 9. Awards */}
+  1220→      <SectionCard
+  1221→        id="awards"
+  1222→        icon={Trophy}
+  1223→        title="Awards"
+  1224→        count={data.awards.length}
+  1225→      >
+  1226→        <div className="space-y-3">
+  1227→          {data.awards.map((a) => (
+  1228→            <SimpleEntryCard
+  1229→              key={a.id}
+  1230→              item={a}
+  1231→              keyName="awards"
+  1232→              subtitleLabel="Organization"
+  1233→            />
+  1234→          ))}
+  1235→          {data.awards.length === 0 && (
+  1236→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1237→              No awards yet.
+  1238→            </p>
+  1239→          )}
+  1240→          <AddButton onClick={() => addSimple("awards")} label="Add award" />
+  1241→        </div>
+  1242→      </SectionCard>
+  1243→
+  1244→      {/* 10. Publications */}
+  1245→      <SectionCard
+  1246→        id="publications"
+  1247→        icon={BookOpen}
+  1248→        title="Publications"
+  1249→        count={data.publications.length}
+  1250→      >
+  1251→        <div className="space-y-3">
+  1252→          {data.publications.map((p) => (
+  1253→            <SimpleEntryCard
+  1254→              key={p.id}
+  1255→              item={p}
+  1256→              keyName="publications"
+  1257→              subtitleLabel="Publisher"
+  1258→            />
+  1259→          ))}
+  1260→          {data.publications.length === 0 && (
+  1261→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1262→              No publications yet.
+  1263→            </p>
+  1264→          )}
+  1265→          <AddButton
+  1266→            onClick={() => addSimple("publications")}
+  1267→            label="Add publication"
+  1268→          />
+  1269→        </div>
+  1270→      </SectionCard>
+  1271→
+  1272→      {/* 11. Interests */}
+  1273→      <SectionCard
+  1274→        id="interests"
+  1275→        icon={Heart}
+  1276→        title="Interests"
+  1277→        count={data.interests.length}
+  1278→      >
+  1279→        <Field label="Interests">
+  1280→          <TagInput
+  1281→            values={data.interests}
+  1282→            onChange={(v) => setTagList("interests", v)}
+  1283→            placeholder="Open Source, Chess…"
+  1284→          />
+  1285→        </Field>
+  1286→      </SectionCard>
+  1287→
+  1288→      {/* 12. References */}
+  1289→      <SectionCard
+  1290→        id="references"
+  1291→        icon={Users}
+  1292→        title="References"
+  1293→        count={data.references.length}
+  1294→      >
+  1295→        <div className="space-y-3">
+  1296→          {data.references.map((r) => (
+  1297→            <ReferenceEntryCard key={r.id} reference={r} />
+  1298→          ))}
+  1299→          {data.references.length === 0 && (
+  1300→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1301→              No references yet.
+  1302→            </p>
+  1303→          )}
+  1304→          <AddButton onClick={addReference} label="Add reference" />
+  1305→        </div>
+  1306→      </SectionCard>
+  1307→
+  1308→      {/* 13. Custom Sections */}
+  1309→      <SectionCard
+  1310→        id="custom"
+  1311→        icon={Layers}
+  1312→        title="Custom Sections"
+  1313→        count={data.customSections.length}
+  1314→      >
+  1315→        <div className="space-y-3">
+  1316→          {data.customSections.map((section) => (
+  1317→            <CustomSectionEntryCard key={section.id} section={section} />
+  1318→          ))}
+  1319→          {data.customSections.length === 0 && (
+  1320→            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-center text-xs text-muted-foreground">
+  1321→              No custom sections yet — add one for volunteering, hobbies,
+  1322→              patents, or anything else.
+  1323→            </p>
+  1324→          )}
+  1325→          <Button
+  1326→            variant="outline"
+  1327→            size="sm"
+  1328→            className="w-full gap-1.5 border-dashed"
+  1329→            onClick={() => setCustomDialogOpen(true)}
+  1330→          >
+  1331→            <Plus className="size-3.5" /> Add custom section
+  1332→          </Button>
+  1333→        </div>
+  1334→      </SectionCard>
+  1335→
+  1336→      <Dialog
+  1337→        open={customDialogOpen}
+  1338→        onOpenChange={(open) => {
+  1339→          setCustomDialogOpen(open);
+  1340→          if (!open) setCustomTitle("");
+  1341→        }}
+  1342→      >
+  1343→        <DialogContent className="sm:max-w-md">
+  1344→          <DialogHeader>
+  1345→            <DialogTitle>New custom section</DialogTitle>
+  1346→          </DialogHeader>
+  1347→          <div className="space-y-1.5">
+  1348→            <Label className="text-xs font-medium text-muted-foreground">
+  1349→              Section title
+  1350→            </Label>
+  1351→            <Input
+  1352→              autoFocus
+  1353→              className="h-9 text-sm"
+  1354→              value={customTitle}
+  1355→              onChange={(e) => setCustomTitle(e.target.value)}
+  1356→              onKeyDown={(e) => {
+  1357→                if (e.key === "Enter") {
+  1358→                  e.preventDefault();
+  1359→                  handleAddCustomSection();
+  1360→                }
+  1361→              }}
+  1362→              placeholder="e.g. Volunteer Work, Patents, Conferences"
+  1363→            />
+  1364→          </div>
+  1365→          <DialogFooter>
+  1366→            <Button
+  1367→              variant="ghost"
+  1368→              size="sm"
+  1369→              onClick={() => {
+  1370→                setCustomDialogOpen(false);
+  1371→                setCustomTitle("");
+  1372→              }}
+  1373→            >
+  1374→              Cancel
+  1375→            </Button>
+  1376→            <Button
+  1377→              size="sm"
+  1378→              className="gap-1"
+  1379→              onClick={handleAddCustomSection}
+  1380→            >
+  1381→              <Plus className="size-3.5" /> Add section
+  1382→            </Button>
+  1383→          </DialogFooter>
+  1384→        </DialogContent>
+  1385→      </Dialog>
+  1386→    </div>
+  1387→  );
+  1388→}
+  1389→

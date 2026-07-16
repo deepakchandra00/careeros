@@ -1,0 +1,1319 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import type { ResumeData } from "@/store/resume-store";
+     5→
+     6→const PAPER = "resume-paper mx-auto w-[794px] max-w-full bg-white text-slate-900 shadow-xl";
+     7→const visible = (s: Record<string, boolean>, id: string) => s[id] !== false;
+     8→
+     9→// Avatar helper — supports circle, square, and rounded shapes for luxury layouts
+    10→function Avatar({ data, size, ring, ringWidth = 2, shape = "circle" }: { data: ResumeData; size: number; ring?: string; ringWidth?: number; shape?: "circle" | "square" | "rounded" }) {
+    11→  const borderStyle = ring ? `${ring} ${ringWidth}px solid` : undefined;
+    12→  const borderRadius = shape === "circle" ? "50%" : shape === "rounded" ? "12px" : "0";
+    13→  const initials = data.name.split(" ").map(n => n[0]).join("").slice(0, 2);
+    14→  if (data.photo) return <img src={data.photo} alt={data.name} style={{ width: size, height: size, borderRadius, objectFit: "cover", border: borderStyle }} />;
+    15→  return <div style={{ width: size, height: size, borderRadius, background: "linear-gradient(135deg, #f1f5f9, #e2e8f0)", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.35, fontWeight: 700, border: borderStyle, fontFamily: "Georgia, serif" }}>{initials}</div>;
+    16→}
+    17→
+    18→function range(start: string, end: string) {
+    19→  const s = (start ?? "").trim(); const e = (end ?? "").trim();
+    20→  if (s && e) return `${s} — ${e}`; if (s) return `${s} — Present`; return e || "";
+    21→}
+    22→
+    23→const PLAYFAIR = "'Playfair Display', Georgia, serif";
+    24→const CORMORANT = "'Cormorant Garamond', Georgia, serif";
+    25→const DM_SANS = "'DM Sans', system-ui, sans-serif";
+    26→const MANROPE = "'Manrope', system-ui, sans-serif";
+    27→
+    28→// =====================================================================
+    29→// 1. VOGUE — Cream/ivory editorial. Oversized Playfair serif name,
+    30→//    champagne gold (#c5a572) thin dividers, vertical "PORTFOLIO" rail
+    31→//    on left edge, circular photo with thin gold ring, vast whitespace.
+    32→//    Font: Playfair Display + Cormorant Garamond.
+    33→// =====================================================================
+    34→export function VogueTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+    35→  const cream = "#faf8f3";
+    36→  const gold = "#c5a572";
+    37→  const ink = "#1a1714";
+    38→  const muted = "#7c736a";
+    39→
+    40→  const SectionLabel = ({ n, label }: { n: string; label: string }) => (
+    41→    <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14, marginTop: 4 }}>
+    42→      <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: gold, letterSpacing: 1 }}>{n}</span>
+    43→      <span style={{ fontFamily: PLAYFAIR, fontSize: 13, fontWeight: 600, color: ink, letterSpacing: 3, textTransform: "uppercase" }}>{label}</span>
+    44→      <div style={{ flex: 1, height: 1, background: gold, opacity: 0.5 }} />
+    45→    </div>
+    46→  );
+    47→
+    48→  return (
+    49→    <div className={PAPER} style={{ fontFamily: CORMORANT, background: cream, color: ink, position: "relative", overflow: "hidden" }}>
+    50→      {/* Vertical PORTFOLIO rail on left edge */}
+    51→      <div style={{ position: "absolute", left: 18, top: 60, bottom: 60, width: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", pointerEvents: "none" }}>
+    52→        <div style={{ writingMode: "vertical-rl" as React.CSSProperties["writingMode"], transform: "rotate(180deg)", fontFamily: DM_SANS, fontSize: 9, letterSpacing: 8, color: gold, fontWeight: 600, textTransform: "uppercase" }}>Portfolio</div>
+    53→        <div style={{ writingMode: "vertical-rl" as React.CSSProperties["writingMode"], transform: "rotate(180deg)", fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: muted, letterSpacing: 2 }}>Est. MMXXV</div>
+    54→      </div>
+    55→
+    56→      {/* Decorative gold ornament top-right */}
+    57→      <svg width="120" height="120" viewBox="0 0 120 120" style={{ position: "absolute", top: 24, right: 24, opacity: 0.35, pointerEvents: "none" }}>
+    58→        <circle cx="60" cy="60" r="50" fill="none" stroke={gold} strokeWidth="0.5" />
+    59→        <circle cx="60" cy="60" r="38" fill="none" stroke={gold} strokeWidth="0.5" />
+    60→        <circle cx="60" cy="60" r="3" fill={gold} />
+    61→        <line x1="60" y1="6" x2="60" y2="20" stroke={gold} strokeWidth="0.5" />
+    62→        <line x1="60" y1="100" x2="60" y2="114" stroke={gold} strokeWidth="0.5" />
+    63→        <line x1="6" y1="60" x2="20" y2="60" stroke={gold} strokeWidth="0.5" />
+    64→        <line x1="100" y1="60" x2="114" y2="60" stroke={gold} strokeWidth="0.5" />
+    65→      </svg>
+    66→
+    67→      {/* Header — editorial cover */}
+    68→      <div style={{ padding: "60px 56px 36px 70px", borderBottom: `1px solid ${gold}`, position: "relative" }}>
+    69→        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 36 }}>
+    70→          <div style={{ flex: 1, paddingTop: 6 }}>
+    71→            <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 14, color: gold, letterSpacing: 4, textTransform: "uppercase", marginBottom: 14 }}>The Profile of</div>
+    72→            <h1 style={{ fontFamily: PLAYFAIR, fontSize: 44, fontWeight: 700, color: ink, margin: 0, lineHeight: 1.05, letterSpacing: -0.5 }}>{data.name}</h1>
+    73→            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+    74→              <div style={{ width: 36, height: 1, background: gold }} />
+    75→              <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 18, color: muted, margin: 0, letterSpacing: 1 }}>{data.title}</p>
+    76→            </div>
+    77→            {/* Contact as elegant editorial caption */}
+    78→            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", marginTop: 22, fontFamily: DM_SANS, fontSize: 9.5, color: muted, letterSpacing: 0.4 }}>
+    79→              {[data.email, data.phone, data.location, data.linkedin, data.website].filter(Boolean).map((c, i) => (
+    80→                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    81→                  <span style={{ color: gold, fontSize: 8 }}>◆</span>{c}
+    82→                </span>
+    83→              ))}
+    84→            </div>
+    85→          </div>
+    86→          <div style={{ position: "relative", flexShrink: 0 }}>
+    87→            {/* Outer decorative ring */}
+    88→            <div style={{ position: "absolute", inset: -10, borderRadius: "50%", border: `0.5px solid ${gold}`, opacity: 0.7 }} />
+    89→            <div style={{ position: "absolute", inset: -18, borderRadius: "50%", border: `0.5px solid ${gold}`, opacity: 0.3 }} />
+    90→            <Avatar data={data} size={108} ring={gold} ringWidth={1} shape="circle" />
+    91→          </div>
+    92→        </div>
+    93→      </div>
+    94→
+    95→      {/* Body */}
+    96→      <div style={{ padding: "36px 56px 44px 70px" }}>
+    97→        {/* Summary — editorial pull quote style */}
+    98→        {visible(sections, "summary") && data.summary && (
+    99→          <div style={{ marginBottom: 32 }}>
+   100→            <SectionLabel n="I." label="Profile" />
+   101→            <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 15, lineHeight: 1.75, color: ink, margin: 0, maxWidth: 580 }}>{data.summary}</p>
+   102→          </div>
+   103→        )}
+   104→
+   105→        {/* Experience */}
+   106→        {visible(sections, "experience") && data.experience.length > 0 && (
+   107→          <div style={{ marginBottom: 32 }}>
+   108→            <SectionLabel n="II." label="Experience" />
+   109→            <div>
+   110→              {data.experience.map((e, i) => (
+   111→                <div key={e.id} style={{ marginBottom: 22, breakInside: "avoid" as React.CSSProperties["breakInside"], display: "flex", gap: 22 }}>
+   112→                  <div style={{ width: 84, flexShrink: 0, textAlign: "right", paddingTop: 2 }}>
+   113→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 11, color: gold, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>{range(e.start, e.end)}</div>
+   114→                  </div>
+   115→                  <div style={{ width: 1, background: gold, opacity: 0.4, flexShrink: 0 }} />
+   116→                  <div style={{ flex: 1 }}>
+   117→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 16, fontWeight: 700, color: ink, lineHeight: 1.2 }}>{e.role}</div>
+   118→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 13, color: gold, marginTop: 2 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+   119→                    <div style={{ marginTop: 8 }}>
+   120→                      {e.bullets.filter(b => b?.trim()).map((b, j) => (
+   121→                        <div key={j} style={{ fontFamily: CORMORANT, fontSize: 11.5, lineHeight: 1.7, color: "#3d3833", marginBottom: 3, paddingLeft: 14, position: "relative" }}>
+   122→                          <span style={{ position: "absolute", left: 0, color: gold, fontSize: 8, top: 7 }}>◆</span>{b}
+   123→                        </div>
+   124→                      ))}
+   125→                    </div>
+   126→                  </div>
+   127→                </div>
+   128→              ))}
+   129→            </div>
+   130→          </div>
+   131→        )}
+   132→
+   133→        {/* Two-column lower section */}
+   134→        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 36 }}>
+   135→          <div>
+   136→            {visible(sections, "education") && data.education.length > 0 && (
+   137→              <div style={{ marginBottom: 28 }}>
+   138→                <SectionLabel n="III." label="Education" />
+   139→                {data.education.map(ed => (
+   140→                  <div key={ed.id} style={{ marginBottom: 12, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   141→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 13, fontWeight: 700, color: ink }}>{ed.degree}</div>
+   142→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: gold, marginTop: 2 }}>{ed.school}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+   143→                    <div style={{ fontFamily: DM_SANS, fontSize: 9, color: muted, marginTop: 2, letterSpacing: 1, textTransform: "uppercase" }}>{range(ed.start, ed.end)}</div>
+   144→                  </div>
+   145→                ))}
+   146→              </div>
+   147→            )}
+   148→            {visible(sections, "skills") && data.skills.length > 0 && (
+   149→              <div style={{ marginBottom: 28 }}>
+   150→                <SectionLabel n="IV." label="Expertise" />
+   151→                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 0" }}>
+   152→                  {data.skills.map((s, i) => (
+   153→                    <div key={i} style={{ width: "50%", fontFamily: CORMORANT, fontSize: 12, color: ink, display: "flex", alignItems: "center", gap: 8 }}>
+   154→                      <span style={{ color: gold, fontSize: 7 }}>◆</span>{s}
+   155→                    </div>
+   156→                  ))}
+   157→                </div>
+   158→              </div>
+   159→            )}
+   160→          </div>
+   161→          <div>
+   162→            {visible(sections, "projects") && data.projects.length > 0 && (
+   163→              <div style={{ marginBottom: 28 }}>
+   164→                <SectionLabel n="V." label="Selected Works" />
+   165→                {data.projects.map(p => (
+   166→                  <div key={p.id} style={{ marginBottom: 12, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   167→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 12.5, fontWeight: 700, color: ink }}>{p.name}</div>
+   168→                    {p.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: "#3d3833", lineHeight: 1.55, marginTop: 2 }}>{p.description}</div>}
+   169→                    {p.tech.length > 0 && <div style={{ fontFamily: DM_SANS, fontSize: 8.5, color: gold, marginTop: 3, letterSpacing: 0.5 }}>{p.tech.join("  ·  ")}</div>}
+   170→                  </div>
+   171→                ))}
+   172→              </div>
+   173→            )}
+   174→            {visible(sections, "languages") && data.languages.length > 0 && (
+   175→              <div style={{ marginBottom: 28 }}>
+   176→                <SectionLabel n="VI." label="Languages" />
+   177→                <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: ink, lineHeight: 1.8 }}>{data.languages.join("   ·   ")}</div>
+   178→              </div>
+   179→            )}
+   180→            {visible(sections, "awards") && data.awards.length > 0 && (
+   181→              <div style={{ marginBottom: 28 }}>
+   182→                <SectionLabel n="VII." label="Distinctions" />
+   183→                {data.awards.map(aw => (
+   184→                  <div key={aw.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   185→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 12, fontWeight: 700, color: ink }}>{aw.title}</div>
+   186→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: gold }}>{aw.subtitle}{aw.date ? `  ·  ${aw.date}` : ""}</div>
+   187→                  </div>
+   188→                ))}
+   189→              </div>
+   190→            )}
+   191→          </div>
+   192→        </div>
+   193→
+   194→        {visible(sections, "certifications") && data.certifications.length > 0 && (
+   195→          <div style={{ marginBottom: 28 }}>
+   196→            <SectionLabel n="VIII." label="Certifications" />
+   197→            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px" }}>
+   198→              {data.certifications.map(c => (
+   199→                <div key={c.id} style={{ fontFamily: CORMORANT, fontSize: 12, color: ink }}>
+   200→                  <span style={{ color: gold, marginRight: 6, fontSize: 8 }}>◆</span>{c.title}{c.date ? <span style={{ color: muted, fontStyle: "italic", marginLeft: 6 }}>, {c.date}</span> : null}
+   201→                </div>
+   202→              ))}
+   203→            </div>
+   204→          </div>
+   205→        )}
+   206→
+   207→        {visible(sections, "interests") && data.interests.length > 0 && (
+   208→          <div>
+   209→            <SectionLabel n="IX." label="Interests" />
+   210→            <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: ink }}>{data.interests.join("   ·   ")}</div>
+   211→          </div>
+   212→        )}
+   213→
+   214→        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+   215→          <div key={cs.id} style={{ marginBottom: 28, marginTop: 12 }}>
+   216→            <SectionLabel n="·" label={cs.title} />
+   217→            {cs.items.map(item => (
+   218→              <div key={item.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   219→                <div style={{ fontFamily: PLAYFAIR, fontSize: 12, fontWeight: 700, color: ink }}>{item.title}{item.date ? <span style={{ color: muted, fontStyle: "italic", fontWeight: 400, marginLeft: 8 }}>{item.date}</span> : null}</div>
+   220→                {item.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: gold, marginTop: 1 }}>{item.subtitle}</div>}
+   221→                {item.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: "#3d3833", lineHeight: 1.55, marginTop: 2 }}>{item.description}</div>}
+   222→              </div>
+   223→            ))}
+   224→          </div>
+   225→        ))}
+   226→
+   227→        {/* Editorial colophon footer */}
+   228→        <div style={{ marginTop: 36, paddingTop: 18, borderTop: `1px solid ${gold}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+   229→          <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: muted, letterSpacing: 1 }}>— Fin —</span>
+   230→          <span style={{ fontFamily: DM_SANS, fontSize: 8, color: gold, letterSpacing: 4, textTransform: "uppercase" }}>Vogue Editorial</span>
+   231→        </div>
+   232→      </div>
+   233→    </div>
+   234→  );
+   235→}
+   236→
+   237→// =====================================================================
+   238→// 2. MAISON — Matte black (#0a0a0a) with gold (#c5a572) accents.
+   239→//    Architectural line art (thin SVG geometric lines), circular photo
+   240→//    with double gold ring, thin platinum dividers, layered paper cards,
+   241→//    vertical "MAISON" text. Font: Cormorant Garamond + DM Sans.
+   242→// =====================================================================
+   243→export function MaisonTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+   244→  const black = "#0a0a0a";
+   245→  const gold = "#c5a572";
+   246→  const platinum = "#e5e4e2";
+   247→  const cream = "#f5f0e8";
+   248→  const muted = "rgba(229,228,226,0.55)";
+   249→
+   250→  const ArchLines = () => (
+   251→    <svg width="220" height="320" viewBox="0 0 220 320" style={{ position: "absolute", top: 60, right: -40, opacity: 0.25, pointerEvents: "none" }}>
+   252→      <line x1="0" y1="0" x2="220" y2="320" stroke={gold} strokeWidth="0.5" />
+   253→      <line x1="220" y1="0" x2="0" y2="320" stroke={gold} strokeWidth="0.5" />
+   254→      <line x1="110" y1="0" x2="110" y2="320" stroke={gold} strokeWidth="0.5" />
+   255→      <line x1="0" y1="160" x2="220" y2="160" stroke={gold} strokeWidth="0.5" />
+   256→      <circle cx="110" cy="160" r="80" fill="none" stroke={gold} strokeWidth="0.5" />
+   257→      <circle cx="110" cy="160" r="40" fill="none" stroke={gold} strokeWidth="0.5" />
+   258→      <rect x="60" y="110" width="100" height="100" fill="none" stroke={gold} strokeWidth="0.5" transform="rotate(45 110 160)" />
+   259→      <circle cx="110" cy="160" r="3" fill={gold} />
+   260→    </svg>
+   261→  );
+   262→
+   263→  const LayeredCard: React.CSSProperties = {
+   264→    background: "linear-gradient(180deg, #161616 0%, #0f0f0f 100%)",
+   265→    border: `0.5px solid ${gold}55`,
+   266→    borderRadius: 2,
+   267→    boxShadow: "0 1px 0 rgba(197,165,114,0.08), 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03)",
+   268→  };
+   269→
+   270→  const Header = ({ label }: { label: string }) => (
+   271→    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+   272→      <span style={{ fontFamily: DM_SANS, fontSize: 9, color: gold, letterSpacing: 4, fontWeight: 600 }}>{label.toUpperCase()}</span>
+   273→      <div style={{ flex: 1, height: 0.5, background: `linear-gradient(90deg, ${gold}, transparent)` }} />
+   274→    </div>
+   275→  );
+   276→
+   277→  return (
+   278→    <div className={PAPER} style={{ fontFamily: CORMORANT, background: black, color: cream, position: "relative", overflow: "hidden" }}>
+   279→      <ArchLines />
+   280→
+   281→      {/* Vertical MAISON rail */}
+   282→      <div style={{ position: "absolute", left: 16, top: 80, bottom: 80, width: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", pointerEvents: "none" }}>
+   283→        <div style={{ writingMode: "vertical-rl" as React.CSSProperties["writingMode"], transform: "rotate(180deg)", fontFamily: PLAYFAIR, fontSize: 16, color: gold, letterSpacing: 12, fontWeight: 700 }}>MAISON</div>
+   284→        <div style={{ writingMode: "vertical-rl" as React.CSSProperties["writingMode"], transform: "rotate(180deg)", fontFamily: DM_SANS, fontSize: 8, color: muted, letterSpacing: 4 }}>ATELIER · MMXXV</div>
+   285→      </div>
+   286→
+   287→      {/* Header with double-ring circular photo */}
+   288→      <div style={{ padding: "48px 56px 36px 70px", borderBottom: `0.5px solid ${platinum}30`, position: "relative" }}>
+   289→        <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
+   290→          <div style={{ position: "relative", flexShrink: 0 }}>
+   291→            <div style={{ position: "absolute", inset: -8, borderRadius: "50%", border: `1px solid ${gold}` }} />
+   292→            <div style={{ position: "absolute", inset: -16, borderRadius: "50%", border: `0.5px solid ${gold}80` }} />
+   293→            <Avatar data={data} size={100} ring={gold} ringWidth={1} shape="circle" />
+   294→          </div>
+   295→          <div style={{ flex: 1 }}>
+   296→            <div style={{ fontFamily: DM_SANS, fontSize: 9, color: gold, letterSpacing: 5, marginBottom: 8, textTransform: "uppercase" }}>Maison Professionnelle</div>
+   297→            <h1 style={{ fontFamily: CORMORANT, fontSize: 42, fontWeight: 600, color: cream, margin: 0, lineHeight: 1.05, letterSpacing: 0.5 }}>{data.name}</h1>
+   298→            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+   299→              <div style={{ width: 28, height: 1, background: gold }} />
+   300→              <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 16, color: gold, margin: 0 }}>{data.title}</p>
+   301→            </div>
+   302→          </div>
+   303→        </div>
+   304→        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginTop: 22, fontFamily: DM_SANS, fontSize: 9, color: muted, letterSpacing: 0.4, paddingLeft: 130 }}>
+   305→          {[data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean).map((c, i) => (
+   306→            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+   307→              <span style={{ color: gold, fontSize: 7 }}>●</span>{c}
+   308→            </span>
+   309→          ))}
+   310→        </div>
+   311→      </div>
+   312→
+   313→      {/* Body */}
+   314→      <div style={{ padding: "32px 56px 40px 70px", display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28 }}>
+   315→        {/* Left column */}
+   316→        <div>
+   317→          {visible(sections, "summary") && data.summary && (
+   318→            <div style={{ marginBottom: 24 }}>
+   319→              <Header label="Manifesto" />
+   320→              <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 14, lineHeight: 1.75, color: "rgba(245,240,232,0.85)", margin: 0 }}>{data.summary}</p>
+   321→            </div>
+   322→          )}
+   323→
+   324→          {visible(sections, "experience") && data.experience.length > 0 && (
+   325→            <div style={{ marginBottom: 24 }}>
+   326→              <Header label="Parcours" />
+   327→              <div>
+   328→                {data.experience.map(e => (
+   329→                  <div key={e.id} style={{ ...LayeredCard, padding: "16px 18px", marginBottom: 12, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   330→                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+   331→                      <span style={{ fontFamily: CORMORANT, fontSize: 17, fontWeight: 600, color: cream }}>{e.role}</span>
+   332→                      <span style={{ fontFamily: DM_SANS, fontSize: 8.5, color: gold, letterSpacing: 1.5, textTransform: "uppercase" }}>{range(e.start, e.end)}</span>
+   333→                    </div>
+   334→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12.5, color: gold, marginBottom: 10 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+   335→                    <div style={{ width: 24, height: 0.5, background: `${gold}80`, marginBottom: 10 }} />
+   336→                    {e.bullets.filter(b => b?.trim()).map((b, i) => (
+   337→                      <div key={i} style={{ fontFamily: CORMORANT, fontSize: 11.5, lineHeight: 1.65, color: "rgba(245,240,232,0.8)", marginBottom: 3, paddingLeft: 14, position: "relative" }}>
+   338→                        <span style={{ position: "absolute", left: 0, color: gold, fontSize: 7, top: 7 }}>●</span>{b}
+   339→                      </div>
+   340→                    ))}
+   341→                  </div>
+   342→                ))}
+   343→              </div>
+   344→            </div>
+   345→          )}
+   346→
+   347→          {visible(sections, "projects") && data.projects.length > 0 && (
+   348→            <div>
+   349→              <Header label="Œuvres" />
+   350→              {data.projects.map(p => (
+   351→                <div key={p.id} style={{ ...LayeredCard, padding: "14px 18px", marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   352→                  <div style={{ fontFamily: CORMORANT, fontSize: 14, fontWeight: 600, color: cream }}>{p.name}</div>
+   353→                  {p.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: "rgba(245,240,232,0.75)", lineHeight: 1.55, marginTop: 3 }}>{p.description}</div>}
+   354→                  {p.tech.length > 0 && <div style={{ fontFamily: DM_SANS, fontSize: 8, color: gold, marginTop: 5, letterSpacing: 0.5 }}>{p.tech.join("   ·   ")}</div>}
+   355→                  {p.link && <div style={{ fontFamily: DM_SANS, fontSize: 8, color: platinum, marginTop: 3, opacity: 0.7 }}>{p.link}</div>}
+   356→                </div>
+   357→              ))}
+   358→            </div>
+   359→          )}
+   360→        </div>
+   361→
+   362→        {/* Right column */}
+   363→        <div>
+   364→          {visible(sections, "skills") && data.skills.length > 0 && (
+   365→            <div style={{ ...LayeredCard, padding: "18px", marginBottom: 16 }}>
+   366→              <Header label="Savoir-Faire" />
+   367→              {data.skills.map((s, i) => (
+   368→                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, paddingBottom: 6, borderBottom: `0.5px solid ${platinum}15` }}>
+   369→                  <span style={{ color: gold, fontSize: 8 }}>◆</span>
+   370→                  <span style={{ fontFamily: CORMORANT, fontSize: 12, color: cream, flex: 1 }}>{s}</span>
+   371→                </div>
+   372→              ))}
+   373→            </div>
+   374→          )}
+   375→
+   376→          {visible(sections, "education") && data.education.length > 0 && (
+   377→            <div style={{ ...LayeredCard, padding: "18px", marginBottom: 16 }}>
+   378→              <Header label="Formation" />
+   379→              {data.education.map(ed => (
+   380→                <div key={ed.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   381→                  <div style={{ fontFamily: CORMORANT, fontSize: 13, fontWeight: 600, color: cream }}>{ed.degree}</div>
+   382→                  <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11.5, color: gold }}>{ed.school}</div>
+   383→                  <div style={{ fontFamily: DM_SANS, fontSize: 8, color: muted, marginTop: 2, letterSpacing: 1 }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+   384→                </div>
+   385→              ))}
+   386→            </div>
+   387→          )}
+   388→
+   389→          {visible(sections, "languages") && data.languages.length > 0 && (
+   390→            <div style={{ ...LayeredCard, padding: "18px", marginBottom: 16 }}>
+   391→              <Header label="Langues" />
+   392→              {data.languages.map((l, i) => (
+   393→                <div key={i} style={{ fontFamily: CORMORANT, fontSize: 12, color: cream, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+   394→                  <span style={{ color: gold, fontSize: 7 }}>●</span>{l}
+   395→                </div>
+   396→              ))}
+   397→            </div>
+   398→          )}
+   399→
+   400→          {visible(sections, "certifications") && data.certifications.length > 0 && (
+   401→            <div style={{ ...LayeredCard, padding: "18px", marginBottom: 16 }}>
+   402→              <Header label="Certifications" />
+   403→              {data.certifications.map(c => (
+   404→                <div key={c.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   405→                  <div style={{ fontFamily: CORMORANT, fontSize: 12, fontWeight: 600, color: cream }}>{c.title}</div>
+   406→                  <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10.5, color: gold }}>{c.subtitle}{c.date ? `  ·  ${c.date}` : ""}</div>
+   407→                </div>
+   408→              ))}
+   409→            </div>
+   410→          )}
+   411→
+   412→          {visible(sections, "awards") && data.awards.length > 0 && (
+   413→            <div style={{ ...LayeredCard, padding: "18px", marginBottom: 16 }}>
+   414→              <Header label="Distinctions" />
+   415→              {data.awards.map(aw => (
+   416→                <div key={aw.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   417→                  <div style={{ fontFamily: CORMORANT, fontSize: 12, fontWeight: 600, color: cream }}>{aw.title}</div>
+   418→                  <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10.5, color: gold }}>{aw.subtitle}{aw.date ? `  ·  ${aw.date}` : ""}</div>
+   419→                </div>
+   420→              ))}
+   421→            </div>
+   422→          )}
+   423→
+   424→          {visible(sections, "interests") && data.interests.length > 0 && (
+   425→            <div style={{ ...LayeredCard, padding: "18px" }}>
+   426→              <Header label="Intérêts" />
+   427→              <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11.5, color: cream, lineHeight: 1.7 }}>{data.interests.join("   ·   ")}</div>
+   428→            </div>
+   429→          )}
+   430→
+   431→          {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+   432→            <div key={cs.id} style={{ ...LayeredCard, padding: "18px", marginBottom: 16 }}>
+   433→              <Header label={cs.title} />
+   434→              {cs.items.map(item => (
+   435→                <div key={item.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   436→                  <div style={{ fontFamily: CORMORANT, fontSize: 12, fontWeight: 600, color: cream }}>{item.title}</div>
+   437→                  {item.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10.5, color: gold }}>{item.subtitle}</div>}
+   438→                  {item.description && <div style={{ fontFamily: CORMORANT, fontSize: 10.5, color: "rgba(245,240,232,0.8)", lineHeight: 1.5, marginTop: 2 }}>{item.description}</div>}
+   439→                </div>
+   440→              ))}
+   441→            </div>
+   442→          ))}
+   443→        </div>
+   444→      </div>
+   445→
+   446→      {/* Footer */}
+   447→      <div style={{ padding: "16px 70px 28px", borderTop: `0.5px solid ${platinum}30`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+   448→        <span style={{ fontFamily: DM_SANS, fontSize: 8, color: muted, letterSpacing: 3 }}>EST. MMXXV</span>
+   449→        <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: gold }}>— Maison —</span>
+   450→        <span style={{ fontFamily: DM_SANS, fontSize: 8, color: muted, letterSpacing: 3 }}>{data.name.toUpperCase()}</span>
+   451→      </div>
+   452→    </div>
+   453→  );
+   454→}
+   455→
+   456→// =====================================================================
+   457→// 3. ATELIER — Burgundy (#5b1a1a) + cream (#faf6ef) + gold (#c5a572).
+   458→//    Botanical SVG accents (leaves, branches), embossed inset-shadow cards,
+   459→//    ribbon-style achievement badges, elegant quote highlight block.
+   460→//    Font: Playfair Display + Cormorant Garamond.
+   461→// =====================================================================
+   462→export function AtelierTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+   463→  const burgundy = "#5b1a1a";
+   464→  const cream = "#faf6ef";
+   465→  const gold = "#c5a572";
+   466→  const ink = "#2b1a1a";
+   467→  const muted = "#7a6a6a";
+   468→
+   469→  const Botanical = ({ style }: { style?: React.CSSProperties }) => (
+   470→    <svg width="180" height="240" viewBox="0 0 180 240" style={{ position: "absolute", ...style, opacity: 0.18, pointerEvents: "none" }}>
+   471→      <g stroke={burgundy} strokeWidth="0.8" fill="none">
+   472→        {/* central branch */}
+   473→        <path d="M 90 230 Q 88 180 92 120 Q 95 80 90 30" />
+   474→        {/* leaves left */}
+   475→        <path d="M 90 200 Q 60 195 50 175 Q 70 175 90 200" fill={burgundy} fillOpacity="0.15" />
+   476→        <path d="M 91 160 Q 65 150 58 128 Q 78 132 91 160" fill={burgundy} fillOpacity="0.15" />
+   477→        <path d="M 92 120 Q 70 108 65 88 Q 84 96 92 120" fill={burgundy} fillOpacity="0.15" />
+   478→        <path d="M 92 80 Q 76 66 74 48 Q 88 56 92 80" fill={burgundy} fillOpacity="0.15" />
+   479→        {/* leaves right */}
+   480→        <path d="M 90 180 Q 120 178 130 158 Q 110 158 90 180" fill={burgundy} fillOpacity="0.15" />
+   481→        <path d="M 91 140 Q 118 132 124 110 Q 104 114 91 140" fill={burgundy} fillOpacity="0.15" />
+   482→        <path d="M 92 100 Q 114 90 118 70 Q 100 76 92 100" fill={burgundy} fillOpacity="0.15" />
+   483→        <path d="M 92 60 Q 108 50 110 32 Q 96 40 92 60" fill={burgundy} fillOpacity="0.15" />
+   484→      </g>
+   485→    </svg>
+   486→  );
+   487→
+   488→  const Embossed: React.CSSProperties = {
+   489→    background: "rgba(255,255,255,0.6)",
+   490→    borderRadius: 4,
+   491→    boxShadow: `inset 0 1px 2px rgba(91,26,26,0.12), inset 0 0 0 0.5px ${gold}55`,
+   492→    border: `0.5px solid ${gold}40`,
+   493→  };
+   494→
+   495→  const RibbonBadge = ({ title, sub }: { title: string; sub?: string }) => (
+   496→    <div style={{ display: "inline-flex", alignItems: "stretch", marginBottom: 8 }}>
+   497→      <div style={{ width: 8, background: burgundy, clipPath: "polygon(0 0, 100% 0, 100% 50%, 0 50%, 0 0)" }} />
+   498→      <div style={{ background: burgundy, color: cream, padding: "5px 14px", fontFamily: PLAYFAIR, fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", position: "relative" }}>
+   499→        {title}{sub ? <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontWeight: 400, marginLeft: 8, opacity: 0.85 }}>{sub}</span> : null}
+   500→      </div>
+   501→      <div style={{ width: 8, background: burgundy, clipPath: "polygon(0 0, 100% 0, 0 50%, 100% 50%)" }} />
+   502→    </div>
+   503→  );
+   504→
+   505→  const SectionLabel = ({ label }: { label: string }) => (
+   506→    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, marginTop: 2 }}>
+   507→      <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1 L9 5 L13 5 L10 8 L11 13 L7 10 L3 13 L4 8 L1 5 L5 5 Z" fill={gold} /></svg>
+   508→      <span style={{ fontFamily: PLAYFAIR, fontSize: 13, fontWeight: 700, color: burgundy, letterSpacing: 3, textTransform: "uppercase" }}>{label}</span>
+   509→      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${gold}, transparent)` }} />
+   510→    </div>
+   511→  );
+   512→
+   513→  return (
+   514→    <div className={PAPER} style={{ fontFamily: CORMORANT, background: cream, color: ink, position: "relative", overflow: "hidden" }}>
+   515→      <Botanical style={{ top: -30, right: -30 }} />
+   516→      <Botanical style={{ bottom: -40, left: -40, transform: "rotate(180deg)" }} />
+   517→
+   518→      {/* Top burgundy bar with gold trim */}
+   519→      <div style={{ background: burgundy, padding: "36px 48px 32px", position: "relative", borderBottom: `2px solid ${gold}` }}>
+   520→        <div style={{ position: "absolute", top: 8, left: 48, right: 48, height: 1, background: `${gold}40` }} />
+   521→        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+   522→          <div style={{ position: "relative", flexShrink: 0 }}>
+   523→            <div style={{ position: "absolute", inset: -8, borderRadius: "50%", border: `1px solid ${gold}` }} />
+   524→            <Avatar data={data} size={96} ring={gold} ringWidth={1} shape="circle" />
+   525→          </div>
+   526→          <div style={{ flex: 1 }}>
+   527→            <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: gold, letterSpacing: 4, marginBottom: 6 }}>Atelier Professionnelle</div>
+   528→            <h1 style={{ fontFamily: PLAYFAIR, fontSize: 40, fontWeight: 700, color: cream, margin: 0, lineHeight: 1.05, letterSpacing: 0.5 }}>{data.name}</h1>
+   529→            <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 16, color: gold, margin: "8px 0 0" }}>{data.title}</p>
+   530→          </div>
+   531→        </div>
+   532→      </div>
+   533→
+   534→      <div style={{ padding: "28px 48px 36px" }}>
+   535→        {/* Contact strip */}
+   536→        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", paddingBottom: 20, marginBottom: 24, borderBottom: `1px solid ${gold}50`, fontFamily: CORMORANT, fontSize: 11, color: muted, fontStyle: "italic" }}>
+   537→          {[data.email, data.phone, data.location, data.linkedin, data.website].filter(Boolean).map((c, i) => (
+   538→            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+   539→              <span style={{ color: gold, fontSize: 7 }}>❦</span>{c}
+   540→            </span>
+   541→          ))}
+   542→        </div>
+   543→
+   544→        {/* Quote-style summary */}
+   545→        {visible(sections, "summary") && data.summary && (
+   546→          <div style={{ marginBottom: 28, position: "relative", padding: "16px 24px 16px 40px" }}>
+   547→            <span style={{ position: "absolute", left: 8, top: -10, fontFamily: PLAYFAIR, fontSize: 56, color: gold, opacity: 0.5, lineHeight: 1 }}>"</span>
+   548→            <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 15, lineHeight: 1.7, color: ink, margin: 0 }}>{data.summary}</p>
+   549→            <div style={{ marginTop: 8, height: 1, background: `${gold}80`, width: 60 }} />
+   550→          </div>
+   551→        )}
+   552→
+   553→        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 28 }}>
+   554→          <div>
+   555→            {visible(sections, "experience") && data.experience.length > 0 && (
+   556→              <div style={{ marginBottom: 24 }}>
+   557→                <SectionLabel label="Experience" />
+   558→                {data.experience.map(e => (
+   559→                  <div key={e.id} style={{ ...Embossed, padding: "14px 18px", marginBottom: 12, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   560→                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+   561→                      <span style={{ fontFamily: PLAYFAIR, fontSize: 14, fontWeight: 700, color: burgundy }}>{e.role}</span>
+   562→                      <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: gold }}>{range(e.start, e.end)}</span>
+   563→                    </div>
+   564→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: muted, marginBottom: 8 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+   565→                    {e.bullets.filter(b => b?.trim()).map((b, i) => (
+   566→                      <div key={i} style={{ fontFamily: CORMORANT, fontSize: 11, lineHeight: 1.6, color: ink, marginBottom: 2, paddingLeft: 16, position: "relative" }}>
+   567→                        <span style={{ position: "absolute", left: 0, color: gold, fontSize: 9, top: 4 }}>❦</span>{b}
+   568→                      </div>
+   569→                    ))}
+   570→                  </div>
+   571→                ))}
+   572→              </div>
+   573→            )}
+   574→
+   575→            {visible(sections, "projects") && data.projects.length > 0 && (
+   576→              <div style={{ marginBottom: 24 }}>
+   577→                <SectionLabel label="Selected Works" />
+   578→                {data.projects.map(p => (
+   579→                  <div key={p.id} style={{ ...Embossed, padding: "12px 18px", marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   580→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 13, fontWeight: 700, color: burgundy }}>{p.name}</div>
+   581→                    {p.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: ink, lineHeight: 1.55, marginTop: 3 }}>{p.description}</div>}
+   582→                    {p.tech.length > 0 && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 9.5, color: gold, marginTop: 4 }}>{p.tech.join("   ·   ")}</div>}
+   583→                    {p.link && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 9.5, color: muted, marginTop: 2 }}>{p.link}</div>}
+   584→                  </div>
+   585→                ))}
+   586→              </div>
+   587→            )}
+   588→          </div>
+   589→
+   590→          <div>
+   591→            {visible(sections, "awards") && data.awards.length > 0 && (
+   592→              <div style={{ marginBottom: 24 }}>
+   593→                <SectionLabel label="Honors" />
+   594→                <div>
+   595→                  {data.awards.map(aw => (
+   596→                    <div key={aw.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   597→                      <RibbonBadge title={aw.title} sub={aw.date} />
+   598→                      {aw.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: muted, marginTop: 2 }}>{aw.subtitle}</div>}
+   599→                      {aw.description && <div style={{ fontFamily: CORMORANT, fontSize: 10.5, color: ink, lineHeight: 1.55, marginTop: 2 }}>{aw.description}</div>}
+   600→                    </div>
+   601→                  ))}
+   602→                </div>
+   603→              </div>
+   604→            )}
+   605→
+   606→            {visible(sections, "skills") && data.skills.length > 0 && (
+   607→              <div style={{ marginBottom: 24 }}>
+   608→                <SectionLabel label="Artistry" />
+   609→                <div style={{ ...Embossed, padding: "12px 16px" }}>
+   610→                  {data.skills.map((s, i) => (
+   611→                    <div key={i} style={{ fontFamily: CORMORANT, fontSize: 12, color: ink, marginBottom: 5, display: "flex", alignItems: "center", gap: 8, paddingBottom: 5, borderBottom: i < data.skills.length - 1 ? `0.5px solid ${gold}30` : "none" }}>
+   612→                      <span style={{ color: gold, fontSize: 7 }}>❦</span>{s}
+   613→                    </div>
+   614→                  ))}
+   615→                </div>
+   616→              </div>
+   617→            )}
+   618→
+   619→            {visible(sections, "education") && data.education.length > 0 && (
+   620→              <div style={{ marginBottom: 24 }}>
+   621→                <SectionLabel label="Education" />
+   622→                <div style={{ ...Embossed, padding: "12px 16px" }}>
+   623→                  {data.education.map(ed => (
+   624→                    <div key={ed.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   625→                      <div style={{ fontFamily: PLAYFAIR, fontSize: 12, fontWeight: 700, color: burgundy }}>{ed.degree}</div>
+   626→                      <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: muted }}>{ed.school}</div>
+   627→                      <div style={{ fontFamily: CORMORANT, fontSize: 10, color: gold }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+   628→                    </div>
+   629→                  ))}
+   630→                </div>
+   631→              </div>
+   632→            )}
+   633→
+   634→            {visible(sections, "certifications") && data.certifications.length > 0 && (
+   635→              <div style={{ marginBottom: 24 }}>
+   636→                <SectionLabel label="Certifications" />
+   637→                <div style={{ ...Embossed, padding: "12px 16px" }}>
+   638→                  {data.certifications.map(c => (
+   639→                    <div key={c.id} style={{ marginBottom: 6, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   640→                      <div style={{ fontFamily: PLAYFAIR, fontSize: 11.5, fontWeight: 700, color: burgundy }}>{c.title}</div>
+   641→                      <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10.5, color: muted }}>{c.subtitle}{c.date ? `  ·  ${c.date}` : ""}</div>
+   642→                    </div>
+   643→                  ))}
+   644→                </div>
+   645→              </div>
+   646→            )}
+   647→
+   648→            {visible(sections, "languages") && data.languages.length > 0 && (
+   649→              <div style={{ marginBottom: 24 }}>
+   650→                <SectionLabel label="Languages" />
+   651→                <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: ink, lineHeight: 1.7 }}>{data.languages.join("   ·   ")}</div>
+   652→              </div>
+   653→            )}
+   654→
+   655→            {visible(sections, "interests") && data.interests.length > 0 && (
+   656→              <div>
+   657→                <SectionLabel label="Interests" />
+   658→                <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: ink, lineHeight: 1.7 }}>{data.interests.join("   ·   ")}</div>
+   659→              </div>
+   660→            )}
+   661→
+   662→            {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+   663→              <div key={cs.id} style={{ marginBottom: 24 }}>
+   664→                <SectionLabel label={cs.title} />
+   665→                <div style={{ ...Embossed, padding: "12px 16px" }}>
+   666→                  {cs.items.map(item => (
+   667→                    <div key={item.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   668→                      <div style={{ fontFamily: PLAYFAIR, fontSize: 12, fontWeight: 700, color: burgundy }}>{item.title}</div>
+   669→                      {item.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: muted }}>{item.subtitle}</div>}
+   670→                      {item.description && <div style={{ fontFamily: CORMORANT, fontSize: 10.5, color: ink, lineHeight: 1.55, marginTop: 2 }}>{item.description}</div>}
+   671→                    </div>
+   672→                  ))}
+   673→                </div>
+   674→              </div>
+   675→            ))}
+   676→          </div>
+   677→        </div>
+   678→      </div>
+   679→
+   680→      <div style={{ background: burgundy, padding: "12px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${gold}` }}>
+   681→        <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: gold }}>— Atelier —</span>
+   682→        <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: `${cream}80` }}>{data.name} · {data.title}</span>
+   683→        <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: gold }}>MMXXV</span>
+   684→      </div>
+   685→    </div>
+   686→  );
+   687→}
+   688→
+   689→// =====================================================================
+   690→// 4. RIVIERA — Sapphire blue (#0f3460) + platinum (#e5e4e2) + white.
+   691→//    Flowing organic wave SVG shapes, frosted-glass panels (backdrop blur),
+   692→//    circular photo, soft gradients. Font: Cormorant Garamond + DM Sans.
+   693→// =====================================================================
+   694→export function RivieraTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+   695→  const sapphire = "#0f3460";
+   696→  const sapphireDark = "#0a2647";
+   697→  const platinum = "#e5e4e2";
+   698→  const white = "#ffffff";
+   699→
+   700→  const Waves = ({ style, color = platinum }: { style?: React.CSSProperties; color?: string }) => (
+   701→    <svg width="794" height="200" viewBox="0 0 794 200" preserveAspectRatio="none" style={{ position: "absolute", ...style, pointerEvents: "none" }}>
+   702→      <path d="M0 100 C 150 50, 300 150, 450 100 S 750 50, 794 100 L 794 200 L 0 200 Z" fill={color} fillOpacity="0.06" />
+   703→      <path d="M0 130 C 200 90, 350 170, 500 130 S 750 90, 794 130 L 794 200 L 0 200 Z" fill={color} fillOpacity="0.04" />
+   704→      <path d="M0 160 C 180 130, 360 180, 540 160 S 740 130, 794 160 L 794 200 L 0 200 Z" fill={color} fillOpacity="0.03" />
+   705→    </svg>
+   706→  );
+   707→
+   708→  // Frosted glass panel — backdrop-filter with rgba fallback so it still reads well in PDF.
+   709→  const Glass: React.CSSProperties = {
+   710→    background: "rgba(255,255,255,0.10)",
+   711→    backdropFilter: "blur(12px)",
+   712→    WebkitBackdropFilter: "blur(12px)",
+   713→    border: `0.5px solid ${platinum}40`,
+   714→    borderRadius: 12,
+   715→    boxShadow: "0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15)",
+   716→  };
+   717→
+   718→  const Header = ({ label }: { label: string }) => (
+   719→    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+   720→      <svg width="20" height="20" viewBox="0 0 20 20">
+   721→        <circle cx="10" cy="10" r="9" fill="none" stroke={platinum} strokeWidth="0.5" opacity="0.6" />
+   722→        <circle cx="10" cy="10" r="5" fill="none" stroke={platinum} strokeWidth="0.5" opacity="0.6" />
+   723→        <circle cx="10" cy="10" r="1.5" fill={platinum} />
+   724→      </svg>
+   725→      <span style={{ fontFamily: CORMORANT, fontSize: 14, fontWeight: 600, color: white, letterSpacing: 3, textTransform: "uppercase" }}>{label}</span>
+   726→      <div style={{ flex: 1, height: 0.5, background: `linear-gradient(90deg, ${platinum}60, transparent)` }} />
+   727→    </div>
+   728→  );
+   729→
+   730→  return (
+   731→    <div className={PAPER} style={{ fontFamily: CORMORANT, background: `linear-gradient(160deg, ${sapphireDark} 0%, ${sapphire} 50%, ${sapphireDark} 100%)`, color: white, position: "relative", overflow: "hidden" }}>
+   732→      {/* Ambient orbs */}
+   733→      <div style={{ position: "absolute", top: -80, left: -80, width: 280, height: 280, borderRadius: "50%", background: `radial-gradient(circle, ${platinum}15, transparent 70%)`, filter: "blur(40px)", pointerEvents: "none" }} />
+   734→      <div style={{ position: "absolute", bottom: 100, right: -100, width: 320, height: 320, borderRadius: "50%", background: `radial-gradient(circle, ${platinum}10, transparent 70%)`, filter: "blur(40px)", pointerEvents: "none" }} />
+   735→      <Waves style={{ top: 0, left: 0, opacity: 0.5 }} />
+   736→      <Waves style={{ bottom: 0, left: 0, transform: "rotate(180deg)", opacity: 0.4 }} />
+   737→
+   738→      {/* Header */}
+   739→      <div style={{ padding: "44px 48px 32px", position: "relative" }}>
+   740→        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+   741→          <div style={{ position: "relative", flexShrink: 0 }}>
+   742→            <div style={{ position: "absolute", inset: -10, borderRadius: "50%", border: `0.5px solid ${platinum}60` }} />
+   743→            <div style={{ position: "absolute", inset: -18, borderRadius: "50%", border: `0.5px solid ${platinum}30` }} />
+   744→            <Avatar data={data} size={100} ring={platinum} ringWidth={1} shape="circle" />
+   745→          </div>
+   746→          <div style={{ flex: 1 }}>
+   747→            <div style={{ fontFamily: DM_SANS, fontSize: 9, color: platinum, letterSpacing: 5, marginBottom: 8, textTransform: "uppercase", opacity: 0.8 }}>Riviera Collection</div>
+   748→            <h1 style={{ fontFamily: CORMORANT, fontSize: 42, fontWeight: 600, color: white, margin: 0, lineHeight: 1.05, letterSpacing: 0.5 }}>{data.name}</h1>
+   749→            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+   750→              <div style={{ width: 32, height: 0.5, background: platinum, opacity: 0.7 }} />
+   751→              <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 17, color: platinum, margin: 0 }}>{data.title}</p>
+   752→            </div>
+   753→          </div>
+   754→        </div>
+   755→        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginTop: 20, fontFamily: DM_SANS, fontSize: 9, color: "rgba(229,228,226,0.75)", letterSpacing: 0.4 }}>
+   756→          {[data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean).map((c, i) => (
+   757→            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+   758→              <span style={{ color: platinum, fontSize: 7 }}>○</span>{c}
+   759→            </span>
+   760→          ))}
+   761→        </div>
+   762→      </div>
+   763→
+   764→      {/* Body */}
+   765→      <div style={{ padding: "8px 48px 40px" }}>
+   766→        {visible(sections, "summary") && data.summary && (
+   767→          <div style={{ ...Glass, padding: "18px 22px", marginBottom: 16 }}>
+   768→            <Header label="Profile" />
+   769→            <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 14, lineHeight: 1.75, color: "rgba(255,255,255,0.9)", margin: 0 }}>{data.summary}</p>
+   770→          </div>
+   771→        )}
+   772→
+   773→        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16 }}>
+   774→          <div>
+   775→            {visible(sections, "experience") && data.experience.length > 0 && (
+   776→              <div style={{ ...Glass, padding: "20px 22px", marginBottom: 16 }}>
+   777→                <Header label="Experience" />
+   778→                {data.experience.map(e => (
+   779→                  <div key={e.id} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: `0.5px solid ${platinum}25`, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   780→                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+   781→                      <span style={{ fontFamily: CORMORANT, fontSize: 17, fontWeight: 600, color: white }}>{e.role}</span>
+   782→                      <span style={{ fontFamily: DM_SANS, fontSize: 8.5, color: platinum, letterSpacing: 1.5, textTransform: "uppercase" }}>{range(e.start, e.end)}</span>
+   783→                    </div>
+   784→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 13, color: platinum, marginBottom: 8 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+   785→                    {e.bullets.filter(b => b?.trim()).map((b, i) => (
+   786→                      <div key={i} style={{ fontFamily: CORMORANT, fontSize: 11.5, lineHeight: 1.65, color: "rgba(255,255,255,0.85)", marginBottom: 2, paddingLeft: 16, position: "relative" }}>
+   787→                        <span style={{ position: "absolute", left: 0, color: platinum, fontSize: 7, top: 7 }}>○</span>{b}
+   788→                      </div>
+   789→                    ))}
+   790→                  </div>
+   791→                ))}
+   792→              </div>
+   793→            )}
+   794→
+   795→            {visible(sections, "projects") && data.projects.length > 0 && (
+   796→              <div style={{ ...Glass, padding: "20px 22px" }}>
+   797→                <Header label="Projects" />
+   798→                {data.projects.map(p => (
+   799→                  <div key={p.id} style={{ marginBottom: 12, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   800→                    <div style={{ fontFamily: CORMORANT, fontSize: 14, fontWeight: 600, color: white }}>{p.name}{p.link ? <span style={{ fontFamily: DM_SANS, fontSize: 8.5, color: platinum, fontStyle: "normal", marginLeft: 8, opacity: 0.8 }}>· {p.link}</span> : null}</div>
+   801→                    {p.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: "rgba(255,255,255,0.8)", lineHeight: 1.55, marginTop: 3 }}>{p.description}</div>}
+   802→                    {p.tech.length > 0 && <div style={{ fontFamily: DM_SANS, fontSize: 8.5, color: platinum, marginTop: 4, letterSpacing: 0.5 }}>{p.tech.join("   ·   ")}</div>}
+   803→                  </div>
+   804→                ))}
+   805→              </div>
+   806→            )}
+   807→          </div>
+   808→
+   809→          <div>
+   810→            {visible(sections, "skills") && data.skills.length > 0 && (
+   811→              <div style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   812→                <Header label="Skills" />
+   813→                {data.skills.map((s, i) => (
+   814→                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7, paddingBottom: 7, borderBottom: `0.5px solid ${platinum}20` }}>
+   815→                    <span style={{ color: platinum, fontSize: 7 }}>○</span>
+   816→                    <span style={{ fontFamily: CORMORANT, fontSize: 12.5, color: white, flex: 1 }}>{s}</span>
+   817→                  </div>
+   818→                ))}
+   819→              </div>
+   820→            )}
+   821→
+   822→            {visible(sections, "education") && data.education.length > 0 && (
+   823→              <div style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   824→                <Header label="Education" />
+   825→                {data.education.map(ed => (
+   826→                  <div key={ed.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   827→                    <div style={{ fontFamily: CORMORANT, fontSize: 13, fontWeight: 600, color: white }}>{ed.degree}</div>
+   828→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11.5, color: platinum }}>{ed.school}</div>
+   829→                    <div style={{ fontFamily: DM_SANS, fontSize: 8, color: "rgba(229,228,226,0.7)", marginTop: 2, letterSpacing: 1 }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+   830→                  </div>
+   831→                ))}
+   832→              </div>
+   833→            )}
+   834→
+   835→            {visible(sections, "certifications") && data.certifications.length > 0 && (
+   836→              <div style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   837→                <Header label="Certifications" />
+   838→                {data.certifications.map(c => (
+   839→                  <div key={c.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   840→                    <div style={{ fontFamily: CORMORANT, fontSize: 12.5, fontWeight: 600, color: white }}>{c.title}</div>
+   841→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: platinum }}>{c.subtitle}{c.date ? `  ·  ${c.date}` : ""}</div>
+   842→                  </div>
+   843→                ))}
+   844→              </div>
+   845→            )}
+   846→
+   847→            {visible(sections, "languages") && data.languages.length > 0 && (
+   848→              <div style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   849→                <Header label="Languages" />
+   850→                {data.languages.map((l, i) => (
+   851→                  <div key={i} style={{ fontFamily: CORMORANT, fontSize: 12, color: white, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+   852→                    <span style={{ color: platinum, fontSize: 7 }}>○</span>{l}
+   853→                  </div>
+   854→                ))}
+   855→              </div>
+   856→            )}
+   857→
+   858→            {visible(sections, "awards") && data.awards.length > 0 && (
+   859→              <div style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   860→                <Header label="Awards" />
+   861→                {data.awards.map(aw => (
+   862→                  <div key={aw.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   863→                    <div style={{ fontFamily: CORMORANT, fontSize: 12.5, fontWeight: 600, color: white }}>{aw.title}</div>
+   864→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: platinum }}>{aw.subtitle}{aw.date ? `  ·  ${aw.date}` : ""}</div>
+   865→                  </div>
+   866→                ))}
+   867→              </div>
+   868→            )}
+   869→
+   870→            {visible(sections, "interests") && data.interests.length > 0 && (
+   871→              <div style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   872→                <Header label="Interests" />
+   873→                <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: "rgba(255,255,255,0.9)", lineHeight: 1.7 }}>{data.interests.join("   ·   ")}</div>
+   874→              </div>
+   875→            )}
+   876→
+   877→            {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+   878→              <div key={cs.id} style={{ ...Glass, padding: "18px 20px", marginBottom: 16 }}>
+   879→                <Header label={cs.title} />
+   880→                {cs.items.map(item => (
+   881→                  <div key={item.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   882→                    <div style={{ fontFamily: CORMORANT, fontSize: 12.5, fontWeight: 600, color: white }}>{item.title}</div>
+   883→                    {item.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: platinum }}>{item.subtitle}</div>}
+   884→                    {item.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: "rgba(255,255,255,0.85)", lineHeight: 1.55, marginTop: 2 }}>{item.description}</div>}
+   885→                  </div>
+   886→                ))}
+   887→              </div>
+   888→            ))}
+   889→          </div>
+   890→        </div>
+   891→      </div>
+   892→
+   893→      <div style={{ padding: "12px 48px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+   894→        <span style={{ fontFamily: DM_SANS, fontSize: 8, color: "rgba(229,228,226,0.6)", letterSpacing: 3 }}>EST. MMXXV</span>
+   895→        <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: platinum }}>— Riviera —</span>
+   896→        <span style={{ fontFamily: DM_SANS, fontSize: 8, color: "rgba(229,228,226,0.6)", letterSpacing: 3 }}>{data.name.toUpperCase()}</span>
+   897→      </div>
+   898→    </div>
+   899→  );
+   900→}
+   901→
+   902→// =====================================================================
+   903→// 5. NOIR — Pure black (#000) + white + single emerald (#10b981) accent.
+   904→//    Ultra-minimalist. Oversized typography (name 44-48px), thin 0.5px
+   905→//    lines, vast whitespace, elegant quote highlight. Font: Playfair Display.
+   906→// =====================================================================
+   907→export function NoirTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+   908→  const black = "#000000";
+   909→  const white = "#ffffff";
+   910→  const emerald = "#10b981";
+   911→  const muted = "rgba(255,255,255,0.55)";
+   912→
+   913→  const ThinLine = () => <div style={{ height: 0.5, background: `linear-gradient(90deg, transparent, ${emerald}, transparent)`, margin: "16px 0" }} />;
+   914→
+   915→  const Label = ({ children }: { children: React.ReactNode }) => (
+   916→    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, marginTop: 4 }}>
+   917→      <span style={{ fontFamily: PLAYFAIR, fontSize: 11, color: emerald, letterSpacing: 5, fontWeight: 600, textTransform: "uppercase" }}>{children}</span>
+   918→      <div style={{ flex: 1, height: 0.5, background: emerald, opacity: 0.4 }} />
+   919→    </div>
+   920→  );
+   921→
+   922→  return (
+   923→    <div className={PAPER} style={{ fontFamily: PLAYFAIR, background: black, color: white, padding: "56px 64px 56px", position: "relative" }}>
+   924→      {/* Subtle emerald corner accent */}
+   925→      <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: "absolute", top: 28, right: 28, pointerEvents: "none" }}>
+   926→        <line x1="0" y1="80" x2="80" y2="0" stroke={emerald} strokeWidth="0.5" opacity="0.5" />
+   927→        <circle cx="40" cy="40" r="3" fill={emerald} />
+   928→      </svg>
+   929→
+   930→      {/* Hero name — vast whitespace, oversized */}
+   931→      <div style={{ marginBottom: 36 }}>
+   932→        <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 12, color: emerald, letterSpacing: 8, marginBottom: 18, textTransform: "uppercase" }}>— Curriculum Vitae —</div>
+   933→        <h1 style={{ fontFamily: PLAYFAIR, fontSize: 48, fontWeight: 700, color: white, margin: 0, lineHeight: 1, letterSpacing: -1 }}>{data.name}</h1>
+   934→        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 18 }}>
+   935→          <div style={{ width: 40, height: 0.5, background: emerald }} />
+   936→          <p style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 18, color: emerald, margin: 0, letterSpacing: 1 }}>{data.title}</p>
+   937→        </div>
+   938→      </div>
+   939→
+   940→      {/* Contact as elegant minimal caption */}
+   941→      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 28px", fontFamily: PLAYFAIR, fontSize: 10.5, color: muted, fontStyle: "italic", marginBottom: 24, paddingBottom: 24, borderBottom: `0.5px solid ${white}20` }}>
+   942→        {[data.email, data.phone, data.location, data.linkedin, data.website].filter(Boolean).map((c, i) => (
+   943→          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+   944→            <span style={{ color: emerald, fontSize: 7 }}>·</span>{c}
+   945→          </span>
+   946→        ))}
+   947→      </div>
+   948→
+   949→      {/* Quote-style summary */}
+   950→      {visible(sections, "summary") && data.summary && (
+   951→        <div style={{ marginBottom: 36, maxWidth: 620 }}>
+   952→          <Label>Manifesto</Label>
+   953→          <p style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 16, lineHeight: 1.7, color: "rgba(255,255,255,0.88)", margin: 0 }}>{data.summary}</p>
+   954→        </div>
+   955→      )}
+   956→
+   957→      {/* Experience — minimalist editorial timeline */}
+   958→      {visible(sections, "experience") && data.experience.length > 0 && (
+   959→        <div style={{ marginBottom: 36 }}>
+   960→          <Label>Experience</Label>
+   961→          <div>
+   962→            {data.experience.map((e, i) => (
+   963→              <div key={e.id} style={{ marginBottom: 22, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+   964→                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
+   965→                  <div style={{ flex: 1 }}>
+   966→                    <div style={{ fontFamily: PLAYFAIR, fontSize: 22, fontWeight: 700, color: white, lineHeight: 1.15 }}>{e.role}</div>
+   967→                    <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 13, color: emerald, marginTop: 4 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+   968→                  </div>
+   969→                  <div style={{ fontFamily: PLAYFAIR, fontSize: 11, color: muted, fontStyle: "italic", whiteSpace: "nowrap", letterSpacing: 1 }}>{range(e.start, e.end)}</div>
+   970→                </div>
+   971→                <div style={{ marginTop: 8 }}>
+   972→                  {e.bullets.filter(b => b?.trim()).map((b, j) => (
+   973→                    <div key={j} style={{ fontFamily: PLAYFAIR, fontSize: 12, lineHeight: 1.7, color: "rgba(255,255,255,0.75)", marginBottom: 2, paddingLeft: 16, position: "relative" }}>
+   974→                      <span style={{ position: "absolute", left: 0, color: emerald, fontSize: 9, top: 6 }}>—</span>{b}
+   975→                    </div>
+   976→                  ))}
+   977→                </div>
+   978→                {i < data.experience.length - 1 && <ThinLine />}
+   979→              </div>
+   980→            ))}
+   981→          </div>
+   982→        </div>
+   983→      )}
+   984→
+   985→      {/* Lower two-column */}
+   986→      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginBottom: 36 }}>
+   987→        <div>
+   988→          {visible(sections, "skills") && data.skills.length > 0 && (
+   989→            <div>
+   990→              <Label>Skills</Label>
+   991→              {data.skills.map((s, i) => (
+   992→                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, fontFamily: PLAYFAIR, fontSize: 12.5, color: "rgba(255,255,255,0.85)" }}>
+   993→                  <span style={{ color: emerald, fontSize: 8 }}>·</span>{s}
+   994→                </div>
+   995→              ))}
+   996→            </div>
+   997→          )}
+   998→        </div>
+   999→        <div>
+  1000→          {visible(sections, "education") && data.education.length > 0 && (
+  1001→            <div>
+  1002→              <Label>Education</Label>
+  1003→              {data.education.map(ed => (
+  1004→                <div key={ed.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1005→                  <div style={{ fontFamily: PLAYFAIR, fontSize: 14, fontWeight: 700, color: white }}>{ed.degree}</div>
+  1006→                  <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 12, color: emerald, marginTop: 2 }}>{ed.school}</div>
+  1007→                  <div style={{ fontFamily: PLAYFAIR, fontSize: 10.5, color: muted, fontStyle: "italic", marginTop: 2 }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+  1008→                </div>
+  1009→              ))}
+  1010→            </div>
+  1011→          )}
+  1012→        </div>
+  1013→      </div>
+  1014→
+  1015→      {/* Projects */}
+  1016→      {visible(sections, "projects") && data.projects.length > 0 && (
+  1017→        <div style={{ marginBottom: 36 }}>
+  1018→          <Label>Selected Works</Label>
+  1019→          {data.projects.map((p, i) => (
+  1020→            <div key={p.id} style={{ marginBottom: 14, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1021→              <div style={{ fontFamily: PLAYFAIR, fontSize: 15, fontWeight: 700, color: white }}>{p.name}{p.link ? <span style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 10.5, color: emerald, fontWeight: 400, marginLeft: 10 }}>· {p.link}</span> : null}</div>
+  1022→              {p.description && <div style={{ fontFamily: PLAYFAIR, fontSize: 12, color: "rgba(255,255,255,0.75)", lineHeight: 1.6, marginTop: 3 }}>{p.description}</div>}
+  1023→              {p.tech.length > 0 && <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 10, color: muted, marginTop: 4 }}>{p.tech.join("   ·   ")}</div>}
+  1024→              {i < data.projects.length - 1 && <div style={{ height: 0.5, background: `${white}15`, marginTop: 14 }} />}
+  1025→            </div>
+  1026→          ))}
+  1027→        </div>
+  1028→      )}
+  1029→
+  1030→      {/* Bottom strip */}
+  1031→      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24, paddingTop: 24, borderTop: `0.5px solid ${white}20` }}>
+  1032→        {visible(sections, "languages") && data.languages.length > 0 && (
+  1033→          <div>
+  1034→            <Label>Languages</Label>
+  1035→            <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 12, color: "rgba(255,255,255,0.85)", lineHeight: 1.8 }}>{data.languages.join("   ·   ")}</div>
+  1036→          </div>
+  1037→        )}
+  1038→        {visible(sections, "certifications") && data.certifications.length > 0 && (
+  1039→          <div>
+  1040→            <Label>Certifications</Label>
+  1041→            {data.certifications.map(c => (
+  1042→              <div key={c.id} style={{ fontFamily: PLAYFAIR, fontSize: 11.5, color: "rgba(255,255,255,0.85)", marginBottom: 4 }}>
+  1043→                <span style={{ color: emerald, marginRight: 6, fontSize: 8 }}>·</span>{c.title}
+  1044→              </div>
+  1045→            ))}
+  1046→          </div>
+  1047→        )}
+  1048→        {visible(sections, "awards") && data.awards.length > 0 && (
+  1049→          <div>
+  1050→            <Label>Distinctions</Label>
+  1051→            {data.awards.map(aw => (
+  1052→              <div key={aw.id} style={{ fontFamily: PLAYFAIR, fontSize: 11.5, color: "rgba(255,255,255,0.85)", marginBottom: 4 }}>
+  1053→                <span style={{ color: emerald, marginRight: 6, fontSize: 8 }}>·</span>{aw.title}
+  1054→              </div>
+  1055→            ))}
+  1056→          </div>
+  1057→        )}
+  1058→      </div>
+  1059→
+  1060→      {visible(sections, "interests") && data.interests.length > 0 && (
+  1061→        <div style={{ marginTop: 24 }}>
+  1062→          <Label>Interests</Label>
+  1063→          <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{data.interests.join("   ·   ")}</div>
+  1064→        </div>
+  1065→      )}
+  1066→
+  1067→      {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+  1068→        <div key={cs.id} style={{ marginTop: 24 }}>
+  1069→          <Label>{cs.title}</Label>
+  1070→          {cs.items.map(item => (
+  1071→            <div key={item.id} style={{ marginBottom: 8, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1072→              <div style={{ fontFamily: PLAYFAIR, fontSize: 13, fontWeight: 700, color: white }}>{item.title}{item.date ? <span style={{ color: muted, fontStyle: "italic", fontWeight: 400, marginLeft: 8 }}>{item.date}</span> : null}</div>
+  1073→              {item.subtitle && <div style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 11.5, color: emerald, marginTop: 1 }}>{item.subtitle}</div>}
+  1074→              {item.description && <div style={{ fontFamily: PLAYFAIR, fontSize: 11.5, color: "rgba(255,255,255,0.75)", lineHeight: 1.55, marginTop: 2 }}>{item.description}</div>}
+  1075→            </div>
+  1076→          ))}
+  1077→        </div>
+  1078→      ))}
+  1079→
+  1080→      {/* Footer */}
+  1081→      <div style={{ marginTop: 36, paddingTop: 18, borderTop: `0.5px solid ${emerald}30`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+  1082→        <span style={{ fontFamily: PLAYFAIR, fontStyle: "italic", fontSize: 10, color: muted, letterSpacing: 2 }}>— Fin —</span>
+  1083→        <span style={{ fontFamily: PLAYFAIR, fontSize: 9, color: emerald, letterSpacing: 6, textTransform: "uppercase" }}>Noir</span>
+  1084→      </div>
+  1085→    </div>
+  1086→  );
+  1087→}
+  1088→
+  1089→// =====================================================================
+  1090→// 6. HERITAGE — Deep burgundy (#4a0e0e) + gold (#c5a572) + cream (#f5f0e8).
+  1091→//    Layered paper effects (multiple subtle shadows), italic serif quote
+  1092→//    highlights, gold ribbon badges for achievements, gold horizontal rules
+  1093→//    with center diamond ornament. Font: Cormorant Garamond + DM Sans.
+  1094→// =====================================================================
+  1095→export function HeritageTemplate({ data, sections, accent: _accent }: { data: ResumeData; sections: Record<string, boolean>; accent: string }) {
+  1096→  const burgundy = "#4a0e0e";
+  1097→  const gold = "#c5a572";
+  1098→  const cream = "#f5f0e8";
+  1099→  const ink = "#2b1a1a";
+  1100→  const muted = "#7a6a5a";
+  1101→
+  1102→  // Layered paper effect — multiple soft shadows on cream card
+  1103→  const Paper: React.CSSProperties = {
+  1104→    background: "#fdfaf3",
+  1105→    borderRadius: 4,
+  1106→    boxShadow: "0 1px 0 rgba(74,14,14,0.06), 0 2px 4px rgba(74,14,14,0.06), 0 8px 18px rgba(74,14,14,0.08), inset 0 0 0 0.5px rgba(197,165,114,0.4)",
+  1107→    border: `0.5px solid ${gold}60`,
+  1108→  };
+  1109→
+  1110→  // Gold rule with center diamond ornament
+  1111→  const GoldRule = () => (
+  1112→    <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "14px 0" }}>
+  1113→      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, transparent, ${gold})` }} />
+  1114→      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0 L12 6 L6 12 L0 6 Z" fill={gold} /></svg>
+  1115→      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${gold}, transparent)` }} />
+  1116→    </div>
+  1117→  );
+  1118→
+  1119→  const SectionTitle = ({ label }: { label: string }) => (
+  1120→    <div style={{ textAlign: "center", marginBottom: 16, marginTop: 8 }}>
+  1121→      <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: gold, letterSpacing: 4, textTransform: "uppercase", marginBottom: 6 }}>— Anno —</div>
+  1122→      <h2 style={{ fontFamily: CORMORANT, fontSize: 22, fontWeight: 600, color: burgundy, margin: 0, letterSpacing: 4, textTransform: "uppercase" }}>{label}</h2>
+  1123→    </div>
+  1124→  );
+  1125→
+  1126→  // Gold ribbon badge
+  1127→  const Ribbon = ({ title, sub }: { title: string; sub?: string }) => (
+  1128→    <div style={{ position: "relative", display: "inline-flex", alignItems: "stretch", marginBottom: 10, boxShadow: "0 4px 8px rgba(74,14,14,0.15)" }}>
+  1129→      <div style={{ width: 10, background: burgundy, clipPath: "polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%)" }} />
+  1130→      <div style={{ background: `linear-gradient(180deg, ${gold}, #b8954f)`, color: burgundy, padding: "6px 16px", fontFamily: CORMORANT, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
+  1131→        {title}{sub ? <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontWeight: 400, marginLeft: 8, opacity: 0.85, fontSize: 11 }}>{sub}</span> : null}
+  1132→      </div>
+  1133→      <div style={{ width: 10, background: burgundy, clipPath: "polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%)", transform: "scaleX(-1)" }} />
+  1134→    </div>
+  1135→  );
+  1136→
+  1137→  return (
+  1138→    <div className={PAPER} style={{ fontFamily: CORMORANT, background: cream, color: ink, position: "relative", overflow: "hidden" }}>
+  1139→      {/* Subtle burgundy texture corners */}
+  1140→      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: burgundy }} />
+  1141→      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 8, background: burgundy }} />
+  1142→
+  1143→      {/* Centered editorial header */}
+  1144→      <div style={{ padding: "44px 48px 28px", textAlign: "center", borderBottom: `1px solid ${gold}60` }}>
+  1145→        <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: gold, letterSpacing: 6, marginBottom: 14, textTransform: "uppercase" }}>The Heritage Collection</div>
+  1146→        <h1 style={{ fontFamily: CORMORANT, fontSize: 46, fontWeight: 600, color: burgundy, margin: 0, lineHeight: 1.05, letterSpacing: 1 }}>{data.name}</h1>
+  1147→        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12 }}>
+  1148→          <div style={{ width: 30, height: 1, background: gold }} />
+  1149→          <p style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 17, color: gold, margin: 0 }}>{data.title}</p>
+  1150→          <div style={{ width: 30, height: 1, background: gold }} />
+  1151→        </div>
+  1152→        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 20px", justifyContent: "center", marginTop: 18, fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: muted }}>
+  1153→          {[data.email, data.phone, data.location, data.linkedin, data.website].filter(Boolean).map((c, i) => (
+  1154→            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+  1155→              <span style={{ color: gold, fontSize: 7 }}>◆</span>{c}
+  1156→            </span>
+  1157→          ))}
+  1158→        </div>
+  1159→      </div>
+  1160→
+  1161→      <div style={{ padding: "32px 44px 36px" }}>
+  1162→        {/* Italic serif quote summary */}
+  1163→        {visible(sections, "summary") && data.summary && (
+  1164→          <div style={{ marginBottom: 24, textAlign: "center", maxWidth: 580, margin: "0 auto 32px" }}>
+  1165→            <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 16, lineHeight: 1.75, color: ink }}>
+  1166→              <span style={{ color: gold, fontSize: 28, lineHeight: 0, position: "relative", top: 8 }}>"</span>
+  1167→              {data.summary}
+  1168→              <span style={{ color: gold, fontSize: 28, lineHeight: 0, position: "relative", top: 8 }}>"</span>
+  1169→            </div>
+  1170→            <GoldRule />
+  1171→          </div>
+  1172→        )}
+  1173→
+  1174→        {/* Experience — two-up elegant */}
+  1175→        {visible(sections, "experience") && data.experience.length > 0 && (
+  1176→          <div style={{ marginBottom: 28 }}>
+  1177→            <SectionTitle label="Experience" />
+  1178→            {data.experience.map(e => (
+  1179→              <div key={e.id} style={{ ...Paper, padding: "18px 22px", marginBottom: 14, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1180→                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+  1181→                  <span style={{ fontFamily: CORMORANT, fontSize: 18, fontWeight: 700, color: burgundy }}>{e.role}</span>
+  1182→                  <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: gold }}>{range(e.start, e.end)}</span>
+  1183→                </div>
+  1184→                <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 13, color: muted, marginBottom: 8 }}>{e.company}{e.location ? `  ·  ${e.location}` : ""}</div>
+  1185→                <div style={{ height: 0.5, background: `${gold}60`, marginBottom: 8 }} />
+  1186→                {e.bullets.filter(b => b?.trim()).map((b, i) => (
+  1187→                  <div key={i} style={{ fontFamily: CORMORANT, fontSize: 11.5, lineHeight: 1.65, color: ink, marginBottom: 2, paddingLeft: 18, position: "relative" }}>
+  1188→                    <span style={{ position: "absolute", left: 0, color: gold, fontSize: 9, top: 5 }}>◆</span>{b}
+  1189→                  </div>
+  1190→                ))}
+  1191→              </div>
+  1192→            ))}
+  1193→          </div>
+  1194→        )}
+  1195→
+  1196→        <GoldRule />
+  1197→
+  1198→        {/* Two-column lower */}
+  1199→        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 28 }}>
+  1200→          <div>
+  1201→            {visible(sections, "education") && data.education.length > 0 && (
+  1202→              <div style={{ ...Paper, padding: "18px 20px", marginBottom: 14 }}>
+  1203→                <h3 style={{ fontFamily: CORMORANT, fontSize: 16, fontWeight: 700, color: burgundy, margin: "0 0 10px", letterSpacing: 2, textTransform: "uppercase", textAlign: "center" }}>Education</h3>
+  1204→                <div style={{ height: 0.5, background: `${gold}60`, marginBottom: 10 }} />
+  1205→                {data.education.map(ed => (
+  1206→                  <div key={ed.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1207→                    <div style={{ fontFamily: CORMORANT, fontSize: 13, fontWeight: 700, color: ink }}>{ed.degree}</div>
+  1208→                    <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: burgundy }}>{ed.school}</div>
+  1209→                    <div style={{ fontFamily: CORMORANT, fontSize: 11, color: gold }}>{range(ed.start, ed.end)}{ed.grade ? `  ·  ${ed.grade}` : ""}</div>
+  1210→                  </div>
+  1211→                ))}
+  1212→              </div>
+  1213→            )}
+  1214→
+  1215→            {visible(sections, "skills") && data.skills.length > 0 && (
+  1216→              <div style={{ ...Paper, padding: "18px 20px" }}>
+  1217→                <h3 style={{ fontFamily: CORMORANT, fontSize: 16, fontWeight: 700, color: burgundy, margin: "0 0 10px", letterSpacing: 2, textTransform: "uppercase", textAlign: "center" }}>Expertise</h3>
+  1218→                <div style={{ height: 0.5, background: `${gold}60`, marginBottom: 10 }} />
+  1219→                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+  1220→                  {data.skills.map((s, i) => (
+  1221→                    <span key={i} style={{ fontFamily: CORMORANT, fontSize: 12, color: ink, display: "inline-flex", alignItems: "center", gap: 6 }}>
+  1222→                      <span style={{ color: gold, fontSize: 7 }}>◆</span>{s}
+  1223→                    </span>
+  1224→                  ))}
+  1225→                </div>
+  1226→              </div>
+  1227→            )}
+  1228→          </div>
+  1229→
+  1230→          <div>
+  1231→            {visible(sections, "projects") && data.projects.length > 0 && (
+  1232→              <div style={{ ...Paper, padding: "18px 20px", marginBottom: 14 }}>
+  1233→                <h3 style={{ fontFamily: CORMORANT, fontSize: 16, fontWeight: 700, color: burgundy, margin: "0 0 10px", letterSpacing: 2, textTransform: "uppercase", textAlign: "center" }}>Notable Works</h3>
+  1234→                <div style={{ height: 0.5, background: `${gold}60`, marginBottom: 10 }} />
+  1235→                {data.projects.map(p => (
+  1236→                  <div key={p.id} style={{ marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1237→                    <div style={{ fontFamily: CORMORANT, fontSize: 13, fontWeight: 700, color: ink }}>{p.name}{p.link ? <span style={{ fontFamily: CORMORANT, fontStyle: "italic", fontWeight: 400, color: gold, marginLeft: 6 }}>· {p.link}</span> : null}</div>
+  1238→                    {p.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: ink, lineHeight: 1.55, marginTop: 2 }}>{p.description}</div>}
+  1239→                    {p.tech.length > 0 && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 10, color: gold, marginTop: 3 }}>{p.tech.join("   ·   ")}</div>}
+  1240→                  </div>
+  1241→                ))}
+  1242→              </div>
+  1243→            )}
+  1244→
+  1245→            {visible(sections, "languages") && data.languages.length > 0 && (
+  1246→              <div style={{ ...Paper, padding: "16px 20px", marginBottom: 14 }}>
+  1247→                <h3 style={{ fontFamily: CORMORANT, fontSize: 16, fontWeight: 700, color: burgundy, margin: "0 0 8px", letterSpacing: 2, textTransform: "uppercase", textAlign: "center" }}>Languages</h3>
+  1248→                <div style={{ height: 0.5, background: `${gold}60`, marginBottom: 8 }} />
+  1249→                <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: ink, textAlign: "center", lineHeight: 1.7 }}>{data.languages.join("   ·   ")}</div>
+  1250→              </div>
+  1251→            )}
+  1252→
+  1253→            {visible(sections, "certifications") && data.certifications.length > 0 && (
+  1254→              <div style={{ ...Paper, padding: "16px 20px" }}>
+  1255→                <h3 style={{ fontFamily: CORMORANT, fontSize: 16, fontWeight: 700, color: burgundy, margin: "0 0 8px", letterSpacing: 2, textTransform: "uppercase", textAlign: "center" }}>Certifications</h3>
+  1256→                <div style={{ height: 0.5, background: `${gold}60`, marginBottom: 8 }} />
+  1257→                {data.certifications.map(c => (
+  1258→                  <div key={c.id} style={{ marginBottom: 5, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1259→                    <span style={{ fontFamily: CORMORANT, fontSize: 11.5, color: ink }}>
+  1260→                      <span style={{ color: gold, marginRight: 6, fontSize: 7 }}>◆</span>{c.title}
+  1261→                      {c.date ? <span style={{ color: muted, fontStyle: "italic", marginLeft: 6 }}>{c.date}</span> : null}
+  1262→                    </span>
+  1263→                  </div>
+  1264→                ))}
+  1265→              </div>
+  1266→            )}
+  1267→          </div>
+  1268→        </div>
+  1269→
+  1270→        {/* Awards with gold ribbon badges */}
+  1271→        {visible(sections, "awards") && data.awards.length > 0 && (
+  1272→          <div style={{ textAlign: "center", marginBottom: 28 }}>
+  1273→            <SectionTitle label="Distinctions" />
+  1274→            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+  1275→              {data.awards.map(aw => (
+  1276→                <div key={aw.id} style={{ marginBottom: 12, maxWidth: 560, width: "100%", breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1277→                  <div style={{ display: "flex", justifyContent: "center" }}>
+  1278→                    <Ribbon title={aw.title} sub={aw.date} />
+  1279→                  </div>
+  1280→                  {aw.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: burgundy, marginTop: 2 }}>{aw.subtitle}</div>}
+  1281→                  {aw.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: ink, lineHeight: 1.55, marginTop: 2, maxWidth: 480, margin: "2px auto 0" }}>{aw.description}</div>}
+  1282→                </div>
+  1283→              ))}
+  1284→            </div>
+  1285→          </div>
+  1286→        )}
+  1287→
+  1288→        {visible(sections, "interests") && data.interests.length > 0 && (
+  1289→          <div style={{ textAlign: "center", marginBottom: 20 }}>
+  1290→            <h3 style={{ fontFamily: CORMORANT, fontSize: 14, fontWeight: 700, color: burgundy, margin: "0 0 6px", letterSpacing: 3, textTransform: "uppercase" }}>Interests</h3>
+  1291→            <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: muted }}>{data.interests.join("   ·   ")}</div>
+  1292→          </div>
+  1293→        )}
+  1294→
+  1295→        {data.customSections.filter(cs => cs.items.length > 0).map(cs => (
+  1296→          <div key={cs.id} style={{ marginBottom: 28 }}>
+  1297→            <SectionTitle label={cs.title} />
+  1298→            {cs.items.map(item => (
+  1299→              <div key={item.id} style={{ ...Paper, padding: "14px 20px", marginBottom: 10, breakInside: "avoid" as React.CSSProperties["breakInside"] }}>
+  1300→                <div style={{ fontFamily: CORMORANT, fontSize: 13, fontWeight: 700, color: burgundy, textAlign: "center" }}>{item.title}{item.date ? <span style={{ color: gold, fontStyle: "italic", fontWeight: 400, marginLeft: 8 }}>{item.date}</span> : null}</div>
+  1301→                {item.subtitle && <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 12, color: muted, textAlign: "center", marginTop: 2 }}>{item.subtitle}</div>}
+  1302→                {item.description && <div style={{ fontFamily: CORMORANT, fontSize: 11, color: ink, lineHeight: 1.55, marginTop: 4 }}>{item.description}</div>}
+  1303→              </div>
+  1304→            ))}
+  1305→          </div>
+  1306→        ))}
+  1307→
+  1308→        <GoldRule />
+  1309→
+  1310→        {/* Colophon */}
+  1311→        <div style={{ textAlign: "center", paddingTop: 6 }}>
+  1312→          <div style={{ fontFamily: CORMORANT, fontStyle: "italic", fontSize: 11, color: muted }}>— Finis —</div>
+  1313→          <div style={{ fontFamily: CORMORANT, fontSize: 9, color: gold, letterSpacing: 4, textTransform: "uppercase", marginTop: 6 }}>Heritage · MMXXV · {data.name}</div>
+  1314→        </div>
+  1315→      </div>
+  1316→    </div>
+  1317→  );
+  1318→}
+  1319→
