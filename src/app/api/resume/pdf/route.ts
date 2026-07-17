@@ -1,8 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { renderToString } from "react-dom/server";
-import * as React from "react";
-import type { ResumeData, TemplateStyle } from "@/store/resume-store";
-import { ResumePreview } from "@/components/modules/resume-templates";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,65 +15,40 @@ const PRINT_CSS = `
     box-shadow: none !important;
     margin: 0 !important;
   }
-  /* Smart page breaks — don't cut inside experience/project/education items */
-  .resume-paper > div > div,
-  .resume-paper > div > section,
-  .resume-paper > div > aside {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
   img { max-width: 100%; }
 `;
 
 /**
  * POST /api/resume/pdf
- * Generates a pixel-perfect, multi-page, ATS-friendly PDF using Puppeteer.
+ *
+ * Receives the already-rendered HTML from the client (captured from the DOM)
+ * and uses Puppeteer to generate a pixel-perfect, multi-page PDF.
+ *
+ * This avoids importing react-dom/server in the route handler (which
+ * Next.js 16 blocks). The client captures the HTML and sends it here.
+ *
  * Works on Vercel via @sparticuz/chromium.
  */
 export async function POST(req: NextRequest) {
   try {
-    const { data, style } = (await req.json()) as {
-      data: ResumeData;
-      style: TemplateStyle;
+    const { html: innerHtml, fileName } = (await req.json()) as {
+      html: string;
+      fileName?: string;
     };
 
-    if (!data || !style) {
+    if (!innerHtml) {
       return NextResponse.json(
-        { error: "Missing data or style" },
+        { error: "Missing HTML content" },
         { status: 400 }
       );
     }
 
-    // 1. Render the resume template to HTML
-    const allSections: Record<string, boolean> = {
-      personal: true, summary: true, experience: true, skills: true,
-      projects: true, education: true, certifications: true, languages: true,
-      awards: true, publications: true, interests: true, references: true,
-    };
+    // Wrap the client-provided HTML in a full document
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Resume</title>${FONT_CDN_LINK}<style>${PRINT_CSS}</style></head><body>${innerHtml}</body></html>`;
 
-    const element = React.createElement(ResumePreview, {
-      data,
-      style,
-      sections: allSections,
-    });
-
-    const innerHtml = renderToString(element);
-
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${data.name || "Resume"}</title>${FONT_CDN_LINK}<style>${PRINT_CSS}</style></head><body><div id="root">${innerHtml}</div></body></html>`;
-
-    // 2. Launch Puppeteer with @sparticuz/chromium (Vercel-compatible)
-    let chromium: { executablePath: () => Promise<string>; headless: boolean; args: string[] };
-    let puppeteer: typeof import("puppeteer-core");
-
-    try {
-      chromium = await import("@sparticuz/chromium");
-      puppeteer = await import("puppeteer-core");
-    } catch {
-      return NextResponse.json(
-        { error: "PDF dependencies not installed. Run: bun add puppeteer-core @sparticuz/chromium" },
-        { status: 500 }
-      );
-    }
+    // Launch Puppeteer with @sparticuz/chromium (Vercel-compatible)
+    const chromium = await import("@sparticuz/chromium");
+    const puppeteer = await import("puppeteer-core");
 
     const executablePath = await chromium.executablePath();
 
@@ -94,7 +65,8 @@ export async function POST(req: NextRequest) {
       await page.evaluate(() => document.fonts?.ready);
       await new Promise((r) => setTimeout(r, 1000));
 
-      // 3. Generate PDF with Chrome's native print engine
+      // Generate PDF with Chrome's native print engine
+      // This gives perfect page breaks, selectable text, and ATS-friendly output
       const pdfBuffer = await page.pdf({
         format: "A4",
         printBackground: true,
@@ -102,11 +74,11 @@ export async function POST(req: NextRequest) {
         preferCSSPageSize: false,
       });
 
-      // 4. Return the PDF
+      const name = fileName || "Resume";
       return new NextResponse(pdfBuffer, {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${data.name.replace(/\s+/g, "_")}_Resume.pdf"`,
+          "Content-Disposition": `attachment; filename="${name.replace(/\s+/g, "_")}_Resume.pdf"`,
         },
       });
     } finally {
