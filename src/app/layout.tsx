@@ -63,7 +63,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
-        {/* Puter.js — free AI API (no key needed, no balance issues) */}
+        {/* Puter.js — free AI API (anonymous, no key, no balance issues) */}
         <script src="https://js.puter.com/v2/" async></script>
       </head>
       <body
