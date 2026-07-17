@@ -8,16 +8,16 @@ export function useMounted() {
   return m;
 }
 
-/** AI prompt registry — used for Puter.js fallback when server route fails */
+/** AI prompt registry — used for Pollinations.ai fallback when server route fails */
 export interface AIFallbackPrompt {
   system: string;
   user: (body: Record<string, unknown>) => string;
 }
 
 /**
- * Registry of AI prompts for fallback to Puter.js.
+ * Registry of AI prompts for fallback to Pollinations.ai.
  * When the server API route fails (e.g., ZAI balance issue), the hook
- * uses the prompt to call Puter.js directly from the client.
+ * uses the prompt to call Pollinations.ai directly from the client.
  */
 const AI_PROMPTS: Record<string, AIFallbackPrompt> = {
   "/api/ai/cover-letter": {
@@ -121,7 +121,7 @@ const AI_PROMPTS: Record<string, AIFallbackPrompt> = {
 
 /**
  * Hook that calls an AI JSON endpoint with loading + error states.
- * If the server route fails, automatically falls back to Puter.js (free AI).
+ * If the server route fails, automatically falls back to Pollinations.ai (free AI).
  */
 export function useAI<T>() {
   const [data, setData] = React.useState<T | null>(null);
@@ -146,7 +146,7 @@ export function useAI<T>() {
     } catch (serverError) {
       const serverMsg = serverError instanceof Error ? serverError.message : "Server failed";
 
-      // Check if this is a ZAI balance/config error → fall back to Puter.js
+      // Check if this is a ZAI balance/config error → fall back to Pollinations.ai
       // Use case-insensitive matching to catch all variations
       const lowerMsg = serverMsg.toLowerCase();
       const isZAIError =
@@ -167,12 +167,12 @@ export function useAI<T>() {
         return null;
       }
 
-      // Fall back to Puter.js
+      // Fall back to Pollinations.ai
       try {
         const prompt = AI_PROMPTS[url];
         if (!prompt) {
           throw new Error(
-            "AI service unavailable (ZAI balance issue) and no Puter.js fallback configured for this endpoint."
+            "AI service unavailable (ZAI balance issue) and no Pollinations.ai fallback configured for this endpoint."
           );
         }
 
@@ -194,8 +194,8 @@ export function useAI<T>() {
         }
         setData(parsed);
         return parsed;
-      } catch (puterError) {
-        const msg = puterError instanceof Error ? puterError.message : "AI fallback failed";
+      } catch (fallbackError) {
+        const msg = fallbackError instanceof Error ? fallbackError.message : "AI fallback failed";
         setError(msg);
         setLoading(false);
         return null;
@@ -210,7 +210,7 @@ export function useAI<T>() {
 
 /**
  * Helper for modules that use direct fetch() instead of useAI hook.
- * Falls back to Puter.js if the server route fails with ZAI errors.
+ * Falls back to Pollinations.ai if the server route fails with ZAI errors.
  *
  * Usage:
  *   const data = await fetchWithFallback("/api/ai/coach", { message: "hi" });
@@ -232,7 +232,7 @@ export async function fetchWithFallback<T>(
     const serverMsg = serverError instanceof Error ? serverError.message : "Server failed";
     const lowerMsg = serverMsg.toLowerCase();
 
-    // Check if this is a ZAI error that should trigger Puter.js fallback
+    // Check if this is a ZAI error that should trigger Pollinations.ai fallback
     const isZAIError =
       lowerMsg.includes("1113") ||
       lowerMsg.includes("insufficient balance") ||
@@ -248,10 +248,10 @@ export async function fetchWithFallback<T>(
       throw serverError;
     }
 
-    // Fall back to Puter.js
+    // Fall back to Pollinations.ai
     const prompt = AI_PROMPTS[url];
     if (!prompt) {
-      throw new Error("AI service unavailable and no Puter.js fallback configured.");
+      throw new Error("AI service unavailable and no Pollinations.ai fallback configured.");
     }
 
     const { complete, extractJson } = await import("@/lib/ai-client");
