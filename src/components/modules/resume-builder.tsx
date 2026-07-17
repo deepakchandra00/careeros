@@ -53,6 +53,7 @@ import {
 import { ModuleHeader, AIButton } from "@/components/shared/blocks";
 import { useResumeStore, type SectionId } from "@/store/resume-store";
 import { ResumeEditor } from "@/components/modules/resume-editor";
+import { PageBasedPreview } from "@/components/modules/page-based-preview";
 import {
   ResumePreview,
   TEMPLATE_OPTIONS,
@@ -762,18 +763,10 @@ export function ResumeBuilderModule() {
           <ResumeEditor />
         </div>
 
-        {/* Preview */}
+        {/* Preview — A4 page-based with automatic page reflow */}
         <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto scroll-thin">
           <div className="flex justify-center rounded-xl bg-muted/40 p-4 sm:p-8">
-            <div
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: "top center",
-                transition: "transform 0.15s ease",
-              }}
-            >
-              <ResumePreview data={data} style={style} sections={sections} />
-            </div>
+            <PageBasedPreview data={data} style={style} sections={sections} zoom={zoom} />
           </div>
         </div>
       </div>
