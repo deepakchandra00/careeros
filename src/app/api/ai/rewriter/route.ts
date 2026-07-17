@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 interface Body {
   resumeText: string;
-  targetLevel: string;
+  targetLevel: string; // entry | senior | lead | architect | manager
   company?: string;
   tone?: string;
 }
@@ -28,24 +28,18 @@ export async function POST(req: Request) {
 {
   "newTitle": string (new resume headline/title),
   "newSummary": string (rewritten professional summary, 2-3 sentences),
-  "rewrittenExperience": [{ "role": string, "company": string, "bullets": string[] }] (rewrite each experience's bullets to match the target level),
-  "keywords": string[] (10 keywords to add for this level)
+  "rewrittenExperience": { "role": string, "company": string, "bullets": string[] }[],
+  "suggestedSkills": string[] (skills to add/emphasize for this level),
+  "rationale": string[] (3 bullets explaining the changes made)
 }
 Return ONLY the JSON.`;
 
-    const out = await complete(system, resumeText, { json: true });
+    const user = `Original resume:\n${resumeText}`;
+    const out = await complete(system, user, { json: true });
     const parsed = extractJson(out);
-    if (!parsed) return aiError("Failed to parse rewrite data.");
+    if (!parsed) return aiError("Failed to parse rewrite.");
     return aiOk(parsed);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Resume rewrite failed";
-    // Check for ZAI API errors and provide helpful messages
-    if (msg.includes("1113") || msg.includes("Insufficient balance")) {
-      return aiError("AI service has insufficient balance. Please recharge at https://z.ai/ or use the client-side Puter.js AI (available in the resume builder).");
-    }
-    if (msg.includes("ZAI_API_KEY is not set") || msg.includes("Configuration file not found")) {
-      return aiError("AI service is not configured. Set ZAI_API_KEY in your environment variables.");
-    }
-    return aiError(msg);
+    return aiError(e instanceof Error ? e.message : "Resume rewrite failed");
   }
 }
