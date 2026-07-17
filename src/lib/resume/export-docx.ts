@@ -475,13 +475,41 @@ export async function exportResumeDocx(data: ResumeData, style: TemplateStyle): 
     default: children = buildSidebarLeft(data, cfg); break;
   }
 
+  // Add page breaks before major sections for long resumes (multi-page support)
+  // Insert a page break before Experience if there's a lot of content before it
+  const hasLongContent = data.experience.length > 2 || data.projects.length > 3;
+  if (hasLongContent) {
+    // Find the "Experience" section header and add pageBreakBefore
+    children = children.map((p, i) => {
+      // Check if this paragraph is a section header for Experience
+      const text = (p as unknown as { text?: string }).text || "";
+      if (/^experience$/i.test(text.trim()) && i > 5) {
+        // Add pageBreakBefore to this paragraph
+        return new Paragraph({
+          ...(p as unknown as { options?: Record<string, unknown> }).options,
+          pageBreakBefore: true,
+        });
+      }
+      return p;
+    });
+  }
+
   const doc = new Document({
     sections: [{
       properties: {
         page: {
+          size: {
+            width: INCH(8.27),  // A4 width
+            height: INCH(11.69), // A4 height
+          },
           margin: cfg.marginCm === 0
             ? { top: 0, bottom: 0, left: 0, right: 0 }
-            : { top: CM(cfg.marginCm), bottom: CM(cfg.marginCm), left: CM(cfg.marginCm + 0.2), right: CM(cfg.marginCm + 0.2) },
+            : {
+                top: CM(cfg.marginCm),
+                bottom: CM(cfg.marginCm),
+                left: CM(cfg.marginCm + 0.2),
+                right: CM(cfg.marginCm + 0.2),
+              },
         },
       },
       children,
