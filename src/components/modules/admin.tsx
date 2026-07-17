@@ -81,6 +81,7 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { ModuleHeader } from "@/components/shared/blocks";
+import { fetchWithFallback } from "@/components/shared/utils";
 import { cn } from "@/lib/utils";
 import { MODULES, type ModuleId } from "@/lib/modules";
 import {
@@ -1574,23 +1575,22 @@ function SystemHealthTab() {
       }
     }
 
-    // 3. AI service — ping /api/ai/coach (may return 401/405 but proves the route exists)
+    // 3. AI service — ping /api/ai/coach (tests ZAI + Puter.js fallback)
     {
       const start = performance.now();
       try {
-        const res = await fetch("/api/ai/coach", {
-          method: "GET",
-          cache: "no-store",
+        await fetchWithFallback<{ reply: string }>("/api/ai/coach", {
+          messages: [{ role: "user", content: "ping" }],
+          resumeContext: "",
         });
         const ms = Math.round(performance.now() - start);
-        // 405 = route exists (POST-only). 401 = auth required. Either is fine.
         checks.push({
           key: "ai",
           label: "AI Service",
           icon: Bot,
-          status: res.ok || res.status === 405 || res.status === 401 ? "ok" : "fail",
+          status: "ok",
           responseMs: ms,
-          message: `HTTP ${res.status}`,
+          message: "OK",
           lastChecked: new Date().toISOString(),
         });
       } catch (e) {

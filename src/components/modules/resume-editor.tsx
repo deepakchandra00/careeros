@@ -56,6 +56,7 @@ import {
   type CustomSection,
   type SectionId,
 } from "@/store/resume-store";
+import { fetchWithFallback } from "@/components/shared/utils";
 import { cn } from "@/lib/utils";
 import {
   DndContext,
@@ -256,13 +257,10 @@ function AIActionButtons({
     }
     setLoading(action);
     try {
-      const res = await fetch("/api/ai/rewrite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, action, context }),
-      });
-      const json = (await res.json()) as { result?: string; error?: string };
-      if (!res.ok) throw new Error(json.error || "AI request failed");
+      const json = await fetchWithFallback<{ result?: string; error?: string }>(
+        "/api/ai/rewrite",
+        { text, action, context },
+      );
       const result = (json.result ?? "").trim();
       if (!result) {
         toast.error("AI returned empty content");

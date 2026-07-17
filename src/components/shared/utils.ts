@@ -146,13 +146,19 @@ export function useAI<T>() {
     } catch (serverError) {
       const serverMsg = serverError instanceof Error ? serverError.message : "Server failed";
 
-      // Check if this is a ZAI balance error → fall back to Puter.js
+      // Check if this is a ZAI balance/config error → fall back to Puter.js
+      // Use case-insensitive matching to catch all variations
+      const lowerMsg = serverMsg.toLowerCase();
       const isZAIError =
-        serverMsg.includes("1113") ||
-        serverMsg.includes("Insufficient balance") ||
-        serverMsg.includes("ZAI_API_KEY") ||
-        serverMsg.includes("Configuration file not found") ||
-        serverMsg.includes("AI request failed");
+        lowerMsg.includes("1113") ||
+        lowerMsg.includes("insufficient balance") ||
+        lowerMsg.includes("zai_api_key") ||
+        lowerMsg.includes("zai api key") ||
+        lowerMsg.includes("configuration file not found") ||
+        lowerMsg.includes("ai request failed") ||
+        lowerMsg.includes("ai service has insufficient") ||
+        lowerMsg.includes("recharge") ||
+        lowerMsg.includes("not configured");
 
       if (!isZAIError) {
         // Non-ZAI error — don't fall back
@@ -200,4 +206,68 @@ export function useAI<T>() {
   }, []);
 
   return { data, loading, error, run, setData, setError };
+}
+
+/**
+ * Helper for modules that use direct fetch() instead of useAI hook.
+ * Falls back to Puter.js if the server route fails with ZAI errors.
+ *
+ * Usage:
+ *   const data = await fetchWithFallback("/api/ai/coach", { message: "hi" });
+ */
+export async function fetchWithFallback<T>(
+  url: string,
+  body: Record<string, unknown>
+): Promise<T> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Request failed");
+    return json as T;
+  } catch (serverError) {
+    const serverMsg = serverError instanceof Error ? serverError.message : "Server failed";
+    const lowerMsg = serverMsg.toLowerCase();
+
+    // Check if this is a ZAI error that should trigger Puter.js fallback
+    const isZAIError =
+      lowerMsg.includes("1113") ||
+      lowerMsg.includes("insufficient balance") ||
+      lowerMsg.includes("zai_api_key") ||
+      lowerMsg.includes("zai api key") ||
+      lowerMsg.includes("configuration file not found") ||
+      lowerMsg.includes("ai request failed") ||
+      lowerMsg.includes("ai service has insufficient") ||
+      lowerMsg.includes("recharge") ||
+      lowerMsg.includes("not configured");
+
+    if (!isZAIError) {
+      throw serverError;
+    }
+
+    // Fall back to Puter.js
+    const prompt = AI_PROMPTS[url];
+    if (!prompt) {
+      throw new Error("AI service unavailable and no Puter.js fallback configured.");
+    }
+
+    const { complete, extractJson } = await import("@/lib/ai-client");
+    const userPrompt = prompt.user(body);
+    const raw = await complete(prompt.system, userPrompt, { json: true });
+
+    // For text responses (cover letter, coach)
+    if (url === "/api/ai/cover-letter" || url === "/api/ai/coach") {
+      return { text: raw } as unknown as T;
+    }
+
+    // For JSON responses
+    const parsed = extractJson<T>(raw);
+    if (!parsed) {
+      throw new Error("AI returned invalid JSON. Please try again.");
+    }
+    return parsed;
+  }
 }

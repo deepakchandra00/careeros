@@ -50,6 +50,7 @@ import {
   ScoreRing,
   TypingDots,
 } from "@/components/shared/blocks";
+import { fetchWithFallback } from "@/components/shared/utils";
 import { cn } from "@/lib/utils";
 
 type Phase = "setup" | "interview" | "results";
@@ -1110,13 +1111,10 @@ export function MockInterviewModule() {
     }
 
     try {
-      const res = await fetch("/api/ai/mock-interview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate", role, type }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to generate questions");
+      const json = await fetchWithFallback<{ questions?: Question[] }>(
+        "/api/ai/mock-interview",
+        { action: "generate", role, type },
+      );
       const qs: Question[] = json.questions ?? [];
       if (!qs.length) throw new Error("No questions returned.");
       // Pad/truncate to TOTAL_QUESTIONS just in case.
@@ -1144,18 +1142,15 @@ export function MockInterviewModule() {
     if (!current) return;
     setScoring(true);
     try {
-      const res = await fetch("/api/ai/mock-interview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const score = await fetchWithFallback<ScoreResult>(
+        "/api/ai/mock-interview",
+        {
           action: "score",
           question: current.question,
           answer,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to score answer");
-      setSubmittedScore(json as ScoreResult);
+        },
+      );
+      setSubmittedScore(score);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Something went wrong";
       toast.error(msg);

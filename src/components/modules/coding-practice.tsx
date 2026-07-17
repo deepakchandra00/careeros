@@ -52,7 +52,7 @@ import {
   ScoreRing,
   TypingDots,
 } from "@/components/shared/blocks";
-import { useMounted } from "@/components/shared/utils";
+import { useMounted, fetchWithFallback } from "@/components/shared/utils";
 import { cn } from "@/lib/utils";
 
 // ---------- Types ----------
@@ -1224,14 +1224,10 @@ export function CodingPracticeModule() {
         language,
         testCases: activeProblem.tests,
       };
-      const res = await fetch("/api/ai/run-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Run failed");
-      const data = json as RunCodeResponse;
+      const data = await fetchWithFallback<RunCodeResponse>(
+        "/api/ai/run-code",
+        payload,
+      );
       const passedCount = data.results.filter((r) => r.passed).length;
       const result: RunResult = {
         passed: passedCount,
@@ -1274,10 +1270,9 @@ export function CodingPracticeModule() {
     setReview(null);
     setReviewLoading(true);
     try {
-      const res = await fetch("/api/ai/code-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const review = await fetchWithFallback<CodeReview>(
+        "/api/ai/code-review",
+        {
           code,
           language: activeProblem.language,
           problem: {
@@ -1285,11 +1280,9 @@ export function CodingPracticeModule() {
             description: activeProblem.description,
             difficulty: activeProblem.difficulty,
           },
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Review failed");
-      setReview(json as CodeReview);
+        },
+      );
+      setReview(review);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "AI review failed");
       setReview(null);

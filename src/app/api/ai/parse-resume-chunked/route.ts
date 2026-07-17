@@ -48,13 +48,8 @@ export async function POST(req: Request) {
     return aiOk(parsed);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Chunked parse failed for section";
-    // Check for common ZAI API errors and provide helpful messages
-    if (msg.includes("1113") || msg.includes("Insufficient balance")) {
-      return aiError("ZAI API key has insufficient balance. Please recharge at https://z.ai/ to use AI features.");
-    }
-    if (msg.includes("ZAI_API_KEY is not set")) {
-      return aiError("ZAI_API_KEY is not configured. Add it to your environment variables.");
-    }
+    // Pass the original error through — the client-side useAI hook detects
+    // ZAI errors and falls back to Puter.js automatically.
     return aiError(msg);
   }
 }

@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ModuleHeader, TypingDots } from "@/components/shared/blocks";
 import { useResumeStore } from "@/store/resume-store";
+import { fetchWithFallback } from "@/components/shared/utils";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -77,19 +78,13 @@ export function CoachModule() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/ai/coach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: nextMessages,
-          resumeContext,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Coach request failed");
+      const json = await fetchWithFallback<{ reply: string }>(
+        "/api/ai/coach",
+        { messages: nextMessages, resumeContext },
+      );
       setMessages((cur) => [
         ...cur,
-        { role: "assistant", content: json.reply as string },
+        { role: "assistant", content: json.reply },
       ]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Something went wrong";
