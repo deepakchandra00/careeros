@@ -9,15 +9,17 @@ import { cn } from "@/lib/utils";
  * A4 Page-Based Resume Preview with Adjustable Padding + Auto-Reflow
  *
  * ┌─────────────────────────────┐  ← .resume-page (fixed 794×1123px)
- * │█  Top Padding (adjustable)█│
+ * │█████████████████████████████│  ← Template background fills entire page
+ * │█  ← Padding (adjustable) →█│
  * │█  ┌─────────────────────┐ █│
- * │█  │ Resume Content       │ █│  ← content area shrinks as padding grows
+ * │█  │ Resume Content       │ █│  ← Content area shrinks as padding grows
  * │█  └─────────────────────┘ █│
- * │█  Bottom Padding         █│
+ * │█████████████████████████████│
  * └─────────────────────────────┘
  *
- * When padding increases → content height decreases → fewer items fit
- * per page → content auto-reflows to next page.
+ * The template background ALWAYS fills the entire A4 page.
+ * Only the content container's padding changes — the background
+ * is never removed or clipped.
  */
 
 const A4_WIDTH_PX = 794;
@@ -44,7 +46,7 @@ export function PageBasedPreview({
   const [totalPages, setTotalPages] = React.useState(1);
 
   // Content height per page = A4 height minus top/bottom padding
-  const contentHeightPerPage = A4_HEIGHT_PX - pageLayout.paddingTop - pageLayout.paddingBottom;
+  const contentHeightPerPage = Math.max(100, A4_HEIGHT_PX - pageLayout.paddingTop - pageLayout.paddingBottom);
 
   React.useEffect(() => {
     const el = measureRef.current;
@@ -75,7 +77,7 @@ export function PageBasedPreview({
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      {/* Hidden measurement container */}
+      {/* Hidden measurement container — renders full template to measure height */}
       <div
         ref={measureRef}
         style={{
@@ -145,22 +147,22 @@ function A4Page({
         breakAfter: !isLast ? "page" : "auto",
       }}
     >
+      {children}
       {/* Visual padding guide (dashed border, hidden in print) */}
       {(pageLayout.paddingTop > 0 || pageLayout.paddingBottom > 0 || pageLayout.paddingLeft > 0 || pageLayout.paddingRight > 0) && (
         <div
-          className="absolute pointer-events-none print:hidden"
+          className="absolute pointer-events-none z-10 print:hidden"
           style={{
             top: `${pageLayout.paddingTop}px`,
             bottom: `${pageLayout.paddingBottom}px`,
             left: `${pageLayout.paddingLeft}px`,
             right: `${pageLayout.paddingRight}px`,
-            border: "1px dashed rgba(0,0,0,0.1)",
+            border: "1px dashed rgba(99,102,241,0.3)",
           }}
         />
       )}
-      {children}
       {totalPages > 1 && (
-        <div className="absolute bottom-2 right-3 text-[10px] font-medium text-slate-400 print:hidden">
+        <div className="absolute bottom-2 right-3 z-10 text-[10px] font-medium text-slate-400 print:hidden">
           Page {pageNumber} of {totalPages}
         </div>
       )}
@@ -168,6 +170,17 @@ function A4Page({
   );
 }
 
+/**
+ * Renders the resume content clipped to a specific page.
+ *
+ * KEY: The template renders at FULL page size (794×1123px) so its background
+ * fills the entire A4 page. The content is then visually clipped by the
+ * parent's overflow:hidden + negative offset, but the background remains
+ * visible in the padding area.
+ *
+ * This ensures sidebar colors, gradient headers, and other template
+ * backgrounds are never removed by padding.
+ */
 function ClippedContent({
   data,
   style,
@@ -181,26 +194,29 @@ function ClippedContent({
   pageIndex: number;
   pageLayout: PageLayout;
 }) {
-  const contentHeight = A4_HEIGHT_PX - pageLayout.paddingTop - pageLayout.paddingBottom;
+  const contentHeight = Math.max(100, A4_HEIGHT_PX - pageLayout.paddingTop - pageLayout.paddingBottom);
   const offset = pageIndex * contentHeight;
 
   return (
     <div
       style={{
         position: "absolute",
-        top: `${pageLayout.paddingTop}px`,
-        left: `${pageLayout.paddingLeft}px`,
-        right: `${pageLayout.paddingRight}px`,
-        bottom: `${pageLayout.paddingBottom}px`,
+        top: "0",
+        left: "0",
+        right: "0",
+        bottom: "0",
         overflow: "hidden",
       }}
     >
+      {/* The template renders at full page size — background fills entire page */}
       <div
         style={{
           position: "absolute",
-          top: `-${offset}px`,
-          left: "0",
-          right: "0",
+          // Shift up by the offset for this page + down by paddingTop
+          // so the content starts below the top padding
+          top: `${pageLayout.paddingTop - offset}px`,
+          left: `${pageLayout.paddingLeft}px`,
+          right: `${pageLayout.paddingRight}px`,
         }}
       >
         <ResumePreview data={data} style={style} sections={sections} />
