@@ -47,8 +47,11 @@ export async function POST(req: NextRequest) {
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Resume</title>${FONT_CDN_LINK}<style>${PRINT_CSS}</style></head><body>${innerHtml}</body></html>`;
 
     // Launch Puppeteer with @sparticuz/chromium (Vercel-compatible)
-    const chromium = await import("@sparticuz/chromium");
-    const puppeteer = await import("puppeteer-core");
+    // @sparticuz/chromium uses a default export — must access .default
+    const chromiumModule = await import("@sparticuz/chromium");
+    const chromium = chromiumModule.default;
+    const puppeteerModule = await import("puppeteer-core");
+    const puppeteer = puppeteerModule.default;
 
     const executablePath = await chromium.executablePath();
 
@@ -60,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
       // Wait for fonts to load
       await page.evaluate(() => document.fonts?.ready);
       await new Promise((r) => setTimeout(r, 1000));
