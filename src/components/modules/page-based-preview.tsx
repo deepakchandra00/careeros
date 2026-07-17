@@ -1,33 +1,33 @@
 "use client";
 
 import * as React from "react";
-import type { ResumeData, TemplateStyle } from "@/store/resume-store";
+import type { ResumeData, TemplateStyle, PageLayout } from "@/store/resume-store";
 import { ResumePreview } from "@/components/modules/resume-templates";
 import { cn } from "@/lib/utils";
 
 /**
- * A4 Page-Based Resume Preview with Automatic Page Reflow
+ * A4 Page-Based Resume Preview with Adjustable Padding + Auto-Reflow
  *
- * Renders the resume as separate A4 pages (210mm × 297mm) instead of
- * one infinitely long page. Uses ResizeObserver to measure content height
- * and automatically split into pages.
+ * ┌─────────────────────────────┐  ← .resume-page (fixed 794×1123px)
+ * │█  Top Padding (adjustable)█│
+ * │█  ┌─────────────────────┐ █│
+ * │█  │ Resume Content       │ █│  ← content area shrinks as padding grows
+ * │█  └─────────────────────┘ █│
+ * │█  Bottom Padding         █│
+ * └─────────────────────────────┘
  *
- * Features:
- * - Automatic pagination (default)
- * - Page break indicators between pages
- * - Page number badges ("Page X of Y")
- * - Each page has CSS page-break-after for clean PDF generation
- * - Print-optimized (works with window.print())
+ * When padding increases → content height decreases → fewer items fit
+ * per page → content auto-reflows to next page.
  */
 
-// A4 dimensions at 96 DPI
-const A4_WIDTH_PX = 794;  // 210mm
-const A4_HEIGHT_PX = 1123; // 297mm
+const A4_WIDTH_PX = 794;
+const A4_HEIGHT_PX = 1123;
 
 interface PageBasedPreviewProps {
   data: ResumeData;
   style: TemplateStyle;
   sections: Record<string, boolean>;
+  pageLayout: PageLayout;
   zoom?: number;
   className?: string;
 }
@@ -36,31 +36,31 @@ export function PageBasedPreview({
   data,
   style,
   sections,
+  pageLayout,
   zoom = 0.75,
   className,
 }: PageBasedPreviewProps) {
   const measureRef = React.useRef<HTMLDivElement | null>(null);
   const [totalPages, setTotalPages] = React.useState(1);
 
-  // Measure content height and calculate page count
+  // Content height per page = A4 height minus top/bottom padding
+  const contentHeightPerPage = A4_HEIGHT_PX - pageLayout.paddingTop - pageLayout.paddingBottom;
+
   React.useEffect(() => {
     const el = measureRef.current;
     if (!el) return;
 
     const measure = () => {
       const fullHeight = el.scrollHeight;
-      const pages = Math.max(1, Math.ceil(fullHeight / A4_HEIGHT_PX));
+      const pages = Math.max(1, Math.ceil(fullHeight / contentHeightPerPage));
       setTotalPages(pages);
     };
 
-    // Initial measure
     measure();
 
-    // Re-measure on content changes
     const observer = new ResizeObserver(() => measure());
     observer.observe(el);
 
-    // Re-measure after fonts load
     if (document.fonts) {
       document.fonts.ready.then(() => measure());
     }
@@ -71,11 +71,11 @@ export function PageBasedPreview({
       observer.disconnect();
       clearTimeout(timer);
     };
-  }, [data, style, sections]);
+  }, [data, style, sections, contentHeightPerPage]);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      {/* Hidden measurement container — renders full template to measure height */}
+      {/* Hidden measurement container */}
       <div
         ref={measureRef}
         style={{
@@ -101,12 +101,18 @@ export function PageBasedPreview({
         className="flex flex-col items-center gap-4 print:!scale-100 print:!transform-none"
       >
         {Array.from({ length: totalPages }, (_, i) => (
-          <A4Page key={i} pageNumber={i + 1} totalPages={totalPages}>
+          <A4Page
+            key={i}
+            pageNumber={i + 1}
+            totalPages={totalPages}
+            pageLayout={pageLayout}
+          >
             <ClippedContent
               data={data}
               style={style}
               sections={sections}
               pageIndex={i}
+              pageLayout={pageLayout}
             />
           </A4Page>
         ))}
@@ -115,15 +121,16 @@ export function PageBasedPreview({
   );
 }
 
-/** A single A4 page container */
 function A4Page({
   children,
   pageNumber,
   totalPages,
+  pageLayout,
 }: {
   children: React.ReactNode;
   pageNumber: number;
   totalPages: number;
+  pageLayout: PageLayout;
 }) {
   const isLast = pageNumber === totalPages;
   return (
@@ -138,8 +145,20 @@ function A4Page({
         breakAfter: !isLast ? "page" : "auto",
       }}
     >
+      {/* Visual padding guide (dashed border, hidden in print) */}
+      {(pageLayout.paddingTop > 0 || pageLayout.paddingBottom > 0 || pageLayout.paddingLeft > 0 || pageLayout.paddingRight > 0) && (
+        <div
+          className="absolute pointer-events-none print:hidden"
+          style={{
+            top: `${pageLayout.paddingTop}px`,
+            bottom: `${pageLayout.paddingBottom}px`,
+            left: `${pageLayout.paddingLeft}px`,
+            right: `${pageLayout.paddingRight}px`,
+            border: "1px dashed rgba(0,0,0,0.1)",
+          }}
+        />
+      )}
       {children}
-      {/* Page number badge (hidden in print) */}
       {totalPages > 1 && (
         <div className="absolute bottom-2 right-3 text-[10px] font-medium text-slate-400 print:hidden">
           Page {pageNumber} of {totalPages}
@@ -149,29 +168,31 @@ function A4Page({
   );
 }
 
-/**
- * Renders the resume content clipped to a specific page.
- * Uses negative top offset to show only the relevant portion.
- */
 function ClippedContent({
   data,
   style,
   sections,
   pageIndex,
+  pageLayout,
 }: {
   data: ResumeData;
   style: TemplateStyle;
   sections: Record<string, boolean>;
   pageIndex: number;
+  pageLayout: PageLayout;
 }) {
-  const offset = pageIndex * A4_HEIGHT_PX;
+  const contentHeight = A4_HEIGHT_PX - pageLayout.paddingTop - pageLayout.paddingBottom;
+  const offset = pageIndex * contentHeight;
+
   return (
     <div
       style={{
-        width: `${A4_WIDTH_PX}px`,
-        height: `${A4_HEIGHT_PX}px`,
+        position: "absolute",
+        top: `${pageLayout.paddingTop}px`,
+        left: `${pageLayout.paddingLeft}px`,
+        right: `${pageLayout.paddingRight}px`,
+        bottom: `${pageLayout.paddingBottom}px`,
         overflow: "hidden",
-        position: "relative",
       }}
     >
       <div
@@ -179,7 +200,7 @@ function ClippedContent({
           position: "absolute",
           top: `-${offset}px`,
           left: "0",
-          width: `${A4_WIDTH_PX}px`,
+          right: "0",
         }}
       >
         <ResumePreview data={data} style={style} sections={sections} />

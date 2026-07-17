@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ArrowUpDown,
   GripVertical,
+  LayoutTemplate,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -42,6 +43,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { Slider } from "@/components/ui/slider";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -283,6 +285,9 @@ export function ResumeBuilderModule() {
   const data = useResumeStore((s) => s.data);
   const style = useResumeStore((s) => s.style);
   const setStyle = useResumeStore((s) => s.setStyle);
+  const pageLayout = useResumeStore((s) => s.pageLayout);
+  const setPageLayout = useResumeStore((s) => s.setPageLayout);
+  const resetPageLayout = useResumeStore((s) => s.resetPageLayout);
   const hydrate = useResumeStore((s) => s.hydrate);
   const setData = useResumeStore((s) => s.setData);
   const reset = useResumeStore((s) => s.reset);
@@ -702,6 +707,101 @@ export function ResumeBuilderModule() {
 
           <div className="h-5 w-px bg-border" />
 
+          {/* Page Layout — adjustable padding with auto-reflow */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <LayoutTemplate className="size-3.5" />
+                <span className="hidden sm:inline">Layout</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold">Page Layout</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs"
+                  onClick={() => resetPageLayout()}
+                >
+                  <RotateCcw className="size-3" />
+                  Reset
+                </Button>
+              </div>
+
+              {/* Top Padding */}
+              <div className="mb-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Top Padding</label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{pageLayout.paddingTop}px</span>
+                </div>
+                <Slider
+                  value={[pageLayout.paddingTop]}
+                  min={0}
+                  max={80}
+                  step={1}
+                  onValueChange={([v]) => setPageLayout({ paddingTop: v })}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Bottom Padding */}
+              <div className="mb-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Bottom Padding</label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{pageLayout.paddingBottom}px</span>
+                </div>
+                <Slider
+                  value={[pageLayout.paddingBottom]}
+                  min={0}
+                  max={80}
+                  step={1}
+                  onValueChange={([v]) => setPageLayout({ paddingBottom: v })}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Left Padding */}
+              <div className="mb-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Left Padding</label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{pageLayout.paddingLeft}px</span>
+                </div>
+                <Slider
+                  value={[pageLayout.paddingLeft]}
+                  min={0}
+                  max={80}
+                  step={1}
+                  onValueChange={([v]) => setPageLayout({ paddingLeft: v })}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Right Padding */}
+              <div className="mb-2">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Right Padding</label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{pageLayout.paddingRight}px</span>
+                </div>
+                <Slider
+                  value={[pageLayout.paddingRight]}
+                  min={0}
+                  max={80}
+                  step={1}
+                  onValueChange={([v]) => setPageLayout({ paddingRight: v })}
+                  className="w-full"
+                />
+              </div>
+
+              <DropdownMenuSeparator />
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                Increasing padding shrinks the content area. Content auto-reflows to the next page.
+              </p>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="h-5 w-px bg-border" />
+
           {/* Sections toggle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -766,7 +866,7 @@ export function ResumeBuilderModule() {
         {/* Preview — A4 page-based with automatic page reflow */}
         <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto scroll-thin">
           <div className="flex justify-center rounded-xl bg-muted/40 p-4 sm:p-8">
-            <PageBasedPreview data={data} style={style} sections={sections} zoom={zoom} />
+            <PageBasedPreview data={data} style={style} sections={sections} pageLayout={pageLayout} zoom={zoom} />
           </div>
         </div>
       </div>

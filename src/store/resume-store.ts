@@ -93,10 +93,24 @@ export type SectionId =
   | "references";
 
 export interface TemplateStyle {
-  template: string; // modern | ats | executive | minimal | software-engineer | academic | creative | web-developer | ux-designer | teacher | product-manager | finance | business-analyst
+  template: string;
   accent: string;
   font: string; // "sans" | "serif" | "mono"
 }
+
+export interface PageLayout {
+  paddingTop: number;
+  paddingBottom: number;
+  paddingLeft: number;
+  paddingRight: number;
+}
+
+const DEFAULT_PAGE_LAYOUT: PageLayout = {
+  paddingTop: 0,
+  paddingBottom: 0,
+  paddingLeft: 0,
+  paddingRight: 0,
+};
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -253,10 +267,13 @@ function loadStyle(): TemplateStyle {
 interface ResumeStore {
   data: ResumeData;
   style: TemplateStyle;
+  pageLayout: PageLayout;
   hydrated: boolean;
   hydrate: () => void;
   setData: (d: ResumeData) => void;
   setStyle: (s: Partial<TemplateStyle>) => void;
+  setPageLayout: (p: Partial<PageLayout>) => void;
+  resetPageLayout: () => void;
   update: (patch: Partial<ResumeData>) => void;
   updateSummary: (s: string) => void;
   updateBullet: (expId: string, idx: number, text: string) => void;
@@ -323,13 +340,35 @@ function persistStyle(style: TemplateStyle) {
   }
 }
 
+const PAGE_LAYOUT_KEY = "careeros-page-layout-v1";
+
+function loadPageLayout(): PageLayout {
+  if (typeof window === "undefined") return DEFAULT_PAGE_LAYOUT;
+  try {
+    const raw = localStorage.getItem(PAGE_LAYOUT_KEY);
+    if (!raw) return DEFAULT_PAGE_LAYOUT;
+    return { ...DEFAULT_PAGE_LAYOUT, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_PAGE_LAYOUT;
+  }
+}
+
+function persistPageLayout(layout: PageLayout) {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(PAGE_LAYOUT_KEY, JSON.stringify(layout));
+    } catch {}
+  }
+}
+
 export const useResumeStore = create<ResumeStore>((set, get) => ({
   data: DEFAULT_RESUME,
   style: { template: "modern", accent: "#10b981", font: "sans" },
+  pageLayout: DEFAULT_PAGE_LAYOUT,
   hydrated: false,
   hydrate: () => {
     if (get().hydrated) return;
-    set({ data: loadStored(), style: loadStyle(), hydrated: true });
+    set({ data: loadStored(), style: loadStyle(), pageLayout: loadPageLayout(), hydrated: true });
   },
   setData: (d) => {
     persist(d);
@@ -339,6 +378,15 @@ export const useResumeStore = create<ResumeStore>((set, get) => ({
     const next = { ...get().style, ...s };
     persistStyle(next);
     set({ style: next });
+  },
+  setPageLayout: (p) => {
+    const next = { ...get().pageLayout, ...p };
+    persistPageLayout(next);
+    set({ pageLayout: next });
+  },
+  resetPageLayout: () => {
+    persistPageLayout(DEFAULT_PAGE_LAYOUT);
+    set({ pageLayout: DEFAULT_PAGE_LAYOUT });
   },
   update: (patch) => {
     const d = { ...get().data, ...patch };
