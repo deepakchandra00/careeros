@@ -112,6 +112,19 @@ const DEFAULT_PAGE_LAYOUT: PageLayout = {
   paddingRight: 0,
 };
 
+/** Per-section layout settings — controlled from the editor toolbar. */
+export interface SectionSettings {
+  /** When true, the section's content stays together on a single page (no splits). */
+  keepTogether: boolean;
+  /** When true, the section always starts on a new page (manual page break). */
+  startOnNewPage: boolean;
+}
+
+const DEFAULT_SECTION_SETTINGS: SectionSettings = {
+  keepTogether: false,
+  startOnNewPage: false,
+};
+
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const DEFAULT_RESUME: ResumeData = {
@@ -238,6 +251,8 @@ const DEFAULT_RESUME: ResumeData = {
 
 const STORAGE_KEY = "careeros-resume-v2";
 const STYLE_KEY = "careeros-resume-style-v2";
+const PAGE_BREAKS_KEY = "careeros-page-breaks-v1";
+const SECTION_SETTINGS_KEY = "careeros-section-settings-v1";
 
 function loadStored(): ResumeData {
   if (typeof window === "undefined") return DEFAULT_RESUME;
@@ -268,12 +283,24 @@ interface ResumeStore {
   data: ResumeData;
   style: TemplateStyle;
   pageLayout: PageLayout;
+  /** Section IDs that should start on a new page (manual page breaks). */
+  pageBreaks: string[];
+  /** Per-section layout settings (keepTogether, startOnNewPage). */
+  sectionSettings: Record<string, SectionSettings>;
   hydrated: boolean;
   hydrate: () => void;
   setData: (d: ResumeData) => void;
   setStyle: (s: Partial<TemplateStyle>) => void;
   setPageLayout: (p: Partial<PageLayout>) => void;
   resetPageLayout: () => void;
+  // Page breaks (manual)
+  addPageBreak: (sectionId: string) => void;
+  removePageBreak: (sectionId: string) => void;
+  togglePageBreak: (sectionId: string) => void;
+  // Section settings (keep together / start on new page)
+  toggleKeepTogether: (sectionId: string) => void;
+  toggleStartOnNewPage: (sectionId: string) => void;
+  getSectionSettings: (sectionId: string) => SectionSettings;
   update: (patch: Partial<ResumeData>) => void;
   updateSummary: (s: string) => void;
   updateBullet: (expId: string, idx: number, text: string) => void;
@@ -361,14 +388,63 @@ function persistPageLayout(layout: PageLayout) {
   }
 }
 
+function loadPageBreaks(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PAGE_BREAKS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistPageBreaks(breaks: string[]) {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(PAGE_BREAKS_KEY, JSON.stringify(breaks));
+    } catch {}
+  }
+}
+
+function loadSectionSettings(): Record<string, SectionSettings> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(SECTION_SETTINGS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, SectionSettings>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistSectionSettings(settings: Record<string, SectionSettings>) {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(SECTION_SETTINGS_KEY, JSON.stringify(settings));
+    } catch {}
+  }
+}
+
 export const useResumeStore = create<ResumeStore>((set, get) => ({
   data: DEFAULT_RESUME,
   style: { template: "modern", accent: "#10b981", font: "sans" },
   pageLayout: DEFAULT_PAGE_LAYOUT,
+  pageBreaks: [],
+  sectionSettings: {},
   hydrated: false,
   hydrate: () => {
     if (get().hydrated) return;
-    set({ data: loadStored(), style: loadStyle(), pageLayout: loadPageLayout(), hydrated: true });
+    set({
+      data: loadStored(),
+      style: loadStyle(),
+      pageLayout: loadPageLayout(),
+      pageBreaks: loadPageBreaks(),
+      sectionSettings: loadSectionSettings(),
+      hydrated: true,
+    });
   },
   setData: (d) => {
     persist(d);
@@ -387,6 +463,40 @@ export const useResumeStore = create<ResumeStore>((set, get) => ({
   resetPageLayout: () => {
     persistPageLayout(DEFAULT_PAGE_LAYOUT);
     set({ pageLayout: DEFAULT_PAGE_LAYOUT });
+  },
+  addPageBreak: (sectionId) => {
+    if (get().pageBreaks.includes(sectionId)) return;
+    const next = [...get().pageBreaks, sectionId];
+    persistPageBreaks(next);
+    set({ pageBreaks: next });
+  },
+  removePageBreak: (sectionId) => {
+    const next = get().pageBreaks.filter((id) => id !== sectionId);
+    persistPageBreaks(next);
+    set({ pageBreaks: next });
+  },
+  togglePageBreak: (sectionId) => {
+    const exists = get().pageBreaks.includes(sectionId);
+    const next = exists
+      ? get().pageBreaks.filter((id) => id !== sectionId)
+      : [...get().pageBreaks, sectionId];
+    persistPageBreaks(next);
+    set({ pageBreaks: next });
+  },
+  toggleKeepTogether: (sectionId) => {
+    const current = get().sectionSettings[sectionId] ?? DEFAULT_SECTION_SETTINGS;
+    const next = { ...get().sectionSettings, [sectionId]: { ...current, keepTogether: !current.keepTogether } };
+    persistSectionSettings(next);
+    set({ sectionSettings: next });
+  },
+  toggleStartOnNewPage: (sectionId) => {
+    const current = get().sectionSettings[sectionId] ?? DEFAULT_SECTION_SETTINGS;
+    const next = { ...get().sectionSettings, [sectionId]: { ...current, startOnNewPage: !current.startOnNewPage } };
+    persistSectionSettings(next);
+    set({ sectionSettings: next });
+  },
+  getSectionSettings: (sectionId) => {
+    return get().sectionSettings[sectionId] ?? DEFAULT_SECTION_SETTINGS;
   },
   update: (patch) => {
     const d = { ...get().data, ...patch };
@@ -430,7 +540,9 @@ export const useResumeStore = create<ResumeStore>((set, get) => ({
   },
   reset: () => {
     persist(DEFAULT_RESUME);
-    set({ data: DEFAULT_RESUME });
+    persistPageBreaks([]);
+    persistSectionSettings({});
+    set({ data: DEFAULT_RESUME, pageBreaks: [], sectionSettings: {} });
   },
   addExperience: () => {
     const newExp: ExperienceItem = {

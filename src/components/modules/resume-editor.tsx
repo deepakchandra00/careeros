@@ -26,6 +26,12 @@ import {
   Upload,
   Layers,
   GripVertical,
+  Hash,
+  Target,
+  Star,
+  Lock,
+  Unlock,
+  SeparatorHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -38,6 +44,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -71,16 +82,234 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 type IconType = React.ComponentType<{ className?: string }>;
-type RewriteAction = "improve" | "shorten" | "expand" | "rewrite";
+
+/**
+ * Extended rewrite action set — the original 4 actions plus `quantify` and
+ * `ats`, which are mapped to `improve` (with a special context) before being
+ * sent to /api/ai/rewrite (which only supports improve/rewrite/shorten/expand).
+ */
+type RewriteAction = "improve" | "shorten" | "expand" | "rewrite" | "quantify" | "ats";
 type SimpleKey = "certifications" | "awards" | "publications";
 type TagKey = "languages" | "interests";
 
+/** Actions shown on summary + project descriptions (kept as before). */
 const AI_ACTIONS: { key: RewriteAction; icon: IconType; label: string }[] = [
   { key: "improve", icon: Sparkles, label: "Improve" },
   { key: "shorten", icon: Minimize2, label: "Shorten" },
   { key: "expand", icon: Maximize2, label: "Expand" },
   { key: "rewrite", icon: Wand2, label: "Rewrite" },
 ];
+
+/**
+ * Actions shown on each experience bullet — Improve / Quantify / Shorten /
+ * ATS Optimize. Per Phase 2 spec.
+ */
+const BULLET_AI_ACTIONS: { key: RewriteAction; icon: IconType; label: string }[] = [
+  { key: "improve", icon: Sparkles, label: "Improve" },
+  { key: "quantify", icon: Hash, label: "Quantify" },
+  { key: "shorten", icon: Minimize2, label: "Shorten" },
+  { key: "ats", icon: Target, label: "ATS Optimize" },
+];
+
+/**
+ * Map a UI action to the API request body. `quantify` and `ats` are routed to
+ * the `improve` system prompt but with a context string that steers the AI
+ * toward the desired behavior (since /api/ai/rewrite only supports four
+ * actions: improve/rewrite/shorten/expand).
+ */
+function buildApiRequest(
+  action: RewriteAction,
+  text: string,
+  context?: string
+): { text: string; action: "improve" | "shorten" | "expand" | "rewrite"; context?: string } {
+  switch (action) {
+    case "quantify": {
+      const ctx = [
+        context ? `Role: ${context}` : "",
+        "Direction: Add concrete numbers, percentages, timeframes, and quantifiable metrics to make the impact measurable.",
+      ].filter(Boolean).join("\n");
+      return { text, action: "improve", context: ctx };
+    }
+    case "ats": {
+      const ctx = [
+        context ? `Role: ${context}` : "",
+        "Direction: Optimize for Applicant Tracking Systems. Weave in industry-standard keywords and required skills naturally without changing the meaning.",
+      ].filter(Boolean).join("\n");
+      return { text, action: "improve", context: ctx };
+    }
+    default:
+      return { text, action, context };
+  }
+}
+
+// ---------- Section health score ----------
+
+/** Set of strong action verbs commonly used in impactful resume bullets. */
+const ACTION_VERBS = new Set([
+  "led", "built", "developed", "designed", "shipped", "launched", "owned",
+  "architected", "drove", "increased", "reduced", "improved", "optimized",
+  "automated", "migrated", "spearheaded", "delivered", "created", "implemented",
+  "streamlined", "scaled", "mentored", "founded", "negotiated", "analyzed",
+  "researched", "prototyped", "rewrote", "refactored", "orchestrated",
+]);
+
+/**
+ * Compute a 0-5 star health score for a section based on simple heuristics.
+ * Pure function — no AI, no DOM.
+ */
+function computeSectionHealth(sectionId: SectionId, data: ResumeData): number {
+  switch (sectionId) {
+    case "summary": {
+      const text = data.summary ?? "";
+      const words = text.split(/\s+/).filter(Boolean);
+      let score = 1;
+      if (words.length >= 30) score++;
+      if (words.length >= 50) score++;
+      if (/\d/.test(text)) score++; // contains a number/metric
+      if (words.length >= 12 && words.length <= 80) score++; // good length
+      return Math.max(0, Math.min(5, score));
+    }
+    case "experience": {
+      const exps = data.experience;
+      if (exps.length === 0) return 0;
+      const bullets = exps.flatMap((e) => e.bullets);
+      let score = 1;
+      if (exps.length >= 2) score++;
+      if (bullets.length >= 4) score++;
+      const metricsCount = bullets.filter((b) => /\d/.test(b)).length;
+      if (metricsCount >= 2) score++;
+      const verbCount = bullets.filter((b) => {
+        const first = (b.split(/\s+/)[0] ?? "").toLowerCase().replace(/[^a-z]/g, "");
+        return ACTION_VERBS.has(first);
+      }).length;
+      if (verbCount >= 2) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "skills": {
+      const n = data.skills.length;
+      if (n === 0) return 0;
+      let score = 1;
+      if (n >= 5) score++;
+      if (n >= 8) score++;
+      if (n >= 12) score++;
+      // Bonus for at least one skill with a proficiency level
+      if (Object.keys(data.skillLevels).length > 0) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "projects": {
+      const projs = data.projects;
+      if (projs.length === 0) return 0;
+      let score = 1;
+      if (projs.length >= 2) score++;
+      const withDesc = projs.filter((p) => (p.description ?? "").split(/\s+/).filter(Boolean).length >= 6);
+      if (withDesc.length >= 1) score++;
+      if (withDesc.length >= 2) score++;
+      const withTech = projs.filter((p) => p.tech.length >= 2);
+      if (withTech.length >= 1) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "education": {
+      const edu = data.education;
+      if (edu.length === 0) return 0;
+      let score = 2;
+      if (edu[0].grade) score++;
+      if (edu[0].school) score++;
+      if (edu.length >= 2) score++;
+      if (edu[0].degree && edu[0].degree.split(/\s+/).length >= 2) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "certifications": {
+      const n = data.certifications.length;
+      if (n === 0) return 0;
+      let score = 2;
+      if (n >= 2) score++;
+      if (data.certifications[0].date) score++;
+      if (data.certifications[0].subtitle) score++;
+      if (n >= 4) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "languages": {
+      const n = data.languages.length;
+      if (n === 0) return 0;
+      let score = 2;
+      if (n >= 2) score++;
+      if (n >= 3) score++;
+      if (n >= 4) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "awards": {
+      const n = data.awards.length;
+      if (n === 0) return 0;
+      let score = 2;
+      if (n >= 2) score++;
+      if (data.awards[0].date) score++;
+      if (data.awards[0].description) score++;
+      if (n >= 3) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "publications": {
+      const n = data.publications.length;
+      if (n === 0) return 0;
+      let score = 2;
+      if (n >= 2) score++;
+      if (data.publications[0].date) score++;
+      if (data.publications[0].description) score++;
+      if (n >= 3) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "interests": {
+      const n = data.interests.length;
+      if (n === 0) return 0;
+      let score = 1;
+      if (n >= 3) score++;
+      if (n >= 5) score++;
+      if (n >= 8) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "references": {
+      const n = data.references.length;
+      if (n === 0) return 0;
+      let score = 2;
+      if (n >= 2) score++;
+      if (data.references[0].role) score++;
+      if (data.references[0].contact) score++;
+      if (n >= 3) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    case "personal": {
+      let score = 1;
+      if (data.name) score++;
+      if (data.title) score++;
+      if (data.email && data.phone) score++;
+      if (data.linkedin || data.github) score++;
+      return Math.max(0, Math.min(5, score));
+    }
+    default:
+      return 0;
+  }
+}
+
+/** Render a 5-star rating with the first N filled. */
+function SectionHealthBadge({ score }: { score: number }) {
+  const clamped = Math.max(0, Math.min(5, score));
+  const tone =
+    clamped >= 4 ? "text-emerald-600" : clamped >= 3 ? "text-amber-600" : clamped >= 1 ? "text-orange-600" : "text-muted-foreground/40";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("inline-flex items-center gap-0.5", tone)} aria-label={`Section health: ${clamped} of 5 stars`}>
+          {Array.from({ length: 5 }, (_, i) => (
+            <Star
+              key={i}
+              className={cn("size-3", i < clamped ? "fill-current" : "fill-transparent opacity-50")}
+            />
+          ))}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Health: {clamped}/5</TooltipContent>
+    </Tooltip>
+  );
+}
 
 // ---------- Reusable helpers ----------
 
@@ -99,6 +328,19 @@ function SectionCard({
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const data = useResumeStore((s) => s.data);
+  const pageBreaks = useResumeStore((s) => s.pageBreaks);
+  const sectionSettings = useResumeStore((s) => s.sectionSettings);
+  const togglePageBreak = useResumeStore((s) => s.togglePageBreak);
+  const toggleKeepTogether = useResumeStore((s) => s.toggleKeepTogether);
+
+  // Health score only applies to real sections (not the "custom" bucket).
+  const sectionId = (id === "custom" ? null : id) as SectionId | null;
+  const health = sectionId ? computeSectionHealth(sectionId, data) : 0;
+  const hasPageBreak = pageBreaks.includes(id);
+  const settings = sectionSettings[id] ?? { keepTogether: false, startOnNewPage: false };
+  const keepTogether = settings.keepTogether;
+
   return (
     <Collapsible
       data-section={id}
@@ -114,6 +356,87 @@ function SectionCard({
             <Icon className="size-4" />
           </span>
           <span className="flex-1 text-sm font-semibold">{title}</span>
+
+          {/* Health score — only for real sections */}
+          {sectionId && (
+            <span
+              role="button"
+              tabIndex={-1}
+              onClick={(e) => e.stopPropagation()}
+              className="px-1"
+            >
+              <SectionHealthBadge score={health} />
+            </span>
+          )}
+
+          {/* Page-break toggle — only for non-pinned sections */}
+          {id !== "personal" && id !== "summary" && id !== "custom" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    togglePageBreak(id);
+                    toast.success(hasPageBreak ? "Removed page break" : "Added page break");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      togglePageBreak(id);
+                    }
+                  }}
+                  className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-md transition-colors",
+                    hasPageBreak
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+                  )}
+                  aria-label={hasPageBreak ? "Remove page break before this section" : "Add page break before this section"}
+                >
+                  <SeparatorHorizontal className="size-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{hasPageBreak ? "Remove page break" : "Start on new page"}</TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Keep-together toggle — only for non-pinned sections */}
+          {id !== "personal" && id !== "summary" && id !== "custom" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleKeepTogether(id);
+                    toast.success(keepTogether ? "Disabled keep together" : "Keep section together");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleKeepTogether(id);
+                    }
+                  }}
+                  className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-md transition-colors",
+                    keepTogether
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground/60 hover:bg-accent hover:text-foreground"
+                  )}
+                  aria-label={keepTogether ? "Disable keep together" : "Keep section together on one page"}
+                >
+                  {keepTogether ? <Lock className="size-3.5" /> : <Unlock className="size-3.5" />}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{keepTogether ? "Keep together: on" : "Keep together: off"}</TooltipContent>
+            </Tooltip>
+          )}
+
           {typeof count === "number" && count > 0 && (
             <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold tabular-nums text-primary">
               {count}
@@ -241,11 +564,17 @@ function AIActionButtons({
   context,
   onResult,
   onMultiResult,
+  actions = AI_ACTIONS,
+  hoverOnly = false,
 }: {
   text: string;
   context?: string;
   onResult: (result: string) => void;
   onMultiResult?: (lines: string[]) => void;
+  /** Action set to render. Defaults to AI_ACTIONS (summary/project descriptions). */
+  actions?: { key: RewriteAction; icon: IconType; label: string }[];
+  /** When true, the buttons fade in on hover (used for inline bullet AI). */
+  hoverOnly?: boolean;
 }) {
   const [loading, setLoading] = React.useState<RewriteAction | null>(null);
 
@@ -257,16 +586,17 @@ function AIActionButtons({
     }
     setLoading(action);
     try {
+      const req = buildApiRequest(action, text, context);
       const json = await fetchWithFallback<{ result?: string; error?: string }>(
         "/api/ai/rewrite",
-        { text, action, context },
+        req,
       );
       const result = (json.result ?? "").trim();
       if (!result) {
         toast.error("AI returned empty content");
         return;
       }
-      if (action === "expand" && onMultiResult) {
+      if ((action === "expand") && onMultiResult) {
         const lines = result
           .split(/\r?\n/)
           .map((l) => l.trim())
@@ -288,11 +618,16 @@ function AIActionButtons({
   };
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div
+      className={cn(
+        "flex items-center gap-0.5 transition-opacity",
+        hoverOnly && "opacity-0 group-hover/bullet:opacity-100 focus-within:opacity-100"
+      )}
+    >
       <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         AI
       </span>
-      {AI_ACTIONS.map(({ key, icon: Icon, label }) => (
+      {actions.map(({ key, icon: Icon, label }) => (
         <Button
           key={key}
           type="button"
@@ -522,7 +857,7 @@ function ExperienceEntryCard({ exp }: { exp: ExperienceItem }) {
           {exp.bullets.map((b, idx) => (
             <div
               key={`${exp.id}-b-${idx}`}
-              className="space-y-1.5 rounded-md border bg-card p-2"
+              className="group/bullet space-y-1.5 rounded-md border bg-card p-2 transition-colors hover:border-primary/30"
             >
               <Textarea
                 rows={2}
@@ -537,6 +872,8 @@ function ExperienceEntryCard({ exp }: { exp: ExperienceItem }) {
                   context={`${exp.role} at ${exp.company}`}
                   onResult={(r) => updateBullet(exp.id, idx, r)}
                   onMultiResult={(lines) => handleMultiBullet(idx, lines)}
+                  actions={BULLET_AI_ACTIONS}
+                  hoverOnly
                 />
                 <Button
                   type="button"

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { ResumeData, TemplateStyle, PageLayout } from "@/store/resume-store";
+import type { ResumeData, TemplateStyle, PageLayout, SectionSettings } from "@/store/resume-store";
 import { generatePageModel, BlockType, type PageModel, type PageBlock } from "@/lib/resume/layout-engine";
 import { ResumePreview } from "@/components/modules/resume-templates";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,10 @@ interface PageBasedPreviewProps {
   pageLayout: PageLayout;
   zoom?: number;
   className?: string;
+  /** Section IDs that should always start on a new page. */
+  pageBreaks?: string[];
+  /** Per-section layout overrides (keepTogether / startOnNewPage). */
+  sectionSettings?: Record<string, SectionSettings>;
 }
 
 /**
@@ -34,6 +38,8 @@ export function PageBasedPreview({
   pageLayout,
   zoom = 0.75,
   className,
+  pageBreaks,
+  sectionSettings,
 }: PageBasedPreviewProps) {
   // Generate the page model using the layout engine
   const sectionOrder = React.useMemo(() => {
@@ -42,8 +48,14 @@ export function PageBasedPreview({
   }, [data.sectionOrder, sections]);
 
   const pageModel = React.useMemo(() => {
-    return generatePageModel(data, sectionOrder, { width: A4_WIDTH, height: A4_HEIGHT }, pageLayout);
-  }, [data, sectionOrder, pageLayout]);
+    return generatePageModel(
+      data,
+      sectionOrder,
+      { width: A4_WIDTH, height: A4_HEIGHT },
+      pageLayout,
+      { pageBreaks, sectionSettings }
+    );
+  }, [data, sectionOrder, pageLayout, pageBreaks, sectionSettings]);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>

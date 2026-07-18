@@ -20,6 +20,12 @@ import {
   ArrowUpDown,
   GripVertical,
   LayoutTemplate,
+  Wand2,
+  AlertTriangle,
+  Keyboard,
+  Share2,
+  FileJson,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -51,9 +57,10 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import { ModuleHeader, AIButton } from "@/components/shared/blocks";
-import { useResumeStore, type SectionId } from "@/store/resume-store";
+import { useResumeStore, type SectionId, type PageLayout } from "@/store/resume-store";
 import { ResumeEditor } from "@/components/modules/resume-editor";
 import { PageBasedPreview } from "@/components/modules/page-based-preview";
 import { PageNavigator } from "@/components/modules/page-navigator";
@@ -83,6 +90,158 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+// ---------- AI Layout Assistant presets ----------
+/**
+ * Each preset returns a partial PageLayout that the AI Layout Assistant will
+ * apply to the store. The presets are intentionally simple — the layout engine
+ * handles reflow automatically once padding changes.
+ */
+type LayoutPresetKey =
+  | "fit-1"
+  | "fit-2"
+  | "compact"
+  | "spacious"
+  | "ats";
+
+const LAYOUT_PRESETS: {
+  key: LayoutPresetKey;
+  label: string;
+  description: string;
+  apply: () => Partial<PageLayout>;
+}[] = [
+  {
+    key: "fit-1",
+    label: "Fit to 1 page",
+    description: "Zero padding to maximize content area",
+    apply: () => ({ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }),
+  },
+  {
+    key: "fit-2",
+    label: "Fit to 2 pages",
+    description: "Slight padding for breathing room",
+    apply: () => ({ paddingTop: 24, paddingBottom: 24, paddingLeft: 16, paddingRight: 16 }),
+  },
+  {
+    key: "compact",
+    label: "Compact",
+    description: "Minimal padding + tighter spacing",
+    apply: () => ({ paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8 }),
+  },
+  {
+    key: "spacious",
+    label: "Spacious",
+    description: "Generous padding for an airy feel",
+    apply: () => ({ paddingTop: 48, paddingBottom: 48, paddingLeft: 32, paddingRight: 32 }),
+  },
+  {
+    key: "ats",
+    label: "ATS Optimized",
+    description: "Zero padding, single-column feel",
+    apply: () => ({ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }),
+  },
+];
+
+// ---------- Zoom presets ----------
+type ZoomKey = "25" | "50" | "75" | "100" | "125" | "fit-width" | "fit-page";
+
+const ZOOM_PRESETS: { key: ZoomKey; label: string }[] = [
+  { key: "25", label: "25%" },
+  { key: "50", label: "50%" },
+  { key: "75", label: "75%" },
+  { key: "100", label: "100%" },
+  { key: "125", label: "125%" },
+  { key: "fit-width", label: "Fit Width" },
+  { key: "fit-page", label: "Fit Page" },
+];
+
+// ---------- Keyboard shortcuts hook ----------
+interface KeyboardShortcutHandlers {
+  onSave: () => void;
+  onPrint: () => void;
+  onShortcutsHelp: () => void;
+}
+
+/**
+ * useKeyboardShortcuts — wires global Ctrl/Cmd+key shortcuts for the resume
+ * builder. Undo/Redo are left to the browser (input fields handle them
+ * natively), so we only register Save, Print, and the Help dialog.
+ *
+ * Returns nothing. Side-effect only.
+ */
+function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
+  const ref = React.useRef(handlers);
+
+  // Keep the latest handlers in the ref without touching it during render.
+  React.useEffect(() => {
+    ref.current = handlers;
+  });
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+
+      // Ctrl+S — Save (prevent browser save dialog)
+      if (key === "s") {
+        e.preventDefault();
+        ref.current.onSave();
+        return;
+      }
+      // Ctrl+P — Print (open print preview)
+      if (key === "p") {
+        e.preventDefault();
+        ref.current.onPrint();
+        return;
+      }
+      // Ctrl+/ — Show shortcuts help
+      if (key === "/") {
+        e.preventDefault();
+        ref.current.onShortcutsHelp();
+        return;
+      }
+      // Ctrl+Z / Ctrl+Shift+Z — leave to the browser (undo/redo on inputs)
+      // Ctrl+D — duplicate selected section (handled below, no-op if no selection)
+      // We don't have a "selected section" concept yet, so we let the browser
+      // keep its default Ctrl+D behavior (bookmark) to avoid hijacking. The
+      // shortcut is documented in the help dialog for future use.
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+}
+
+// ---------- Common helper: counts keywords in the resume ----------
+function countKeywords(data: ReturnType<typeof useResumeStore.getState>["data"]): number {
+  const text = [
+    data.summary,
+    ...data.experience.flatMap((e) => [e.role, ...e.bullets]),
+    ...data.projects.flatMap((p) => [p.name, p.description, ...p.tech]),
+    ...data.skills,
+    ...data.education.flatMap((e) => [e.degree, e.school]),
+    ...data.certifications.flatMap((c) => [c.title, c.subtitle]),
+  ].filter(Boolean).join(" ").toLowerCase();
+  // Crude keyword detection: any capitalized word in the source data that's
+  // 3+ chars and not a stopword. Good enough for a live metric.
+  const stop = new Set(["the", "and", "for", "with", "from", "into", "this", "that", "have", "been", "was", "are", "you", "your", "our", "their", "they", "them", "but", "not", "all", "any", "can", "will", "would", "could", "should", "may", "might", "must", "shall"]);
+  const tokens = text.split(/[^a-z0-9+#.\-]+/i).filter((t) => t.length >= 3 && !stop.has(t.toLowerCase()));
+  const unique = new Set(tokens.map((t) => t.toLowerCase()));
+  return unique.size;
+}
+
+function countCharacters(data: ReturnType<typeof useResumeStore.getState>["data"]): number {
+  const text = [
+    data.name, data.title, data.summary,
+    ...data.experience.flatMap((e) => [e.role, e.company, e.location, ...e.bullets]),
+    ...data.projects.flatMap((p) => [p.name, p.description, ...p.tech]),
+    ...data.skills,
+    ...data.education.flatMap((e) => [e.degree, e.school, e.location, e.grade]),
+    ...data.certifications.flatMap((c) => [c.title, c.subtitle, c.description]),
+    ...data.languages,
+  ].filter(Boolean).join(" ");
+  return text.length;
+}
 
 const ALL_SECTIONS: { id: SectionId; label: string }[] = [
   { id: "personal", label: "Personal Info" },
@@ -291,6 +450,8 @@ export function ResumeBuilderModule() {
   const pageLayout = useResumeStore((s) => s.pageLayout);
   const setPageLayout = useResumeStore((s) => s.setPageLayout);
   const resetPageLayout = useResumeStore((s) => s.resetPageLayout);
+  const pageBreaks = useResumeStore((s) => s.pageBreaks);
+  const sectionSettings = useResumeStore((s) => s.sectionSettings);
   const hydrate = useResumeStore((s) => s.hydrate);
   const setData = useResumeStore((s) => s.setData);
   const reset = useResumeStore((s) => s.reset);
@@ -300,6 +461,7 @@ export function ResumeBuilderModule() {
     DEFAULT_SECTIONS
   );
   const [zoom, setZoom] = React.useState(0.75);
+  const [zoomMode, setZoomMode] = React.useState<ZoomKey>("75");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [importing, setImporting] = React.useState(false);
   const [exportingDocx, setExportingDocx] = React.useState(false);
@@ -308,6 +470,7 @@ export function ResumeBuilderModule() {
   const [pasteText, setPasteText] = React.useState("");
   const [pasting, setPasting] = React.useState(false);
   const [reorderOpen, setReorderOpen] = React.useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [importSteps, setImportSteps] = React.useState<
     { label: string; status: "pending" | "parsing" | "done"; count?: number }[]
   >([]);
@@ -315,6 +478,7 @@ export function ResumeBuilderModule() {
   const [templateSearch, setTemplateSearch] = React.useState("");
   const [templateCategory, setTemplateCategory] = React.useState("All");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const previewScrollRef = React.useRef<HTMLDivElement>(null);
 
   // Compute page model, word count, and ATS score
   const sectionOrder = React.useMemo(
@@ -323,8 +487,14 @@ export function ResumeBuilderModule() {
   );
 
   const pageModel = React.useMemo(
-    () => generatePageModel(data, sectionOrder, { width: 794, height: 1123 }, pageLayout),
-    [data, sectionOrder, pageLayout]
+    () => generatePageModel(
+      data,
+      sectionOrder,
+      { width: 794, height: 1123 },
+      pageLayout,
+      { pageBreaks, sectionSettings }
+    ),
+    [data, sectionOrder, pageLayout, pageBreaks, sectionSettings]
   );
 
   const wordCount = React.useMemo(() => {
@@ -338,6 +508,15 @@ export function ResumeBuilderModule() {
     return text.split(/\s+/).filter(Boolean).length;
   }, [data]);
 
+  const charCount = React.useMemo(() => countCharacters(data), [data]);
+  const keywordCount = React.useMemo(() => countKeywords(data), [data]);
+  const readingTimeMin = Math.max(1, Math.round(wordCount / 200));
+  const estimatedPdfKb = React.useMemo(() => {
+    // Crude estimate: ~1KB per 100 chars + 30KB base per page
+    const base = 30 + Math.ceil(charCount / 100);
+    return base * (pageModel?.totalPages ?? 1);
+  }, [charCount, pageModel]);
+
   const atsScore = React.useMemo(() => {
     let score = 50;
     if (data.summary?.length > 50) score += 10;
@@ -349,6 +528,18 @@ export function ResumeBuilderModule() {
     return Math.min(100, score);
   }, [data]);
 
+  // Compute the tallest single section (used by the overflow indicator).
+  // Heuristic: estimate each section's word count and flag the largest.
+  const tallestSection = React.useMemo(() => {
+    const candidates: { id: string; words: number }[] = [
+      { id: "experience", words: data.experience.flatMap((e) => [e.role, ...e.bullets]).join(" ").split(/\s+/).filter(Boolean).length },
+      { id: "skills", words: data.skills.length },
+      { id: "projects", words: data.projects.flatMap((p) => [p.name, p.description, ...p.tech]).join(" ").split(/\s+/).filter(Boolean).length },
+      { id: "education", words: data.education.flatMap((e) => [e.degree, e.school]).join(" ").split(/\s+/).filter(Boolean).length },
+    ];
+    return candidates.sort((a, b) => b.words - a.words)[0];
+  }, [data]);
+
   const toggleSection = React.useCallback((id: string) => {
     setSections((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -357,6 +548,93 @@ export function ResumeBuilderModule() {
   React.useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // ---- AI Layout Assistant ----
+  const applyLayoutPreset = (preset: typeof LAYOUT_PRESETS[number]) => {
+    setPageLayout(preset.apply());
+    toast.success(`Layout: ${preset.label}`, { description: preset.description });
+  };
+
+  // ---- Zoom helpers (Fit Width / Fit Page) ----
+  const applyZoomPreset = React.useCallback((key: ZoomKey) => {
+    setZoomMode(key);
+    if (key === "fit-width" || key === "fit-page") {
+      // Defer until after the dropdown closes so the container has its full width.
+      requestAnimationFrame(() => {
+        const container = previewScrollRef.current;
+        if (!container) return;
+        const containerWidth = container.clientWidth - 48; // padding
+        const containerHeight = container.clientHeight - 48;
+        const A4_W = 794;
+        const A4_H = 1123;
+        if (key === "fit-width") {
+          const z = Math.max(0.1, Math.min(2, containerWidth / A4_W));
+          setZoom(+z.toFixed(2));
+        } else {
+          const z = Math.max(0.1, Math.min(2, Math.min(containerWidth / A4_W, containerHeight / A4_H)));
+          setZoom(+z.toFixed(2));
+        }
+      });
+      return;
+    }
+    const numeric = parseInt(key, 10) / 100;
+    setZoom(numeric);
+  }, []);
+
+  // ---- Save (keyboard shortcut) ----
+  const handleSave = React.useCallback(() => {
+    // Persist to localStorage (already happens via store subscribers, but call
+    // hydrate to be safe) and show a confirmation toast.
+    try {
+      localStorage.setItem("careeros-resume-v2", JSON.stringify(data));
+    } catch {}
+    toast.success("Saved", { description: "Resume stored locally." });
+  }, [data]);
+
+  // ---- Open print preview ----
+  const handlePrintPreview = React.useCallback(() => {
+    window.open("/resume/preview", "_blank");
+  }, []);
+
+  // ---- Export JSON ----
+  const handleExportJson = React.useCallback(() => {
+    try {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(data.name || "resume").toLowerCase().replace(/\s+/g, "-")}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("JSON exported");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "JSON export failed");
+    }
+  }, [data]);
+
+  // ---- Share link ----
+  const handleShareLink = React.useCallback(() => {
+    const username = (data.name || "you").toLowerCase().replace(/\s+/g, "-");
+    const url = `${window.location.origin}/u/${username}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        toast.success("Share link copied", { description: url });
+      }).catch(() => {
+        toast.success("Share link", { description: url });
+      });
+    } else {
+      toast.success("Share link", { description: url });
+    }
+  }, [data.name]);
+
+  // Wire keyboard shortcuts
+  useKeyboardShortcuts({
+    onSave: handleSave,
+    onPrint: handlePrintPreview,
+    onShortcutsHelp: () => setShortcutsOpen(true),
+  });
 
   // ---- Import flow (instant regex parser, no AI needed) ----
   /**
@@ -597,34 +875,75 @@ export function ResumeBuilderModule() {
             disabled={importing || pasting}
           >
             <ClipboardPaste className="size-3.5" />
-            Paste text
+            <span className="hidden sm:inline">Paste text</span>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={handleExportPdf}
-            disabled={exportingPdf}
-          >
-            {exportingPdf ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Download className="size-3.5" />
-            )} PDF
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5"
-            onClick={handleExportDocx}
-            disabled={exportingDocx}
-          >
-            {exportingDocx ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <FileType2 className="size-3.5" />
-            )}
-            Word
-          </Button>
+
+          {/* Export dropdown — replaces separate PDF/Word buttons (Phase 3 #10) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-1.5">
+                <Download className="size-3.5" />
+                <span className="hidden sm:inline">Export</span>
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Export resume</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={exportingPdf}
+                onClick={handleExportPdf}
+              >
+                {exportingPdf ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <FileText className="size-3.5" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm">PDF</p>
+                  <p className="text-[10px] text-muted-foreground">Download .pdf</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={exportingDocx}
+                onClick={handleExportDocx}
+              >
+                {exportingDocx ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <FileType2 className="size-3.5" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm">Word</p>
+                  <p className="text-[10px] text-muted-foreground">Download .docx</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={handleExportJson}>
+                <FileJson className="size-3.5" />
+                <div className="flex-1">
+                  <p className="text-sm">JSON</p>
+                  <p className="text-[10px] text-muted-foreground">Raw resume data</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={handlePrintPreview}>
+                <Printer className="size-3.5" />
+                <div className="flex-1">
+                  <p className="text-sm">Print</p>
+                  <p className="text-[10px] text-muted-foreground">Open print preview</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2" onClick={handleShareLink}>
+                <Share2 className="size-3.5" />
+                <div className="flex-1">
+                  <p className="text-sm">Share link</p>
+                  <p className="text-[10px] text-muted-foreground">Copy public URL</p>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </ModuleHeader>
 
@@ -709,38 +1028,104 @@ export function ResumeBuilderModule() {
 
           <div className="h-5 w-px bg-border" />
 
-          {/* Zoom */}
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.1).toFixed(2)))}
+          {/* Zoom — dropdown with presets + Fit Width / Fit Page (Phase 3 #7) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <ZoomIn className="size-3.5" />
+                <span className="tabular-nums">
+                  {zoomMode === "fit-width" || zoomMode === "fit-page"
+                    ? ZOOM_PRESETS.find((z) => z.key === zoomMode)?.label
+                    : `${Math.round(zoom * 100)}%`}
+                </span>
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel>Zoom</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {ZOOM_PRESETS.map((z) => (
+                <DropdownMenuCheckboxItem
+                  key={z.key}
+                  checked={zoomMode === z.key}
+                  onCheckedChange={() => applyZoomPreset(z.key)}
                 >
-                  <ZoomOut className="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom out</TooltipContent>
-            </Tooltip>
-            <span className="w-10 text-center text-xs font-medium tabular-nums">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={() => setZoom((z) => Math.min(1.2, +(z + 0.1).toFixed(2)))}
+                  {z.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <div className="flex items-center gap-1 px-2 py-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setZoom((z) => Math.max(0.1, +(z - 0.1).toFixed(2)))}
+                    >
+                      <ZoomOut className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Zoom out</TooltipContent>
+                </Tooltip>
+                <span className="flex-1 text-center text-[11px] tabular-nums text-muted-foreground">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))}
+                    >
+                      <ZoomIn className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Zoom in</TooltipContent>
+                </Tooltip>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* AI Layout Assistant — applies page-layout presets (Phase 2 #1) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Wand2 className="size-3.5 text-primary" />
+                <span className="hidden sm:inline">Optimize Layout</span>
+                <span className="sm:hidden">AI</span>
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuLabel>AI Layout Assistant</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {LAYOUT_PRESETS.map((preset) => (
+                <DropdownMenuItem
+                  key={preset.key}
+                  className="gap-2"
+                  onClick={() => applyLayoutPreset(preset)}
                 >
-                  <ZoomIn className="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom in</TooltipContent>
-            </Tooltip>
-          </div>
+                  <div className="flex-1">
+                    <p className="text-sm">{preset.label}</p>
+                    <p className="text-[10px] text-muted-foreground">{preset.description}</p>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 text-muted-foreground"
+                onClick={() => {
+                  resetPageLayout();
+                  toast.success("Layout reset to default");
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+                <span className="text-sm">Reset to default</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <div className="h-5 w-px bg-border" />
 
@@ -885,9 +1270,35 @@ export function ResumeBuilderModule() {
             Reorder
           </Button>
 
-          <div className="ml-auto">
+          {/* Keyboard shortcuts help (Phase 3 #9) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Keyboard shortcuts"
+              >
+                <Keyboard className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Keyboard shortcuts (Ctrl+/)</TooltipContent>
+          </Tooltip>
+
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleSave}
+              aria-label="Save (Ctrl+S)"
+            >
+              <CheckCircle2 className="size-3.5 text-primary" />
+              <span className="hidden sm:inline">Save</span>
+            </Button>
             <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleReset}>
-              <RotateCcw className="size-3.5" /> Reset
+              <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">Reset</span>
             </Button>
           </div>
         </CardContent>
@@ -909,7 +1320,11 @@ export function ResumeBuilderModule() {
           <ResizablePanel defaultSize={62} minSize={40} className="overflow-hidden">
             <div className="flex h-full flex-col">
               {/* Canvas area */}
-              <div data-preview-scroll className="flex-1 overflow-auto scroll-thin bg-muted/30 p-4 sm:p-6">
+              <div
+                ref={previewScrollRef}
+                data-preview-scroll
+                className="flex-1 overflow-auto scroll-thin bg-muted/30 p-4 sm:p-6"
+              >
                 <div className="flex justify-center">
                   <PageBasedPreview
                     data={data}
@@ -917,6 +1332,8 @@ export function ResumeBuilderModule() {
                     sections={sections}
                     pageLayout={pageLayout}
                     zoom={zoom}
+                    pageBreaks={pageBreaks}
+                    sectionSettings={sectionSettings}
                   />
                 </div>
               </div>
@@ -928,7 +1345,7 @@ export function ResumeBuilderModule() {
                   currentPage={currentPage}
                   onPageClick={(page) => {
                     // Scroll to the page in the preview
-                    const previewArea = document.querySelector('[data-preview-scroll]');
+                    const previewArea = previewScrollRef.current;
                     if (previewArea) {
                       const pages = previewArea.querySelectorAll('.resume-page');
                       const targetPage = pages[page - 1];
@@ -941,20 +1358,48 @@ export function ResumeBuilderModule() {
                 />
               </div>
 
-              {/* Status Bar */}
-              <div className="flex items-center justify-between border-t bg-card px-4 py-1.5 text-[11px] text-muted-foreground">
-                <div className="flex items-center gap-3">
-                  <span>{pageModel?.totalPages ?? 1} page{(pageModel?.totalPages ?? 1) > 1 ? 's' : ''}</span>
+              {/* Status Bar — Live page metrics + overflow indicator (Phase 2 #6 + Phase 3 #8) */}
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t bg-card px-4 py-1.5 text-[11px] text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-medium text-foreground">
+                    {pageModel?.totalPages ?? 1} page{(pageModel?.totalPages ?? 1) > 1 ? 's' : ''}
+                  </span>
                   <span>·</span>
                   <span>{wordCount} words</span>
+                  <span className="hidden sm:inline">·</span>
+                  <span className="hidden sm:inline">{charCount} chars</span>
+                  <span className="hidden md:inline">·</span>
+                  <span className="hidden md:inline">{keywordCount} keywords</span>
                   <span>·</span>
-                  <span>~{Math.ceil(wordCount / 200)} min read</span>
+                  <span>~{readingTimeMin} min read</span>
+                  <span className="hidden lg:inline">·</span>
+                  <span className="hidden lg:inline">~{estimatedPdfKb} KB pdf</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span>ATS: {atsScore}%</span>
-                  {pageLayout.paddingTop > 0 || pageLayout.paddingBottom > 0 ? (
-                    <span className="text-primary">· Custom padding</span>
+                  {/* Overflow indicator (Phase 2 #6) */}
+                  {(pageModel?.totalPages ?? 1) > 1 ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      <AlertTriangle className="size-3" />
+                      Content overflows to {pageModel?.totalPages} pages
+                    </span>
+                  ) : tallestSection && tallestSection.words > 220 ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800 capitalize dark:bg-amber-950 dark:text-amber-300">
+                      <AlertTriangle className="size-3" />
+                      {tallestSection.id} exceeds 1 page
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      <CheckCircle2 className="size-3" />
+                      Fits 1 page
+                    </span>
+                  )}
+                  <span className="font-medium text-foreground">ATS: {atsScore}%</span>
+                  {(pageLayout.paddingTop > 0 || pageLayout.paddingBottom > 0 || pageLayout.paddingLeft > 0 || pageLayout.paddingRight > 0) ? (
+                    <span className="hidden sm:inline text-primary">· Custom padding</span>
                   ) : null}
+                  {pageBreaks.length > 0 && (
+                    <span className="hidden sm:inline text-primary">· {pageBreaks.length} page break{pageBreaks.length > 1 ? 's' : ''}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1200,88 +1645,47 @@ export function ResumeBuilderModule() {
         setSectionOrder={setSectionOrder}
       />
 
-      {/* Template picker dialog — 140+ templates with thumbnails + categories */}
-      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
-        <DialogContent className="max-h-[85vh] max-w-4xl overflow-hidden p-0">
-          <DialogHeader className="border-b p-4">
-            <DialogTitle>Choose a template</DialogTitle>
-            <DialogDescription>
-              {PREMIUM_TEMPLATES.length + TEMPLATE_PRESETS.length} templates — search or filter by category.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="border-b p-3 space-y-2">
-            <Input
-              placeholder="Search templates… (e.g. 'engineer', 'purple', 'serif')"
-              value={templateSearch}
-              onChange={(e) => setTemplateSearch(e.target.value)}
-              className="h-9"
-            />
-            <div className="flex flex-wrap gap-1.5">
-              {["All", "Premium", "Pro", "Tech", "Luxury", "Featured", "Modern", "ATS", "Executive", "Minimal", "Creative", "Engineer"].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setTemplateCategory(cat)}
-                  className={cn(
-                    "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                    templateCategory === cat ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  )}
-                >
-                  {cat === "Premium" && "✨ "}
-                  {cat === "Pro" && "🎨 "}
-                  {cat === "Tech" && "⚡ "}
-                  {cat === "Luxury" && "💎 "}
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="scroll-thin max-h-[58vh] overflow-y-auto p-3">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {PREMIUM_TEMPLATES
-                .filter((p) => {
-                  if (templateCategory === "All") return true;
-                  if (["Premium", "Pro", "Tech", "Luxury", "Designer"].includes(templateCategory)) {
-                    return p.category === templateCategory.toLowerCase();
-                  }
-                  return false;
-                })
-                .filter((p) => !templateSearch.trim() || p.name.toLowerCase().includes(templateSearch.toLowerCase()) || p.description.toLowerCase().includes(templateSearch.toLowerCase()))
-                .map((preset) => (
-                  <button key={preset.id} onClick={() => { setStyle({ template: preset.base, accent: preset.accent, font: preset.font }); setTemplatePickerOpen(false); setTemplateSearch(""); }} className={cn("group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md", style.template === preset.base && style.accent === preset.accent && style.font === preset.font && "border-primary ring-2 ring-primary")}>
-                    <div className="aspect-[3/4] overflow-hidden bg-muted"><img src={preset.thumbnail} alt={preset.name} className="h-full w-full object-cover object-top transition-transform group-hover:scale-105" /></div>
-                    <div className="p-2"><p className="truncate text-xs font-medium">{preset.name}</p><p className="truncate text-[10px] text-muted-foreground">{preset.description}</p></div>
-                    <span className={cn("absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white shadow", preset.category === "designer" ? "bg-emerald-600" : preset.category === "luxury" ? "bg-rose-600" : preset.category === "tech" ? "bg-violet-600" : preset.category === "pro" ? "bg-sky-600" : "bg-amber-500")}>{preset.category === "designer" ? "DESIGNER" : preset.category === "luxury" ? "LUXURY" : preset.category === "tech" ? "TECH" : preset.category === "pro" ? "PRO" : "PREMIUM"}</span>
-                  </button>
-                ))}
-              {(templateCategory === "All" || (templateCategory !== "Premium" && templateCategory !== "Pro" && templateCategory !== "Tech" && templateCategory !== "Luxury" && templateCategory !== "Designer" && templateCategory !== "Featured")) &&
-                TEMPLATE_PRESETS.filter((p) => templateCategory === "All" ? true : templateCategory === "Featured" ? p.category === "Featured" : p.category === templateCategory).filter((p) => !templateSearch.trim() || p.name.toLowerCase().includes(templateSearch.toLowerCase()) || p.description.toLowerCase().includes(templateSearch.toLowerCase())).slice(0, 60).map((preset) => (
-                  <button key={preset.id} onClick={() => { setStyle({ template: preset.base, accent: preset.accent, font: preset.font }); setTemplatePickerOpen(false); setTemplateSearch(""); }} className={cn("group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md", style.template === preset.base && style.accent === preset.accent && style.font === preset.font && "border-primary ring-2 ring-primary")}>
-                    <div className="aspect-[3/4] bg-white p-1.5"><TemplateMiniPreview preset={preset} /></div>
-                    <div className="p-2"><p className="truncate text-xs font-medium">{preset.name}</p><p className="truncate text-[10px] text-muted-foreground">{preset.description}</p></div>
-                  </button>
-                ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Paste-text fallback dialog */}
-      <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Keyboard shortcuts help dialog (Phase 3 #9) */}
+      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardPaste className="size-5 text-primary" />
-              Paste your resume text
+              <Keyboard className="size-5 text-primary" />
+              Keyboard shortcuts
             </DialogTitle>
             <DialogDescription>
-              If the file import timed out or failed, paste your resume text here and the AI will parse it.
+              Speed up your workflow with these shortcuts.
             </DialogDescription>
           </DialogHeader>
-          <Textarea value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder="Paste your full resume text here…" className="min-h-[300px] resize-none font-mono text-xs" />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setPasteOpen(false)}>Cancel</Button>
-            <Button onClick={handlePasteImport} disabled={pasting || pasteText.trim().length < 30} className="gap-1.5">{pasting ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}Parse with AI</Button>
+          <div className="space-y-2">
+            {[
+              { keys: ["Ctrl", "S"], desc: "Save resume (local)" },
+              { keys: ["Ctrl", "Z"], desc: "Undo (input field)" },
+              { keys: ["Ctrl", "Shift", "Z"], desc: "Redo (input field)" },
+              { keys: ["Ctrl", "P"], desc: "Open print preview" },
+              { keys: ["Ctrl", "D"], desc: "Duplicate selected section (coming soon)" },
+              { keys: ["Ctrl", "/"], desc: "Show this help" },
+            ].map((row) => (
+              <div key={row.desc} className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+                <span className="text-sm text-muted-foreground">{row.desc}</span>
+                <div className="flex items-center gap-1">
+                  {row.keys.map((k, i) => (
+                    <kbd
+                      key={i}
+                      className="rounded border bg-background px-1.5 py-0.5 text-[10px] font-semibold shadow-sm"
+                    >
+                      {k}
+                    </kbd>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShortcutsOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -11,10 +11,18 @@
  * - allowSplit: if a node has children, try to split children across pages
  * - keepWithNext: keep a node with the next one (e.g., section header with first entry)
  * - widowLines/orphanLines: minimum lines at start/end of a split block
+ * - pageBreaks: list of section IDs (top-level node ids) that must start a new page
+ * - sectionSettings.startOnNewPage: equivalent to pageBreaks for that section
  */
 
 import type { Insets } from "./types";
-import { BlockType, type LayoutNode, type PageBlock, type PageModel, type Page } from "./types";
+import type { LayoutNode, PageBlock, PageModel, Page } from "./types";
+
+/** Optional pagination controls driven by the resume store. */
+export interface PaginateOptions {
+  /** Section IDs that must always start on a new page (manual page breaks). */
+  pageBreaks?: string[];
+}
 
 /**
  * Paginate LayoutNodes into a PageModel.
@@ -22,23 +30,46 @@ import { BlockType, type LayoutNode, type PageBlock, type PageModel, type Page }
  * @param nodes - The measured layout nodes (from the measurer)
  * @param contentArea - The content area { width, height } available per page
  * @param padding - The user-adjustable padding (Insets)
+ * @param options - Optional page-break overrides from the store
  */
 export function paginate(
   nodes: LayoutNode[],
   contentArea: { width: number; height: number },
-  padding: Insets
+  padding: Insets,
+  options?: PaginateOptions
 ): PageModel {
   const pages: Page[] = [];
   const availableHeight = contentArea.height - padding.top - padding.bottom;
   const availableWidth = contentArea.width - padding.left - padding.right;
+  const pageBreakSet = new Set(options?.pageBreaks ?? []);
 
   let currentPage: Page = { pageNumber: 1, blocks: [] };
   let currentY = padding.top;
   let pageNumber = 1;
 
+  /**
+   * Start a new page. Pushes the current page to the pages array and resets
+   * the cursor. No-op if the current page is already empty (avoids blank pages
+   * when a break is requested at the top of a fresh page).
+   */
+  const startNewPage = () => {
+    if (currentPage.blocks.length === 0) return; // already on a fresh page
+    pages.push(currentPage);
+    pageNumber++;
+    currentPage = { pageNumber, blocks: [] };
+    currentY = padding.top;
+  };
+
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     const nodeHeight = node.estimatedHeight + node.marginTop + node.marginBottom;
+
+    // Manual page break: this section must start on a new page.
+    // We treat both the explicit `pageBreaks` list and any node whose id is in
+    // the set as a forced break.
+    if (pageBreakSet.has(node.id)) {
+      startNewPage();
+    }
 
     // Check if this node fits on the current page
     if (currentY + nodeHeight <= padding.top + availableHeight) {
@@ -49,11 +80,8 @@ export function paginate(
       // Doesn't fit
       if (node.rules.keepTogether || !node.rules.allowSplit || !node.children) {
         // Move to next page
-        pages.push(currentPage);
-        pageNumber++;
-        currentPage = { pageNumber, blocks: [] };
-        currentY = padding.top;
-        
+        startNewPage();
+
         // Add to new page (if it fits on a fresh page)
         if (nodeHeight <= availableHeight) {
           addNodeToPage(currentPage, node, padding.left, currentY + node.marginTop, availableWidth);
@@ -65,7 +93,6 @@ export function paginate(
         }
       } else {
         // allowSplit — try to add children to current page, rest to next
-        const remainingHeight = padding.top + availableHeight - currentY;
 
         // Add section header to current page
         const headerHeight = node.estimatedHeight - (node.children?.reduce((sum, c) => sum + c.estimatedHeight + c.marginTop + c.marginBottom, 0) || 0);
@@ -94,11 +121,7 @@ export function paginate(
               currentY += childHeight;
             } else {
               // Child doesn't fit — new page
-              // First, add a continuation header on the new page
-              pages.push(currentPage);
-              pageNumber++;
-              currentPage = { pageNumber, blocks: [] };
-              currentY = padding.top;
+              startNewPage();
 
               // Add continuation header
               if (headerHeight > 0) {
