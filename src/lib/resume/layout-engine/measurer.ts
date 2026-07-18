@@ -30,16 +30,19 @@ const ENTRY_GAP = 10;            // gap between entries within a section
 
 /**
  * Measure all LayoutNodes — sets their estimatedHeight.
- * Returns the same array (mutated in place for efficiency).
+ *
+ * CRITICAL: Measures CHILDREN FIRST (bottom-up), then parents.
+ * This ensures parent section heights include the correct child heights.
+ * (Previously measured parents first — children were 0 when parent was calculated.)
  */
 export function measureNodes(nodes: LayoutNode[]): LayoutNode[] {
   for (const node of nodes) {
-    node.estimatedHeight = measureNode(node);
-    
-    // Also measure children
+    // Measure children FIRST (bottom-up)
     if (node.children) {
       measureNodes(node.children);
     }
+    // Then measure the parent (now children have correct heights)
+    node.estimatedHeight = measureNode(node);
   }
   return nodes;
 }
@@ -114,12 +117,12 @@ function measureSummary(data: { text: string }): number {
   return SECTION_HEADER_HEIGHT + lines * LINE_HEIGHT;
 }
 
-/** Experience section: header + all entries */
+/** Experience section: header + all entries (including entry gaps) */
 function measureExperienceSection(node: LayoutNode): number {
   if (!node.children) return SECTION_HEADER_HEIGHT;
   let height = SECTION_HEADER_HEIGHT;
   for (const child of node.children) {
-    height += child.estimatedHeight + ENTRY_GAP;
+    height += child.estimatedHeight + child.marginTop + child.marginBottom;
   }
   return height;
 }
@@ -142,12 +145,12 @@ function measureSkills(skills: string[]): number {
   return SECTION_HEADER_HEIGHT + rows * SKILL_CHIP_HEIGHT;
 }
 
-/** Projects section: header + all entries */
+/** Projects section: header + all entries (including entry gaps) */
 function measureProjectsSection(node: LayoutNode): number {
   if (!node.children) return SECTION_HEADER_HEIGHT;
   let height = SECTION_HEADER_HEIGHT;
   for (const child of node.children) {
-    height += child.estimatedHeight + ENTRY_GAP;
+    height += child.estimatedHeight + child.marginTop + child.marginBottom;
   }
   return height;
 }
@@ -168,12 +171,12 @@ function measureProjectEntry(data: ProjectItem): number {
   return Math.max(height, ENTRY_HEADER_HEIGHT + 20);
 }
 
-/** Education section: header + all entries */
+/** Education section: header + all entries (including entry gaps) */
 function measureEducationSection(node: LayoutNode): number {
   if (!node.children) return SECTION_HEADER_HEIGHT;
   let height = SECTION_HEADER_HEIGHT;
   for (const child of node.children) {
-    height += child.estimatedHeight + ENTRY_GAP;
+    height += child.estimatedHeight + child.marginTop + child.marginBottom;
   }
   return height;
 }

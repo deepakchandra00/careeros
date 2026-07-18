@@ -3,35 +3,23 @@
  *
  * Pure TypeScript. No React. No DOM.
  *
- * Input: LayoutNode[] (measured, with estimated heights)
- * Output: PageModel (pages with blocks at absolute positions)
- *
- * Rules:
- * - keepTogether: if a node doesn't fit on the current page, move it to the next
- * - allowSplit: if a node has children, try to split children across pages
- * - keepWithNext: keep a node with the next one (e.g., section header with first entry)
- * - widowLines/orphanLines: minimum lines at start/end of a split block
- * - pageBreaks: list of section IDs (top-level node ids) that must start a new page
- * - sectionSettings.startOnNewPage: equivalent to pageBreaks for that section
+ * FIXED:
+ * 1. startNewPage() always creates a new page (no early return on empty)
+ * 2. headerHeight uses Math.max(0, ...) — never negative
+ * 3. No double-counting of margins (estimator includes margins in section height,
+ *    paginator uses nodeHeight = estimatedHeight only, NOT + marginTop + marginBottom
+ *    for parent nodes — margins are already baked in)
+ * 4. Children fill the current page 100% before moving to next page
+ * 5. No empty pages created
  */
 
 import type { Insets } from "./types";
 import type { LayoutNode, PageBlock, PageModel, Page } from "./types";
 
-/** Optional pagination controls driven by the resume store. */
 export interface PaginateOptions {
-  /** Section IDs that must always start on a new page (manual page breaks). */
   pageBreaks?: string[];
 }
 
-/**
- * Paginate LayoutNodes into a PageModel.
- *
- * @param nodes - The measured layout nodes (from the measurer)
- * @param contentArea - The content area { width, height } available per page
- * @param padding - The user-adjustable padding (Insets)
- * @param options - Optional page-break overrides from the store
- */
 export function paginate(
   nodes: LayoutNode[],
   contentArea: { width: number; height: number },
@@ -44,115 +32,117 @@ export function paginate(
   const pageBreakSet = new Set(options?.pageBreaks ?? []);
 
   let currentPage: Page = { pageNumber: 1, blocks: [] };
-  let currentY = padding.top;
+  let currentY = 0; // Track Y within the content area (0 = top of usable area)
   let pageNumber = 1;
 
-  /**
-   * Start a new page. Pushes the current page to the pages array and resets
-   * the cursor. No-op if the current page is already empty (avoids blank pages
-   * when a break is requested at the top of a fresh page).
-   */
+  /** Start a new page. Always creates a fresh page. */
   const startNewPage = () => {
-    if (currentPage.blocks.length === 0) return; // already on a fresh page
-    pages.push(currentPage);
-    pageNumber++;
+    if (currentPage.blocks.length > 0) {
+      pages.push(currentPage);
+      pageNumber++;
+    }
     currentPage = { pageNumber, blocks: [] };
-    currentY = padding.top;
+    currentY = 0;
+  };
+
+  /** Check if a block of the given height fits in the remaining space */
+  const fits = (height: number) => currentY + height <= availableHeight;
+
+  /** Add a node to the current page */
+  const addBlock = (node: LayoutNode, isHeader = false, isContinuation = false) => {
+    currentPage.blocks.push({
+      id: isContinuation ? node.id + "-cont-" + pageNumber : node.id,
+      type: node.type,
+      x: padding.left,
+      y: padding.top + currentY,
+      width: availableWidth,
+      height: node.estimatedHeight,
+      data: isHeader
+        ? { isHeader: true, isContinuation, sectionType: node.type, sectionData: node.data }
+        : node.data,
+    });
+    // Use estimatedHeight only (margins are already included in the estimator's calculation)
+    currentY += node.estimatedHeight;
   };
 
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
-    const nodeHeight = node.estimatedHeight + node.marginTop + node.marginBottom;
 
-    // Manual page break: this section must start on a new page.
-    // We treat both the explicit `pageBreaks` list and any node whose id is in
-    // the set as a forced break.
+    // Manual page break
     if (pageBreakSet.has(node.id)) {
       startNewPage();
     }
 
-    // Check if this node fits on the current page
-    if (currentY + nodeHeight <= padding.top + availableHeight) {
-      // Fits — add to current page
-      addNodeToPage(currentPage, node, padding.left, currentY + node.marginTop, availableWidth);
-      currentY += nodeHeight;
-    } else {
-      // Doesn't fit
-      if (node.rules.keepTogether || !node.rules.allowSplit || !node.children) {
-        // Move to next page
+    // For nodes WITHOUT children (simple blocks: contact, summary, skills, etc.)
+    if (!node.children || node.children.length === 0) {
+      if (fits(node.estimatedHeight)) {
+        addBlock(node);
+      } else {
+        // Doesn't fit — move to next page
+        startNewPage();
+        addBlock(node); // Add even if taller than page (better than skipping)
+      }
+      continue;
+    }
+
+    // For nodes WITH children (experience, projects, education — splittable sections)
+    // Calculate the header height safely
+    const childrenHeight = node.children.reduce(
+      (sum, child) => sum + child.estimatedHeight,
+      0
+    );
+    const headerHeight = Math.max(0, node.estimatedHeight - childrenHeight);
+
+    // Try to fit the entire section on the current page
+    if (fits(node.estimatedHeight)) {
+      // Entire section fits — add as one block
+      addBlock(node);
+      continue;
+    }
+
+    // Section doesn't fit — need to split
+    // First, add the section header to the current page (if there's room)
+    if (headerHeight > 0 && fits(headerHeight)) {
+      addBlock(node, true, false); // Header block
+    }
+
+    // Distribute children across pages — FILL each page 100% before moving
+    let isFirstChunk = true;
+    for (const child of node.children) {
+      if (fits(child.estimatedHeight)) {
+        // Child fits on current page — add it
+        addBlock(child);
+      } else {
+        // Child doesn't fit — start a new page
         startNewPage();
 
-        // Add to new page (if it fits on a fresh page)
-        if (nodeHeight <= availableHeight) {
-          addNodeToPage(currentPage, node, padding.left, currentY + node.marginTop, availableWidth);
-          currentY += nodeHeight;
-        } else {
-          // Node is taller than a full page — add it anyway (will overflow but that's OK for now)
-          addNodeToPage(currentPage, node, padding.left, currentY + node.marginTop, availableWidth);
-          currentY += nodeHeight;
-        }
-      } else {
-        // allowSplit — try to add children to current page, rest to next
-
-        // Add section header to current page
-        const headerHeight = node.estimatedHeight - (node.children?.reduce((sum, c) => sum + c.estimatedHeight + c.marginTop + c.marginBottom, 0) || 0);
-        if (headerHeight > 0 && currentY + headerHeight <= padding.top + availableHeight) {
-          // Add a header block for this section
+        // Add continuation header on the new page (smaller)
+        if (headerHeight > 0) {
           currentPage.blocks.push({
-            id: node.id + "-header",
+            id: node.id + "-cont-" + pageNumber,
             type: node.type,
             x: padding.left,
-            y: currentY + node.marginTop,
+            y: padding.top,
             width: availableWidth,
-            height: headerHeight,
-            data: { isHeader: true, sectionType: node.type, sectionData: node.data },
+            height: 20,
+            data: { isHeader: true, isContinuation: true, sectionType: node.type, sectionData: node.data },
           });
-          currentY += headerHeight + node.marginTop;
+          currentY += 20;
         }
 
-        // Distribute children across pages
-        if (node.children) {
-          for (const child of node.children) {
-            const childHeight = child.estimatedHeight + child.marginTop + child.marginBottom;
-
-            if (currentY + childHeight <= padding.top + availableHeight) {
-              // Child fits on current page
-              addNodeToPage(currentPage, child, padding.left, currentY + child.marginTop, availableWidth);
-              currentY += childHeight;
-            } else {
-              // Child doesn't fit — new page
-              startNewPage();
-
-              // Add continuation header
-              if (headerHeight > 0) {
-                currentPage.blocks.push({
-                  id: node.id + "-cont-" + pageNumber,
-                  type: node.type,
-                  x: padding.left,
-                  y: currentY,
-                  width: availableWidth,
-                  height: 20, // smaller continuation header
-                  data: { isHeader: true, isContinuation: true, sectionType: node.type, sectionData: node.data },
-                });
-                currentY += 20;
-              }
-
-              // Add child to new page
-              addNodeToPage(currentPage, child, padding.left, currentY + child.marginTop, availableWidth);
-              currentY += childHeight;
-            }
-          }
-        }
+        // Add the child to the new page
+        addBlock(child);
+        isFirstChunk = false;
       }
     }
   }
 
-  // Push the last page
+  // Push the last page if it has content
   if (currentPage.blocks.length > 0) {
     pages.push(currentPage);
   }
 
-  // If no pages (empty resume), create one empty page
+  // Ensure at least one page
   if (pages.length === 0) {
     pages.push({ pageNumber: 1, blocks: [] });
   }
@@ -162,23 +152,4 @@ export function paginate(
     pages,
     totalPages: pages.length,
   };
-}
-
-/** Add a LayoutNode to a page as a PageBlock */
-function addNodeToPage(
-  page: Page,
-  node: LayoutNode,
-  x: number,
-  y: number,
-  width: number
-): void {
-  page.blocks.push({
-    id: node.id,
-    type: node.type,
-    x,
-    y,
-    width,
-    height: node.estimatedHeight,
-    data: node.data,
-  });
 }

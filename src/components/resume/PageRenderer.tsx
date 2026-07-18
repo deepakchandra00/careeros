@@ -84,7 +84,8 @@ export function PageRenderer({
             padding: "0 16px",
             zIndex: 2,
             color: "#ffffff",
-            overflow: "hidden",
+            // NO overflow:hidden — sidebar content should flow naturally
+            // The page-level overflow:hidden clips at the A4 boundary
           }}
         >
           {sidebarBlocks.map((block) => (
