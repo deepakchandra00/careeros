@@ -73,8 +73,9 @@ export function PageBasedPreview({
       },
       pageWidth: A4_WIDTH,
       pageHeight: A4_HEIGHT,
+      accent: style.accent,
     }),
-    [pattern, sidebarWidth, pageLayout]
+    [pattern, sidebarWidth, pageLayout, style.accent]
   );
 
   const pageModel = React.useMemo(() => {

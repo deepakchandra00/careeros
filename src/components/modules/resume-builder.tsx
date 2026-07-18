@@ -501,13 +501,14 @@ export function ResumeBuilderModule() {
       },
       pageWidth: 794,
       pageHeight: 1123,
+      accent: style.accent,
     };
     return generatePageModel(data, sectionOrder, {
       layout,
       pageBreaks,
       sectionSettings,
     });
-  }, [data, sectionOrder, pageLayout, pageBreaks, sectionSettings, style.template]);
+  }, [data, sectionOrder, pageLayout, pageBreaks, sectionSettings, style.template, style.accent]);
 
   const wordCount = React.useMemo(() => {
     const text = [

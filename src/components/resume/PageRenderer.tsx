@@ -5,21 +5,23 @@ import { A4_WIDTH, A4_HEIGHT, type Page } from "@/lib/resume/layout-engine/types
 import type { PageLayout } from "@/store/resume-store";
 import { TemplateBackground } from "./TemplateBackground";
 import { BlockRenderer } from "./BlockRenderer";
+import { computePageRects, type PageLayoutRects } from "@/lib/resume/layout-engine/layout-rects";
 import type { TemplatePattern } from "./template-layout";
 
 /**
  * PageRenderer — renders ONE A4 page from the PageModel.
  *
- * The flow engine assigns each page:
- *   - `blocks`        → main content column (flows top-to-bottom)
- *   - `sidebarBlocks` → sidebar column (for sidebar-left/right patterns)
+ * REDESIGNED: Uses the UNIFIED content rectangle system (computePageRects)
+ * as the single source of truth for page geometry. The header, sidebar,
+ * content, and page number ALL use the same rects — nobody recomputes
+ * padding independently.
  *
- * The sidebar column has NO overflow:hidden — content flows naturally.
- * The page-level overflow:hidden clips only at the A4 boundary (needed
- * for clean page breaks in print).
- *
- * For header-band patterns, the header (name/contacts) is part of the
- * main content and renders below the colored band.
+ * This fixes:
+ *   - Left/right padding sliders now work (content respects padding)
+ *   - Header respects padding (no longer left:0)
+ *   - Footer respects padding (no longer left:0 right:0)
+ *   - Sidebar aligns with content (same coordinate system)
+ *   - No overflow (content stays within contentRect)
  */
 export function PageRenderer({
   page,
@@ -38,18 +40,24 @@ export function PageRenderer({
   showPageNumber?: boolean;
   totalPages?: number;
 }) {
-  const isSidebarLeft = pattern === "sidebar-left";
-  const isSidebarRight = pattern === "sidebar-right";
-  const isHeaderBand = pattern === "header-band";
-  const hasSidebar = isSidebarLeft || isSidebarRight;
-
-  const headerBandHeight = isHeaderBand ? 120 : 0;
-  const paddingTop = pageLayout.paddingTop + headerBandHeight;
-  const paddingBottom = pageLayout.paddingBottom;
-
-  // For sidebar layouts: main content is next to the sidebar.
-  const mainPaddingLeft = hasSidebar && isSidebarLeft ? 0 : pageLayout.paddingLeft;
-  const mainPaddingRight = hasSidebar && isSidebarRight ? 0 : pageLayout.paddingRight;
+  // ── Compute the UNIFIED layout rects (single source of truth) ──
+  const rects: PageLayoutRects = React.useMemo(
+    () =>
+      computePageRects({
+        pageWidth: A4_WIDTH,
+        pageHeight: A4_HEIGHT,
+        padding: {
+          top: pageLayout.paddingTop ?? 0,
+          bottom: pageLayout.paddingBottom ?? 0,
+          left: pageLayout.paddingLeft ?? 0,
+          right: pageLayout.paddingRight ?? 0,
+        },
+        pattern,
+        sidebarWidth,
+        headerBandHeight: pattern === "header-band" ? 120 : 0,
+      }),
+    [pageLayout, pattern, sidebarWidth]
+  );
 
   const sidebarBlocks = page.sidebarBlocks || [];
 
@@ -59,7 +67,7 @@ export function PageRenderer({
       style={{
         width: A4_WIDTH,
         height: A4_HEIGHT,
-        overflow: "hidden", // Clip at PAGE level — needed for clean A4 boundary in print
+        overflow: "hidden",
         position: "relative",
         boxSizing: "border-box",
         pageBreakAfter: page.pageNumber < totalPages ? "always" : "auto",
@@ -71,21 +79,23 @@ export function PageRenderer({
         pattern={pattern}
         accent={accent}
         sidebarWidth={sidebarWidth}
-        headerHeight={headerBandHeight}
+        headerHeight={rects.header.height}
+        rects={rects}
       />
 
       {/* ── Sidebar content (for sidebar patterns) ──────────────────── */}
-      {hasSidebar && sidebarBlocks.length > 0 && (
+      {rects.hasSidebar && sidebarBlocks.length > 0 && (
         <div
           style={{
             position: "absolute",
-            top: paddingTop,
-            bottom: paddingBottom,
-            [isSidebarLeft ? "left" : "right"]: 0,
-            width: sidebarWidth,
+            left: rects.sidebar.x,
+            top: rects.sidebar.y,
+            width: rects.sidebar.width,
+            height: rects.sidebar.height,
             padding: "0 16px",
             zIndex: 2,
             color: "#ffffff",
+            overflow: "hidden",
           }}
         >
           {sidebarBlocks.map((block) => (
@@ -94,17 +104,16 @@ export function PageRenderer({
         </div>
       )}
 
-      {/* ── Main content layer (padded frame) ───────────────────────── */}
+      {/* ── Main content layer (uses contentRect — single coordinate) ── */}
       <div
         style={{
-          position: "relative",
+          position: "absolute",
+          left: rects.content.x,
+          top: rects.content.y,
+          width: rects.content.width,
+          height: rects.content.height,
           zIndex: 1,
-          paddingTop,
-          paddingBottom,
-          paddingLeft: hasSidebar && isSidebarLeft ? sidebarWidth + mainPaddingLeft : mainPaddingLeft,
-          paddingRight: hasSidebar && isSidebarRight ? sidebarWidth + mainPaddingRight : mainPaddingRight,
-          height: "100%",
-          boxSizing: "border-box",
+          overflow: "hidden",
         }}
       >
         {page.blocks.map((block) => (
@@ -112,14 +121,16 @@ export function PageRenderer({
         ))}
       </div>
 
-      {/* ── Page number indicator (screen only, hidden in print) ────── */}
+      {/* ── Page number indicator (respects padding via usableRect) ──── */}
       {showPageNumber && totalPages > 1 ? (
         <div
           className="print:hidden"
           style={{
             position: "absolute",
-            bottom: 6,
-            right: 12,
+            left: rects.usable.x,
+            bottom: A4_HEIGHT - rects.usable.y - rects.usable.height + 6,
+            right: A4_WIDTH - rects.usable.x - rects.usable.width + 6,
+            textAlign: "right",
             zIndex: 20,
             fontSize: 10,
             fontWeight: 500,
