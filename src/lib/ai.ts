@@ -1,27 +1,18 @@
-import ZAI from "z-ai-web-dev-sdk";
+/**
+ * Server-side AI helper using OpenRouter API.
+ *
+ * Model: deepseek/deepseek-chat
+ * API: https://openrouter.ai/api/v1/chat/completions
+ * Key: process.env.OPENROUTER_API_KEY
+ *
+ * This replaces ZAI (which has insufficient balance) and works
+ * reliably on Vercel with no rate limits or region restrictions.
+ */
 
-let zaiInstance: ZAI | null = null;
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL = "deepseek/deepseek-chat";
 
-async function getZAI(): Promise<ZAI> {
-  if (!zaiInstance) {
-    // Read API key from env var (works on both local dev and Vercel)
-    const apiKey = process.env.ZAI_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        "ZAI_API_KEY is not set. Add it to your .env file (local) or Vercel environment variables."
-      );
-    }
-    // Instantiate directly — bypasses .z-ai-config file lookup
-    // (which doesn't work on Vercel since the file is in .gitignore)
-    zaiInstance = new ZAI({
-      baseUrl: "https://api.z.ai/api/paas/v4",
-      apiKey,
-    });
-  }
-  return zaiInstance;
-}
-
-type Message = { role: "assistant" | "user" | "system"; content: string };
+type Message = { role: "system" | "user" | "assistant"; content: string };
 
 /** Generic single-shot completion. */
 export async function complete(
@@ -29,30 +20,44 @@ export async function complete(
   userPrompt: string,
   opts: { json?: boolean } = {}
 ): Promise<string> {
-  const zai = await getZAI();
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set. Add it to your .env file.");
+  }
+
+  let system = systemPrompt;
+  if (opts.json) {
+    system =
+      systemPrompt +
+      " You MUST respond with ONLY valid minified JSON. No markdown fences, no commentary.";
+  }
+
   const messages: Message[] = [
-    { role: "assistant", content: systemPrompt },
+    { role: "system", content: system },
     { role: "user", content: userPrompt },
   ];
-  if (opts.json) {
-    messages[0] = {
-      role: "assistant",
-      content:
-        systemPrompt +
-        " You MUST respond with ONLY valid minified JSON. No markdown fences, no commentary.",
-    };
-  }
-  try {
-    const completion = await zai.chat.completions.create({
-      model: "glm-4.6",
+
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://careeros.app",
+      "X-Title": "CareerOS",
+    },
+    body: JSON.stringify({
+      model: MODEL,
       messages,
-      thinking: { type: "disabled" },
-    });
-    return completion.choices?.[0]?.message?.content ?? "";
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`AI request failed: ${msg}`);
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OpenRouter API error (${res.status}): ${text.slice(0, 200)}`);
   }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
 }
 
 /** Multi-turn chat completion. */
@@ -60,48 +65,62 @@ export async function chat(
   history: Message[],
   opts: { json?: boolean } = {}
 ): Promise<string> {
-  const zai = await getZAI();
-  if (opts.json && history.length > 0) {
-    history = [
-      {
-        role: "assistant",
-        content:
-          history[0].content +
-          " You MUST respond with ONLY valid minified JSON. No markdown fences, no commentary.",
-      },
-      ...history.slice(1),
-    ];
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set. Add it to your .env file.");
   }
-  try {
-    const completion = await zai.chat.completions.create({
-      model: "glm-4.6",
-      messages: history,
-      thinking: { type: "disabled" },
-    });
-    return completion.choices?.[0]?.message?.content ?? "";
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`AI request failed: ${msg}`);
+
+  let messages = [...history];
+  if (opts.json && messages.length > 0) {
+    messages[0] = {
+      ...messages[0],
+      content:
+        messages[0].content +
+        " You MUST respond with ONLY valid minified JSON. No markdown fences, no commentary.",
+    };
   }
+
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://careeros.app",
+      "X-Title": "CareerOS",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OpenRouter API error (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
 }
 
 /** Safely extract a JSON object/array from a possibly noisy LLM string. */
 export function extractJson<T = unknown>(raw: string): T | null {
   if (!raw) return null;
   let text = raw.trim();
-  // strip code fences (with optional language tag like ```json)
   text = text
     .replace(/^\s*```(?:json|JSON)?\s*\n?/i, "")
     .replace(/\n?\s*```\s*$/i, "");
-  // find first { or [
+
   const start = text.search(/[{[]/);
   if (start === -1) return null;
   const open = text[start];
   const close = open === "{" ? "}" : "]";
+
   let depth = 0;
   let inStr = false;
   let esc = false;
   let end = -1;
+
   for (let i = start; i < text.length; i++) {
     const c = text[i];
     if (inStr) {
@@ -120,33 +139,17 @@ export function extractJson<T = unknown>(raw: string): T | null {
       }
     }
   }
+
   const candidate = end >= 0 ? text.slice(start, end + 1) : text.slice(start);
-  // try direct parse, then repair strategies
   return parseWithRepair<T>(candidate);
 }
 
-/** Try JSON.parse, then apply common repairs (trailing commas, single quotes). */
+/** Try JSON.parse with common repair strategies. */
 function parseWithRepair<T>(s: string): T | null {
-  // 1. direct
-  try {
-    return JSON.parse(s) as T;
-  } catch {}
-  // 2. remove trailing commas (,} or ,] or , before whitespace+close)
-  try {
-    return JSON.parse(s.replace(/,(\s*[}\]])/g, "$1")) as T;
-  } catch {}
-  // 3. single quotes -> double quotes (naive, only for keys/values without internal quotes)
-  try {
-    const dq = s.replace(/'/g, '"');
-    return JSON.parse(dq) as T;
-  } catch {}
-  // 4. trailing commas + single quotes
-  try {
-    return JSON.parse(
-      s.replace(/,(\s*[}\]])/g, "$1").replace(/'/g, '"')
-    ) as T;
-  } catch {}
-  // 5. remove control chars / smart quotes
+  try { return JSON.parse(s) as T; } catch {}
+  try { return JSON.parse(s.replace(/,(\s*[}\]])/g, "$1")) as T; } catch {}
+  try { return JSON.parse(s.replace(/'/g, '"')) as T; } catch {}
+  try { return JSON.parse(s.replace(/,(\s*[}\]])/g, "$1").replace(/'/g, '"')) as T; } catch {}
   try {
     const clean = s
       .replace(/[\u201C\u201D]/g, '"')

@@ -8,16 +8,16 @@ export function useMounted() {
   return m;
 }
 
-/** AI prompt registry — used for Pollinations.ai fallback when server route fails */
+/** AI prompt registry — used for OpenRouter fallback when server route fails */
 export interface AIFallbackPrompt {
   system: string;
   user: (body: Record<string, unknown>) => string;
 }
 
 /**
- * Registry of AI prompts for fallback to Pollinations.ai.
+ * Registry of AI prompts for fallback to OpenRouter.
  * When the server API route fails (e.g., ZAI balance issue), the hook
- * uses the prompt to call Pollinations.ai directly from the client.
+ * uses the prompt to call OpenRouter directly from the client.
  */
 const AI_PROMPTS: Record<string, AIFallbackPrompt> = {
   "/api/ai/cover-letter": {
@@ -121,7 +121,7 @@ const AI_PROMPTS: Record<string, AIFallbackPrompt> = {
 
 /**
  * Hook that calls an AI JSON endpoint with loading + error states.
- * If the server route fails, automatically falls back to Pollinations.ai (free AI).
+ * If the server route fails, automatically falls back to OpenRouter (free AI).
  */
 export function useAI<T>() {
   const [data, setData] = React.useState<T | null>(null);
@@ -146,10 +146,10 @@ export function useAI<T>() {
     } catch (serverError) {
       const serverMsg = serverError instanceof Error ? serverError.message : "Server failed";
 
-      // Check if this is a ZAI balance/config error → fall back to Pollinations.ai
+      // Check if this is a ZAI/server error → fall back to OpenRouter
       // Use case-insensitive matching to catch all variations
       const lowerMsg = serverMsg.toLowerCase();
-      const isZAIError =
+      const isServerError =
         lowerMsg.includes("1113") ||
         lowerMsg.includes("insufficient balance") ||
         lowerMsg.includes("zai_api_key") ||
@@ -158,21 +158,23 @@ export function useAI<T>() {
         lowerMsg.includes("ai request failed") ||
         lowerMsg.includes("ai service has insufficient") ||
         lowerMsg.includes("recharge") ||
-        lowerMsg.includes("not configured");
+        lowerMsg.includes("not configured") ||
+        lowerMsg.includes("openrouter") ||
+        lowerMsg.includes("500");
 
-      if (!isZAIError) {
-        // Non-ZAI error — don't fall back
+      if (!isServerError) {
+        // Non-server error — don't fall back
         setError(serverMsg);
         setLoading(false);
         return null;
       }
 
-      // Fall back to Pollinations.ai
+      // Fall back to OpenRouter
       try {
         const prompt = AI_PROMPTS[url];
         if (!prompt) {
           throw new Error(
-            "AI service unavailable (ZAI balance issue) and no Pollinations.ai fallback configured for this endpoint."
+            "AI service unavailable (ZAI balance issue) and no OpenRouter fallback configured for this endpoint."
           );
         }
 
@@ -210,7 +212,7 @@ export function useAI<T>() {
 
 /**
  * Helper for modules that use direct fetch() instead of useAI hook.
- * Falls back to Pollinations.ai if the server route fails with ZAI errors.
+ * Falls back to OpenRouter if the server route fails with ZAI errors.
  *
  * Usage:
  *   const data = await fetchWithFallback("/api/ai/coach", { message: "hi" });
@@ -232,7 +234,7 @@ export async function fetchWithFallback<T>(
     const serverMsg = serverError instanceof Error ? serverError.message : "Server failed";
     const lowerMsg = serverMsg.toLowerCase();
 
-    // Check if this is a ZAI error that should trigger Pollinations.ai fallback
+    // Check if this is a ZAI error that should trigger OpenRouter fallback
     const isZAIError =
       lowerMsg.includes("1113") ||
       lowerMsg.includes("insufficient balance") ||
@@ -248,10 +250,10 @@ export async function fetchWithFallback<T>(
       throw serverError;
     }
 
-    // Fall back to Pollinations.ai
+    // Fall back to OpenRouter
     const prompt = AI_PROMPTS[url];
     if (!prompt) {
-      throw new Error("AI service unavailable and no Pollinations.ai fallback configured.");
+      throw new Error("AI service unavailable and no OpenRouter fallback configured.");
     }
 
     const { complete, extractJson } = await import("@/lib/ai-client");
