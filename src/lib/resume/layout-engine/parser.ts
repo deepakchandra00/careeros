@@ -98,7 +98,10 @@ function parseSection(
       );
       return createNode(
         BlockType.Experience,
-        null,
+        // Pack items into `data` so a section block is self-contained when the
+        // paginator places the whole section as a single PageBlock (i.e. when it
+        // fits on one page). The paginator still uses `children` for splitting.
+        { items: data.experience },
         applySectionOverrides(DEFAULT_PAGINATION_RULES[BlockType.Experience], settings),
         20,
         12,
@@ -132,7 +135,9 @@ function parseSection(
       );
       return createNode(
         BlockType.Projects,
-        null,
+        // Pack items into `data` so a section block is self-contained when
+        // placed as a single PageBlock. See Experience above for rationale.
+        { items: data.projects },
         applySectionOverrides(DEFAULT_PAGINATION_RULES[BlockType.Projects], settings),
         20,
         12,
@@ -154,7 +159,9 @@ function parseSection(
       );
       return createNode(
         BlockType.Education,
-        null,
+        // Pack items into `data` so a section block is self-contained when
+        // placed as a single PageBlock. See Experience above for rationale.
+        { items: data.education },
         applySectionOverrides(DEFAULT_PAGINATION_RULES[BlockType.Education], settings),
         20,
         12,

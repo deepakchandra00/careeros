@@ -15,7 +15,6 @@ import { parseResume } from "./parser";
 import { measureNodes } from "./measurer";
 import { paginate, type PaginateOptions } from "./paginator";
 
-export { types } from "./types";
 export type { LayoutNode, PageBlock, Page, PageModel, TemplateDefinition, Insets, PaginationRules } from "./types";
 export { BlockType } from "./types";
 export { parseResume } from "./parser";
