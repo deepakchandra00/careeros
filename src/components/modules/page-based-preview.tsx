@@ -9,6 +9,7 @@ import type {
 } from "@/store/resume-store";
 import {
   generatePageModel,
+  clearMeasureCache,
   type LayoutContext,
 } from "@/lib/resume/layout-engine";
 import { PageRenderer } from "@/components/resume/PageRenderer";
@@ -77,6 +78,11 @@ export function PageBasedPreview({
     }),
     [pattern, sidebarWidth, pageLayout, style.accent]
   );
+
+  // Clear the DOM measurement cache when data or layout changes
+  React.useEffect(() => {
+    clearMeasureCache();
+  }, [data, layout]);
 
   const pageModel = React.useMemo(() => {
     return generatePageModel(data, sectionOrder, {

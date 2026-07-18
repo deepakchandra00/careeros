@@ -96,13 +96,13 @@ const PROJECT_MARGIN = 12;
 const SECTION_GAP = 16;
 /**
  * Inter-block spacing — added to the y cursor for each placed block.
- * Accounts for the residual gap between rendered blocks that the
- * measurement functions (which return block content height + marginBottom)
- * don't fully capture: line-height rounding, flex gaps, margin collapsing.
- * Calibrated to 12px (measured average inter-block gap is ~4px, plus
- * line-height rounding, margin collapsing, and flex gap effects).
+ *
+ * Even with TRUE DOM measurement (which includes each block's marginBottom),
+ * there are residual inter-block gaps from margin collapsing, line-height
+ * rounding, and flex layout effects. Measured average gap is ~4px per block,
+ * calibrated to 6px for safety.
  */
-const BLOCK_SPACING = 12;
+const BLOCK_SPACING = 6;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout context — passed in by the component layer

@@ -1,0 +1,803 @@
+     1→/**
+     2→ * Flow-Based Layout Engine — Pure TypeScript, no React, no DOM.
+     3→ *
+     4→ * This replaces the old section-level parser/measurer/paginator trio.
+     5→ *
+     6→ * The resume is flattened into a list of ATOMIC renderable units (FlowNodes):
+     7→ *
+     8→ *   SectionTitle("Experience")
+     9→ *   JobHeader(Google — Senior Engineer — 2020-2024)
+    10→ *   Bullet("Built X using Y...")
+    11→ *   Bullet("Led team of Z...")
+    12→ *   JobHeader(Microsoft — ...)
+    13→ *   Bullet(...)
+    14→ *
+    15→ * The paginator walks this flat list and places each atom on a page:
+    16→ *   - Section titles & job headers use keepWithNext (stick to following content)
+    17→ *   - Paragraphs split mid-text across pages (line-by-line)
+    18→ *   - Bullets flow individually (no "move whole job" behaviour)
+    19→ *   - Every page is filled to 100% before starting a new one
+    20→ *
+    21→ * Sidebar content is paginated independently in the sidebar column.
+    22→ *
+    23→ * Pipeline:
+    24→ *   Resume JSON → buildFlow() → { mainGroups, sidebarGroups }
+    25→ *              → paginateFlow(main) + paginateFlow(sidebar)
+    26→ *              → merge → PageModel
+    27→ */
+    28→
+    29→import type {
+    30→  ResumeData,
+    31→  SectionSettings,
+    32→  ExperienceItem,
+    33→  ProjectItem,
+    34→  EducationItem,
+    35→  SimpleItem,
+    36→  CustomSection,
+    37→} from "@/store/resume-store";
+    38→import {
+    39→  BlockType,
+    40→  A4_WIDTH,
+    41→  A4_HEIGHT,
+    42→  type Insets,
+    43→  type FlowNode,
+    44→  type PageBlock,
+    45→  type Page,
+    46→  type PageModel,
+    47→} from "./types";
+    48→
+    49→// ─────────────────────────────────────────────────────────────────────────────
+    50→// Measurement constants (calibrated against actual rendered block heights)
+    51→// ─────────────────────────────────────────────────────────────────────────────
+    52→
+    53→/**
+    54→ * Average character width at 10pt sans-serif (px). Used for line wrapping.
+    55→ * Calibrated to 6.5px based on browser measurements (actual ~6.4px per char
+    56→ * at 10pt in a 512px-wide container → ~79 chars/line).
+    57→ */
+    58→const CHAR_WIDTH = 6.5;
+    59→/** Line height for body text / bullets (px). Matches block components. */
+    60→const LINE_HEIGHT = 16;
+    61→/** Section title height: 12px font + 4px pad + 8px margin + buffer. */
+    62→const SECTION_TITLE_HEIGHT = 36;
+    63→/** Job header height: role line (~14px) + company line (~14px) + 8px margin + buffer. */
+    64→const JOB_HEADER_HEIGHT = 44;
+    65→/** Per-bullet line height (matches BulletBlock div). */
+    66→const BULLET_LINE_HEIGHT = 16;
+    67→/** Per-bullet bottom margin (matches BulletBlock marginBottom: 4). */
+    68→const BULLET_MARGIN = 4;
+    69→/** Bullet text indent (left padding for the bullet marker). */
+    70→const BULLET_INDENT = 12;
+    71→/** Skill chip height including gap. */
+    72→const SKILL_CHIP_HEIGHT = 26;
+    73→/** Skills per row in the main column. */
+    74→const SKILLS_PER_ROW_MAIN = 6;
+    75→/** Skills per row in the narrow sidebar. */
+    76→const SKILLS_PER_ROW_SIDEBAR = 2;
+    77→/** Skills section bottom margin. */
+    78→const SKILLS_MARGIN_BOTTOM = 16;
+    79→/** Education entry height (degree + school + optional grade/location). */
+    80→const EDUCATION_ENTRY_HEIGHT = 42;
+    81→/** Education entry bottom margin. */
+    82→const EDUCATION_ENTRY_MARGIN = 8;
+    83→/** Simple-list item height (title + optional subtitle/date). */
+    84→const SIMPLE_ITEM_HEIGHT = 32;
+    85→/** Simple-list item margin. */
+    86→const SIMPLE_ITEM_MARGIN = 6;
+    87→/** Languages / interests section height (title + one line). */
+    88→const LANGUAGES_HEIGHT = 52;
+    89→/** Project header height (name + link line). */
+    90→const PROJECT_HEADER_HEIGHT = 24;
+    91→/** Project tech chips height (one row + margin). */
+    92→const PROJECT_TECH_HEIGHT = 24;
+    93→/** Project entry bottom margin. */
+    94→const PROJECT_MARGIN = 12;
+    95→/** Section bottom margin (gap between sections). */
+    96→const SECTION_GAP = 16;
+    97→/**
+    98→ * Inter-block vertical spacing. Each rendered block has a marginBottom
+    99→ * (from the block component styles) that creates a gap between blocks.
+   100→ * This constant is added to every node's measured height so the
+   101→ * paginator accounts for these gaps. Calibrated to 12px (average of
+   102→ * section marginBottom:16, header marginBottom:16, bullet marginBottom:4,
+   103→ * plus line-height rounding).
+   104→ */
+   105→const BLOCK_SPACING = 12;
+   106→
+   107→/**
+   108→ * Safety factor applied to available height for sidebar-left, sidebar-right,
+   109→ * and single-column patterns. Accounts for measurement underestimation.
+   110→ * 0.90 = reserve 10% buffer.
+   111→ */
+   112→const HEIGHT_SAFETY_FACTOR = 0.90;
+   113→
+   114→/**
+   115→ * Safety factor for header-band patterns. Header bands need a larger buffer
+   116→ * because the header block (name+contacts) renders below the band and the
+   117→ * layout has more unpredictable spacing. 0.80 = reserve 20% buffer.
+   118→ */
+   119→const HEADER_BAND_SAFETY_FACTOR = 0.80;
+   120→
+   121→// ─────────────────────────────────────────────────────────────────────────────
+   122→// Layout context — passed in by the component layer
+   123→// ─────────────────────────────────────────────────────────────────────────────
+   124→
+   125→export type TemplatePattern = "sidebar-left" | "sidebar-right" | "header-band" | "single-column";
+   126→
+   127→export interface LayoutContext {
+   128→  pattern: TemplatePattern;
+   129→  sidebarWidth: number;
+   130→  /** Header band height (header-band pattern only). 0 otherwise. */
+   131→  headerBandHeight: number;
+   132→  padding: Insets;
+   133→  pageWidth: number;
+   134→  pageHeight: number;
+   135→}
+   136→
+   137→/** Sections that render in the sidebar column (for sidebar-left/right patterns). */
+   138→const SIDEBAR_SECTION_IDS = new Set([
+   139→  "personal",
+   140→  "skills",
+   141→  "languages",
+   142→  "certifications",
+   143→  "interests",
+   144→]);
+   145→
+   146→/**
+   147→ * For header-band patterns, there is NO separate sidebar column —
+   148→ * all sections flow in the main column. (The header band is just a
+   149→ * decorative top strip; content below it is single-column.)
+   150→ */
+   151→const HEADER_BAND_SIDEBAR_IDS = new Set<string>([]);
+   152→
+   153→// ─────────────────────────────────────────────────────────────────────────────
+   154→// Section group — a section's nodes + pagination preferences
+   155→// ─────────────────────────────────────────────────────────────────────────────
+   156→
+   157→interface SectionGroup {
+   158→  sectionId: string;
+   159→  keepTogether: boolean;
+   160→  startOnNewPage: boolean;
+   161→  nodes: FlowNode[];
+   162→}
+   163→
+   164→// ─────────────────────────────────────────────────────────────────────────────
+   165→// buildFlow — ResumeData → { mainGroups, sidebarGroups }
+   166→// ─────────────────────────────────────────────────────────────────────────────
+   167→
+   168→const uid = () => Math.random().toString(36).slice(2, 10);
+   169→
+   170→/** Compute characters per line for a given content width. */
+   171→function charsPerLine(widthPx: number, indent = 0): number {
+   172→  return Math.max(8, Math.floor((widthPx - indent) / CHAR_WIDTH));
+   173→}
+   174→
+   175→/** Greedy word-wrap: split text into lines no longer than charsPerLine. */
+   176→function wrapText(text: string, charsPerLine: number): string[] {
+   177→  const words = text.split(/\s+/).filter(Boolean);
+   178→  const lines: string[] = [];
+   179→  let line = "";
+   180→  for (const word of words) {
+   181→    if (line.length === 0) {
+   182→      line = word;
+   183→    } else if (line.length + 1 + word.length <= charsPerLine) {
+   184→      line += " " + word;
+   185→    } else {
+   186→      lines.push(line);
+   187→      line = word;
+   188→    }
+   189→  }
+   190→  if (line) lines.push(line);
+   191→  return lines;
+   192→}
+   193→
+   194→/** Measure a paragraph's height given text and content width. */
+   195→function measureParagraph(text: string, widthPx: number, indent = 0): number {
+   196→  const cpl = charsPerLine(widthPx, indent);
+   197→  const lines = wrapText(text, cpl);
+   198→  return lines.length * LINE_HEIGHT;
+   199→}
+   200→
+   201→/** Measure a single bullet's height (including margin). */
+   202→function measureBullet(text: string, widthPx: number): number {
+   203→  const cpl = charsPerLine(widthPx, BULLET_INDENT);
+   204→  const lines = wrapText(text, cpl);
+   205→  return lines.length * BULLET_LINE_HEIGHT + BULLET_MARGIN;
+   206→}
+   207→
+   208→/** Measure the header block (name + title + contacts). */
+   209→function measureHeader(data: ResumeData, isSidebar: boolean): number {
+   210→  let h = 0;
+   211→  if (isSidebar) {
+   212→    h += 80 + 12; // photo circle + margin
+   213→    h += 22; // name
+   214→    if (data.title) h += 14;
+   215→    const contacts = [data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean);
+   216→    h += contacts.length * 14 + 8;
+   217→    h += 20; // bottom margin
+   218→  } else {
+   219→    h += 30; // name (26px font + line height)
+   220→    if (data.title) h += 18;
+   221→    const contacts = [data.email, data.phone, data.location, data.linkedin, data.github, data.website].filter(Boolean);
+   222→    h += Math.max(1, Math.ceil(contacts.length / 4)) * 15 + 8;
+   223→    h += 16; // bottom margin
+   224→  }
+   225→  return h;
+   226→}
+   227→
+   228→/** Measure the skills section (chips). */
+   229→function measureSkills(skills: string[], isSidebar: boolean): number {
+   230→  if (!skills.length) return 0;
+   231→  const perRow = isSidebar ? SKILLS_PER_ROW_SIDEBAR : SKILLS_PER_ROW_MAIN;
+   232→  const rows = Math.ceil(skills.length / perRow);
+   233→  return SECTION_TITLE_HEIGHT + rows * SKILL_CHIP_HEIGHT + SKILLS_MARGIN_BOTTOM;
+   234→}
+   235→
+   236→/** Measure the languages / interests section. */
+   237→function measureLanguagesSection(): number {
+   238→  return LANGUAGES_HEIGHT + SECTION_GAP;
+   239→}
+   240→
+   241→/** Measure a simple list section (certifications, awards, publications). */
+   242→function measureSimpleList(items: SimpleItem[], widthPx: number): number {
+   243→  if (!items.length) return 0;
+   244→  let h = SECTION_TITLE_HEIGHT;
+   245→  for (const item of items) {
+   246→    const titleLines = wrapText(item.title || "", charsPerLine(widthPx, 10)).length;
+   247→    h += titleLines * LINE_HEIGHT;
+   248→    if (item.subtitle) h += LINE_HEIGHT;
+   249→    if (item.date) h += 0; // date is on the same line as title
+   250→    h += SIMPLE_ITEM_MARGIN;
+   251→  }
+   252→  return h + SECTION_GAP;
+   253→}
+   254→
+   255→/**
+   256→ * Build the flow: ResumeData → { mainGroups, sidebarGroups }.
+   257→ *
+   258→ * Each section becomes a SectionGroup with a flat list of atomic FlowNodes.
+   259→ * The group is routed to the main or sidebar column based on the template
+   260→ * pattern.
+   261→ */
+   262→function buildFlow(
+   263→  data: ResumeData,
+   264→  sectionOrder: string[],
+   265→  sectionSettings: Record<string, SectionSettings> | undefined,
+   266→  ctx: LayoutContext
+   267→): { mainGroups: SectionGroup[]; sidebarGroups: SectionGroup[] } {
+   268→  const mainGroups: SectionGroup[] = [];
+   269→  const sidebarGroups: SectionGroup[] = [];
+   270→
+   271→  const isSidebarPattern = ctx.pattern === "sidebar-left" || ctx.pattern === "sidebar-right";
+   272→  const isHeaderBand = ctx.pattern === "header-band";
+   273→
+   274→  // Effective content widths
+   275→  const mainWidth = ctx.pageWidth - ctx.sidebarWidth - ctx.padding.left - ctx.padding.right;
+   276→  const sidebarWidth = ctx.sidebarWidth > 0 ? ctx.sidebarWidth - 32 : 0; // 16px padding each side
+   277→
+   278→  // Which sections go to the sidebar?
+   279→  const sidebarIds = isSidebarPattern
+   280→    ? SIDEBAR_SECTION_IDS
+   281→    : isHeaderBand
+   282→    ? HEADER_BAND_SIDEBAR_IDS
+   283→    : new Set<string>();
+   284→
+   285→  for (const sectionId of sectionOrder) {
+   286→    const settings = sectionSettings?.[sectionId];
+   287→    const goesToSidebar = sidebarIds.has(sectionId);
+   288→    const columnWidth = goesToSidebar ? sidebarWidth : mainWidth;
+   289→
+   290→    const group = buildSection(sectionId, data, columnWidth, goesToSidebar, settings);
+   291→    if (!group || group.nodes.length === 0) continue;
+   292→
+   293→    if (goesToSidebar) {
+   294→      sidebarGroups.push(group);
+   295→    } else {
+   296→      mainGroups.push(group);
+   297→    }
+   298→  }
+   299→
+   300→  return { mainGroups, sidebarGroups };
+   301→}
+   302→
+   303→/** Build a single section into a SectionGroup. */
+   304→function buildSection(
+   305→  sectionId: string,
+   306→  data: ResumeData,
+   307→  width: number,
+   308→  isSidebar: boolean,
+   309→  settings: SectionSettings | undefined
+   310→): SectionGroup | null {
+   311→  const group: SectionGroup = {
+   312→    sectionId,
+   313→    keepTogether: !!settings?.keepTogether,
+   314→    startOnNewPage: !!settings?.startOnNewPage,
+   315→    nodes: [],
+   316→  };
+   317→
+   318→  switch (sectionId) {
+   319→    case "personal": {
+   320→      group.nodes.push({
+   321→        id: uid(),
+   322→        type: BlockType.Contact,
+   323→        data: data,
+   324→        height: measureHeader(data, isSidebar),
+   325→        column: isSidebar ? "sidebar" : "main",
+   326→        sectionId,
+   327→      });
+   328→      break;
+   329→    }
+   330→
+   331→    case "summary": {
+   332→      const text = (data.summary || "").trim();
+   333→      if (!text) return null;
+   334→      group.nodes.push({
+   335→        id: uid(),
+   336→        type: BlockType.SectionTitle,
+   337→        data: { title: "Profile", isSidebar },
+   338→        height: SECTION_TITLE_HEIGHT,
+   339→        keepWithNext: true,
+   340→        sectionId,
+   341→      });
+   342→      group.nodes.push({
+   343→        id: uid(),
+   344→        type: BlockType.Paragraph,
+   345→        data: { text },
+   346→        height: measureParagraph(text, width) + SECTION_GAP,
+   347→        splittable: true,
+   348→        text,
+   349→        lineHeight: LINE_HEIGHT,
+   350→        charsPerLine: charsPerLine(width),
+   351→        sectionId,
+   352→      });
+   353→      break;
+   354→    }
+   355→
+   356→    case "experience": {
+   357→      if (!data.experience?.length) return null;
+   358→      group.nodes.push({
+   359→        id: uid(),
+   360→        type: BlockType.SectionTitle,
+   361→        data: { title: "Experience", isSidebar },
+   362→        height: SECTION_TITLE_HEIGHT,
+   363→        keepWithNext: true,
+   364→        sectionId,
+   365→      });
+   366→      for (const exp of data.experience) {
+   367→        const bullets = (exp.bullets || []).filter((b) => b?.trim());
+   368→        group.nodes.push({
+   369→          id: uid(),
+   370→          type: BlockType.JobHeader,
+   371→          data: exp,
+   372→          height: JOB_HEADER_HEIGHT,
+   373→          keepWithNext: bullets.length > 0,
+   374→          sectionId,
+   375→        });
+   376→        for (const b of bullets) {
+   377→          group.nodes.push({
+   378→            id: uid(),
+   379→            type: BlockType.Bullet,
+   380→            data: { text: b },
+   381→            height: measureBullet(b, width),
+   382→            sectionId,
+   383→          });
+   384→        }
+   385→      }
+   386→      // Add section gap to the last node
+   387→      if (group.nodes.length > 0) {
+   388→        group.nodes[group.nodes.length - 1].height += SECTION_GAP;
+   389→      }
+   390→      break;
+   391→    }
+   392→
+   393→    case "skills": {
+   394→      if (!data.skills?.length) return null;
+   395→      group.nodes.push({
+   396→        id: uid(),
+   397→        type: BlockType.Skills,
+   398→        data: { skills: data.skills, isSidebar },
+   399→        height: measureSkills(data.skills, isSidebar),
+   400→        column: isSidebar ? "sidebar" : "main",
+   401→        sectionId,
+   402→      });
+   403→      break;
+   404→    }
+   405→
+   406→    case "projects": {
+   407→      if (!data.projects?.length) return null;
+   408→      group.nodes.push({
+   409→        id: uid(),
+   410→        type: BlockType.SectionTitle,
+   411→        data: { title: "Projects", isSidebar },
+   412→        height: SECTION_TITLE_HEIGHT,
+   413→        keepWithNext: true,
+   414→        sectionId,
+   415→      });
+   416→      for (const proj of data.projects) {
+   417→        const tech = (proj.tech || []).filter((t) => t?.trim());
+   418→        group.nodes.push({
+   419→          id: uid(),
+   420→          type: BlockType.ProjectHeader,
+   421→          data: proj,
+   422→          height: PROJECT_HEADER_HEIGHT,
+   423→          keepWithNext: true,
+   424→          sectionId,
+   425→        });
+   426→        if (proj.description?.trim()) {
+   427→          group.nodes.push({
+   428→            id: uid(),
+   429→            type: BlockType.Paragraph,
+   430→            data: { text: proj.description },
+   431→            height: measureParagraph(proj.description, width),
+   432→            splittable: true,
+   433→            text: proj.description,
+   434→            lineHeight: LINE_HEIGHT,
+   435→            charsPerLine: charsPerLine(width),
+   436→            sectionId,
+   437→          });
+   438→        }
+   439→        if (tech.length > 0) {
+   440→          group.nodes.push({
+   441→            id: uid(),
+   442→            type: BlockType.ProjectTech,
+   443→            data: { tech },
+   444→            height: PROJECT_TECH_HEIGHT,
+   445→            sectionId,
+   446→          });
+   447→        }
+   448→        // Entry margin
+   449→        if (group.nodes.length > 0) {
+   450→          group.nodes[group.nodes.length - 1].height += PROJECT_MARGIN;
+   451→        }
+   452→      }
+   453→      break;
+   454→    }
+   455→
+   456→    case "education": {
+   457→      if (!data.education?.length) return null;
+   458→      group.nodes.push({
+   459→        id: uid(),
+   460→        type: BlockType.SectionTitle,
+   461→        data: { title: "Education", isSidebar },
+   462→        height: SECTION_TITLE_HEIGHT,
+   463→        keepWithNext: true,
+   464→        sectionId,
+   465→      });
+   466→      for (const edu of data.education) {
+   467→        let h = EDUCATION_ENTRY_HEIGHT;
+   468→        if (edu.grade) h += LINE_HEIGHT;
+   469→        group.nodes.push({
+   470→          id: uid(),
+   471→          type: BlockType.EducationEntry,
+   472→          data: edu,
+   473→          height: h + EDUCATION_ENTRY_MARGIN,
+   474→          sectionId,
+   475→        });
+   476→      }
+   477→      if (group.nodes.length > 0) {
+   478→        group.nodes[group.nodes.length - 1].height += SECTION_GAP;
+   479→      }
+   480→      break;
+   481→    }
+   482→
+   483→    case "certifications": {
+   484→      if (!data.certifications?.length) return null;
+   485→      // SimpleSectionBlock renders its own title — no separate SectionTitle atom.
+   486→      group.nodes.push({
+   487→        id: uid(),
+   488→        type: BlockType.Certifications,
+   489→        data: { items: data.certifications, title: "Certifications", isSidebar },
+   490→        height: measureSimpleList(data.certifications, width),
+   491→        sectionId,
+   492→      });
+   493→      break;
+   494→    }
+   495→
+   496→    case "languages": {
+   497→      if (!data.languages?.length) return null;
+   498→      // LanguagesBlock renders its own title.
+   499→      group.nodes.push({
+   500→        id: uid(),
+   501→        type: BlockType.Languages,
+   502→        data: { items: data.languages, isSidebar },
+   503→        height: measureLanguagesSection(),
+   504→        sectionId,
+   505→      });
+   506→      break;
+   507→    }
+   508→
+   509→    case "awards": {
+   510→      if (!data.awards?.length) return null;
+   511→      // SimpleSectionBlock renders its own title.
+   512→      group.nodes.push({
+   513→        id: uid(),
+   514→        type: BlockType.Awards,
+   515→        data: { items: data.awards, title: "Achievements", isSidebar },
+   516→        height: measureSimpleList(data.awards, width),
+   517→        sectionId,
+   518→      });
+   519→      break;
+   520→    }
+   521→
+   522→    case "publications": {
+   523→      if (!data.publications?.length) return null;
+   524→      // SimpleSectionBlock renders its own title.
+   525→      group.nodes.push({
+   526→        id: uid(),
+   527→        type: BlockType.Publications,
+   528→        data: { items: data.publications, title: "Publications", isSidebar },
+   529→        height: measureSimpleList(data.publications, width),
+   530→        sectionId,
+   531→      });
+   532→      break;
+   533→    }
+   534→
+   535→    case "interests": {
+   536→      if (!data.interests?.length) return null;
+   537→      // InterestsBlock renders its own title.
+   538→      group.nodes.push({
+   539→        id: uid(),
+   540→        type: BlockType.Interests,
+   541→        data: { items: data.interests, isSidebar },
+   542→        height: measureLanguagesSection(),
+   543→        sectionId,
+   544→      });
+   545→      break;
+   546→    }
+   547→
+   548→    case "references":
+   549→      return null;
+   550→
+   551→    default: {
+   552→      // Custom section — CustomSectionBlock renders its own title.
+   553→      const custom = data.customSections?.find(
+   554→        (cs) => cs.id === sectionId || cs.title.toLowerCase() === sectionId
+   555→      );
+   556→      if (!custom || !custom.items?.length) return null;
+   557→      group.nodes.push({
+   558→        id: uid(),
+   559→        type: BlockType.CustomSection,
+   560→        data: { title: custom.title, items: custom.items, isSidebar },
+   561→        height: measureSimpleList(custom.items, width),
+   562→        sectionId,
+   563→      });
+   564→      break;
+   565→    }
+   566→  }
+   567→
+   568→  return group.nodes.length > 0 ? group : null;
+   569→}
+   570→
+   571→// ─────────────────────────────────────────────────────────────────────────────
+   572→// paginateFlow — flow-based pagination on atomic blocks
+   573→// ─────────────────────────────────────────────────────────────────────────────
+   574→
+   575→/**
+   576→ * Paginate a list of section groups into pages of RenderedBlocks.
+   577→ *
+   578→ * Algorithm:
+   579→ *   For each group:
+   580→ *     - If startOnNewPage: flush current page first.
+   581→ *     - If keepTogether: try to fit the whole group on the current page.
+   582→ *       If it doesn't fit, flush and try on a fresh page. If it STILL
+   583→ *       doesn't fit (taller than a full page), fall back to normal flow.
+   584→ *     - Otherwise (normal flow): place nodes one by one.
+   585→ *       - keepWithNext nodes: ensure header + next atom fit, else flush.
+   586→ *       - splittable nodes: split text across pages line-by-line.
+   587→ *       - atomic nodes: if they don't fit, flush first.
+   588→ *
+   589→ * Every page is filled to 100% before starting a new one.
+   590→ */
+   591→function paginateFlow(groups: SectionGroup[], availableHeight: number): PageBlock[][] {
+   592→  const pages: PageBlock[][] = [];
+   593→  let current: PageBlock[] = [];
+   594→  let y = 0;
+   595→
+   596→  const flush = () => {
+   597→    if (current.length > 0) {
+   598→      pages.push(current);
+   599→      current = [];
+   600→      y = 0;
+   601→    }
+   602→  };
+   603→
+   604→  const remaining = () => availableHeight - y;
+   605→
+   606→  const place = (node: FlowNode, overrides?: Partial<PageBlock>) => {
+   607→    current.push({
+   608→      id: node.id,
+   609→      type: node.type,
+   610→      data: node.data,
+   611→      height: node.height,
+   612→      sectionId: node.sectionId,
+   613→      ...overrides,
+   614→    });
+   615→    y += node.height;
+   616→  };
+   617→
+   618→  for (const group of groups) {
+   619→    // Manual page break before this section
+   620→    if (group.startOnNewPage) flush();
+   621→
+   622→    // Compute group total height
+   623→    const groupHeight = group.nodes.reduce((sum, n) => sum + n.height, 0);
+   624→
+   625→    if (group.keepTogether) {
+   626→      // Try to keep the whole section together
+   627→      if (y > 0 && y + groupHeight > availableHeight) {
+   628→        flush();
+   629→      }
+   630→      // If it fits on a fresh page (or current page), place all nodes
+   631→      if (groupHeight <= availableHeight || y === 0) {
+   632→        for (const node of group.nodes) {
+   633→          place(node);
+   634→        }
+   635→        continue;
+   636→      }
+   637→      // Doesn't fit even on a fresh page — fall through to normal flow (split)
+   638→    }
+   639→
+   640→    // Normal flow: place nodes one by one
+   641→    for (let i = 0; i < group.nodes.length; i++) {
+   642→      const node = group.nodes[i];
+   643→      const next = group.nodes[i + 1];
+   644→
+   645→      // Manual page break on this specific node
+   646→      if (node.forceBreak && current.length > 0) {
+   647→        flush();
+   648→      }
+   649→
+   650→      // keepWithNext: header must stay with following content.
+   651→      // Ensure header + at least the first chunk of the next node fits.
+   652→      if (node.keepWithNext) {
+   653→        // Estimate the minimum we need to keep with the header:
+   654→        // the header itself + at least 2 lines of the next block.
+   655→        const nextMin = next
+   656→          ? next.splittable
+   657→            ? 2 * (next.lineHeight || LINE_HEIGHT)
+   658→            : Math.min(next.height, 2 * LINE_HEIGHT)
+   659→          : 0;
+   660→        if (y > 0 && y + node.height + nextMin > availableHeight) {
+   661→          flush();
+   662→        }
+   663→        place(node);
+   664→        continue;
+   665→      }
+   666→
+   667→      // Splittable text node: split across pages line-by-line
+   668→      if (node.splittable && node.text) {
+   669→        const lh = node.lineHeight || LINE_HEIGHT;
+   670→        const cpl = node.charsPerLine || 80;
+   671→        const lines = wrapText(node.text, cpl);
+   672→        let idx = 0;
+   673→
+   674→        while (idx < lines.length) {
+   675→          const avail = remaining();
+   676→          const fitCount = Math.floor(avail / lh);
+   677→
+   678→          if (fitCount <= 0) {
+   679→            // No room for even one line — start a new page
+   680→            if (current.length > 0) flush();
+   681→            continue;
+   682→          }
+   683→
+   684→          const take = Math.min(fitCount, lines.length - idx);
+   685→
+   686→          if (take >= lines.length - idx) {
+   687→            // Rest fits on current page
+   688→            const fittedText = lines.slice(idx).join(" ");
+   689→            place(node, {
+   690→              data: { text: fittedText },
+   691→              height: (lines.length - idx) * lh,
+   692→            });
+   693→            idx = lines.length;
+   694→          } else {
+   695→            // Split: take `take` lines, continue on next page
+   696→            const fittedText = lines.slice(idx, idx + take).join(" ");
+   697→            place(node, {
+   698→              data: { text: fittedText },
+   699→              height: take * lh,
+   700→              continued: true,
+   701→            });
+   702→            idx += take;
+   703→            flush();
+   704→          }
+   705→        }
+   706→        continue;
+   707→      }
+   708→
+   709→      // Atomic node: if it doesn't fit, flush first
+   710→      if (y > 0 && y + node.height > availableHeight) {
+   711→        flush();
+   712→      }
+   713→      place(node);
+   714→    }
+   715→  }
+   716→
+   717→  flush();
+   718→
+   719→  // Ensure at least one page
+   720→  if (pages.length === 0) {
+   721→    pages.push([]);
+   722→  }
+   723→
+   724→  return pages;
+   725→}
+   726→
+   727→// ─────────────────────────────────────────────────────────────────────────────
+   728→// generatePageModel — the public entry point
+   729→// ─────────────────────────────────────────────────────────────────────────────
+   730→
+   731→export interface GeneratePageModelOptions {
+   732→  /** Section IDs that must start on a new page (manual page breaks). */
+   733→  pageBreaks?: string[];
+   734→  /** Per-section layout overrides (keepTogether / startOnNewPage). */
+   735→  sectionSettings?: Record<string, SectionSettings>;
+   736→  /** Template layout context (pattern, sidebar width, etc.). */
+   737→  layout: LayoutContext;
+   738→}
+   739→
+   740→/**
+   741→ * Full pipeline: Resume JSON → PageModel
+   742→ *
+   743→ * @param data - The resume data from the store
+   744→ * @param sectionOrder - The order of sections (from the store)
+   745→ * @param options - Layout context + page-break + section-settings overrides
+   746→ * @returns PageModel with pages (each carrying main blocks + sidebar blocks)
+   747→ */
+   748→export function generatePageModel(
+   749→  data: ResumeData,
+   750→  sectionOrder: string[],
+   751→  options: GeneratePageModelOptions
+   752→): PageModel {
+   753→  const ctx = options.layout;
+   754→
+   755→  // Compose effective section settings: merge explicit pageBreaks as startOnNewPage
+   756→  const settings: Record<string, SectionSettings> = { ...(options.sectionSettings || {}) };
+   757→  for (const breakId of options.pageBreaks || []) {
+   758→    settings[breakId] = {
+   759→      keepTogether: settings[breakId]?.keepTogether ?? false,
+   760→      startOnNewPage: true,
+   761→    };
+   762→  }
+   763→
+   764→  // 1. Build: ResumeData → { mainGroups, sidebarGroups }
+   765→  const { mainGroups, sidebarGroups } = buildFlow(data, sectionOrder, settings, ctx);
+   766→
+   767→  // 2. Compute available heights for main and sidebar columns.
+   768→  // Header-band patterns need a larger safety buffer because the header block
+   769→  // (name+contacts) renders BELOW the band and adds extra height that's hard
+   770→  // to estimate precisely.
+   771→  const isHeaderBand = ctx.pattern === "header-band";
+   772→  const mainSafetyFactor = isHeaderBand ? HEADER_BAND_SAFETY_FACTOR : HEIGHT_SAFETY_FACTOR;
+   773→  const mainAvailableHeight = Math.floor(
+   774→    (ctx.pageHeight - ctx.padding.top - ctx.padding.bottom - (isHeaderBand ? ctx.headerBandHeight : 0)) *
+   775→      mainSafetyFactor
+   776→  );
+   777→  const sidebarAvailableHeight = Math.floor(
+   778→    (ctx.pageHeight - ctx.padding.top - ctx.padding.bottom) * HEIGHT_SAFETY_FACTOR
+   779→  );
+   780→
+   781→  // 3. Paginate main and sidebar independently
+   782→  const mainPages = paginateFlow(mainGroups, mainAvailableHeight);
+   783→  const sidebarPages = paginateFlow(sidebarGroups, sidebarAvailableHeight);
+   784→
+   785→  // 4. Merge: page N gets main page N's blocks + sidebar page N's blocks
+   786→  const totalPages = Math.max(mainPages.length, sidebarPages.length);
+   787→  const pages: Page[] = [];
+   788→
+   789→  for (let i = 0; i < totalPages; i++) {
+   790→    pages.push({
+   791→      pageNumber: i + 1,
+   792→      blocks: mainPages[i] || [],
+   793→      sidebarBlocks: sidebarPages[i] || [],
+   794→    });
+   795→  }
+   796→
+   797→  return {
+   798→    version: 2,
+   799→    pages,
+   800→    totalPages: pages.length,
+   801→  };
+   802→}
+   803→

@@ -11,17 +11,22 @@ import type { TemplatePattern } from "./template-layout";
 /**
  * PageRenderer — renders ONE A4 page from the PageModel.
  *
- * REDESIGNED: Uses the UNIFIED content rectangle system (computePageRects)
- * as the single source of truth for page geometry. The header, sidebar,
- * content, and page number ALL use the same rects — nobody recomputes
- * padding independently.
+ * FIXES applied (Issues 1, 3, 4):
  *
- * This fixes:
- *   - Left/right padding sliders now work (content respects padding)
- *   - Header respects padding (no longer left:0)
- *   - Footer respects padding (no longer left:0 right:0)
- *   - Sidebar aligns with content (same coordinate system)
- *   - No overflow (content stays within contentRect)
+ *   Issue 1: Removed overflow:hidden from content & sidebar layers.
+ *            The paginator MUST guarantee fitting — the renderer must
+ *            NEVER hide data. If content overflows, it's visible (and
+ *            the user sees the bug) rather than silently clipped.
+ *
+ *   Issue 3: Content & sidebar use top+bottom absolute positioning
+ *            instead of fixed height. This is more reliable for print.
+ *
+ *   Issue 4: Removed pageBreakAfter (kept only breakAfter). Chrome's
+ *            print engine has conflicts when both are present.
+ *
+ * The page-level container still has overflow:hidden — that's needed
+ * for the A4 boundary (background color, sidebar fill). But the CONTENT
+ * layers inside flow naturally.
  */
 export function PageRenderer({
   page,
@@ -40,7 +45,6 @@ export function PageRenderer({
   showPageNumber?: boolean;
   totalPages?: number;
 }) {
-  // ── Compute the UNIFIED layout rects (single source of truth) ──
   const rects: PageLayoutRects = React.useMemo(
     () =>
       computePageRects({
@@ -67,10 +71,14 @@ export function PageRenderer({
       style={{
         width: A4_WIDTH,
         height: A4_HEIGHT,
+        // Page-level overflow:hidden is needed for the A4 boundary
+        // (background color, sidebar fill). Content layers inside do NOT
+        // have overflow:hidden — they flow naturally.
         overflow: "hidden",
         position: "relative",
         boxSizing: "border-box",
-        pageBreakAfter: page.pageNumber < totalPages ? "always" : "auto",
+        // Issue 4: Use ONLY breakAfter (modern CSS). Don't use pageBreakAfter
+        // alongside it — Chrome's print engine has conflicts when both present.
         breakAfter: page.pageNumber < totalPages ? "page" : "auto",
       }}
     >
@@ -84,18 +92,19 @@ export function PageRenderer({
       />
 
       {/* ── Sidebar content (for sidebar patterns) ──────────────────── */}
+      {/* Issue 1: NO overflow:hidden — content flows naturally */}
+      {/* Issue 3: Use top+bottom instead of fixed height for print reliability */}
       {rects.hasSidebar && sidebarBlocks.length > 0 && (
         <div
           style={{
             position: "absolute",
             left: rects.sidebar.x,
             top: rects.sidebar.y,
+            bottom: A4_HEIGHT - rects.sidebar.y - rects.sidebar.height,
             width: rects.sidebar.width,
-            height: rects.sidebar.height,
             padding: "0 16px",
             zIndex: 2,
             color: "#ffffff",
-            overflow: "hidden",
           }}
         >
           {sidebarBlocks.map((block) => (
@@ -105,15 +114,16 @@ export function PageRenderer({
       )}
 
       {/* ── Main content layer (uses contentRect — single coordinate) ── */}
+      {/* Issue 1: NO overflow:hidden — content flows naturally */}
+      {/* Issue 3: Use top+bottom instead of fixed height for print reliability */}
       <div
         style={{
           position: "absolute",
           left: rects.content.x,
           top: rects.content.y,
+          bottom: A4_HEIGHT - rects.content.y - rects.content.height,
           width: rects.content.width,
-          height: rects.content.height,
           zIndex: 1,
-          overflow: "hidden",
         }}
       >
         {page.blocks.map((block) => (
