@@ -23,12 +23,11 @@ interface PageBasedPreviewProps {
 /**
  * Page-Based Resume Preview with Layout Engine.
  *
- * The layout engine calculates page count based on the content frame
- * (page size minus padding). The template renders at full page size.
- * Content is shifted vertically per page using translateY.
+ * Padding is an INPUT to the layout engine (determines contentHeightPerPage),
+ * AND is visually applied in the renderer (content starts at paddingTop, ends at paddingBottom).
  *
- * NO content repetition. Each page shows a DIFFERENT portion of the resume.
- * The template's background (sidebar, colors) fills every page naturally.
+ * The template's background (sidebar, colors) fills the entire A4 page.
+ * Content is shifted vertically per page using translateY.
  */
 export function PageBasedPreview({
   data,
@@ -151,16 +150,15 @@ function A4Page({
 /**
  * Renders content for a single page.
  *
- * CRITICAL FIX: The template renders ONCE per page, but shifted vertically
- * by (pageIndex * contentHeightPerPage) so each page shows a DIFFERENT
- * portion of the resume. This prevents content repetition.
+ * FIX: Padding is now VISUALLY APPLIED:
+ * - The outer clip container starts at paddingTop and ends at paddingBottom
+ * - The template is shifted by (pageIndex * contentHeightPerPage) + paddingTop
+ * - This means content on page 1 starts at paddingTop (not 0)
+ * - Content on page 2 starts at paddingTop + contentHeightPerPage
+ * - The template's background fills the entire page (renders at full size)
+ * - The white padding areas show the template's background naturally
  *
- * The template's background (sidebar, colors, gradients) fills the entire
- * A4 page on every page because it renders at full size. Only the text
- * content scrolls between pages.
- *
- * Padding is an INPUT to the layout engine (determines contentHeightPerPage),
- * NOT a CSS hack applied to the template.
+ * NO content repetition. Each page shows a DIFFERENT portion.
  */
 function PageContent({
   data,
@@ -168,7 +166,7 @@ function PageContent({
   sections,
   pageIndex,
   contentHeightPerPage,
-  pageLayout: _pageLayout,
+  pageLayout,
 }: {
   data: ResumeData;
   style: TemplateStyle;
@@ -177,11 +175,14 @@ function PageContent({
   contentHeightPerPage: number;
   pageLayout: PageLayout;
 }) {
-  // Calculate vertical offset: page 0 = 0px, page 1 = contentHeight, page 2 = 2*contentHeight
-  const verticalOffset = pageIndex * contentHeightPerPage;
+  // The total vertical offset = page offset + top padding
+  // Page 0: offset = paddingTop (content starts below the top padding)
+  // Page 1: offset = paddingTop + contentHeightPerPage
+  // Page 2: offset = paddingTop + 2 * contentHeightPerPage
+  const verticalOffset = pageLayout.paddingTop + pageIndex * contentHeightPerPage;
 
   return (
-    // Outer container: clips to A4 page boundary (overflow hidden)
+    // Outer container: clips to A4 page boundary
     <div
       style={{
         position: "absolute",
@@ -193,7 +194,7 @@ function PageContent({
       }}
     >
       {/* Inner container: holds the template, shifted up by verticalOffset */}
-      {/* This shows a DIFFERENT portion of the resume on each page */}
+      {/* The template renders at full 794px width — background fills entire page */}
       <div
         style={{
           position: "absolute",

@@ -106,8 +106,8 @@ export interface PageLayout {
 }
 
 const DEFAULT_PAGE_LAYOUT: PageLayout = {
-  paddingTop: 0,
-  paddingBottom: 0,
+  paddingTop: 40,
+  paddingBottom: 40,
   paddingLeft: 0,
   paddingRight: 0,
 };
