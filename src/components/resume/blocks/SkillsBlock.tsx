@@ -1,60 +1,61 @@
 "use client";
 
 import * as React from "react";
-import type { BlockProps, SkillsBlockData } from "./types";
+import type { SkillsBlockData } from "./types";
 import { SectionTitle } from "./SummaryBlock";
+
+interface SkillsBlockProps {
+  data: SkillsBlockData;
+  accent: string;
+  isSidebar?: boolean;
+}
 
 /**
  * SkillsBlock — renders a list of skills as chips/pills.
  *
- * Chips wrap to multiple lines as needed. The chip background uses a soft
- * tint of the accent color (10% opacity) with the accent color for the text
- * and a thin accent border, giving a clean, modern look that works on both
- * light and dark template backgrounds.
+ * When `isSidebar` is true, renders with white/translucent chips on colored background.
+ * When false, renders with accent-tinted chips on white background.
  */
-export function SkillsBlock({ data, accent }: BlockProps<SkillsBlockData>) {
-  const skills = (data || []).filter((s) => s?.trim());
+export function SkillsBlock({ data, accent, isSidebar = false }: SkillsBlockProps) {
+  const skills = (data || []).filter((s: string) => s?.trim());
   if (skills.length === 0) return null;
 
+  const chipStyle = isSidebar
+    ? {
+        fontSize: 10,
+        lineHeight: 1.4,
+        color: "#ffffff",
+        background: "rgba(255,255,255,0.15)",
+        border: "1px solid rgba(255,255,255,0.25)",
+        borderRadius: 4,
+        padding: "3px 8px",
+        fontWeight: 500,
+        whiteSpace: "nowrap" as const,
+      }
+    : {
+        fontSize: 10,
+        lineHeight: 1.4,
+        color: accent,
+        background: hexToRgba(accent, 0.1),
+        border: `1px solid ${hexToRgba(accent, 0.35)}`,
+        borderRadius: 4,
+        padding: "3px 8px",
+        fontWeight: 500,
+        whiteSpace: "nowrap" as const,
+      };
+
   return (
-    <section
-      style={{
-        marginBottom: 16,
-        breakInside: "avoid" as const,
-      }}
-    >
-      <SectionTitle accent={accent}>Skills</SectionTitle>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 6,
-        }}
-      >
-        {skills.map((s, i) => (
-          <span
-            key={i}
-            style={{
-              fontSize: 10,
-              lineHeight: 1.4,
-              color: accent,
-              background: hexToRgba(accent, 0.1),
-              border: `1px solid ${hexToRgba(accent, 0.35)}`,
-              borderRadius: 4,
-              padding: "3px 8px",
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {s}
-          </span>
+    <section style={{ marginBottom: 16, breakInside: "avoid" as const }}>
+      <SectionTitle accent={accent} isSidebar={isSidebar}>Skills</SectionTitle>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {skills.map((s: string, i: number) => (
+          <span key={i} style={chipStyle}>{s}</span>
         ))}
       </div>
     </section>
   );
 }
 
-/** Convert a #RRGGBB hex string to an rgba() string with the given alpha. */
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace("#", "");
   if (clean.length !== 6) return hex;

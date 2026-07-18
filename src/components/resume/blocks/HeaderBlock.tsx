@@ -2,18 +2,20 @@
 
 import * as React from "react";
 import type { ResumeData } from "@/store/resume-store";
-import type { BlockProps } from "./types";
+
+interface HeaderBlockProps {
+  data: ResumeData;
+  accent: string;
+  isSidebar?: boolean;
+}
 
 /**
- * HeaderBlock — renders the candidate's name, title, and contact line.
+ * HeaderBlock — renders the candidate's name, title, and contact info.
  *
- * This is the "personal" / contact section. It receives the full ResumeData
- * (only the contact fields are read) so it can render name, title, email,
- * phone, location, and any linked profiles in a single, compact header.
- *
- * Inline styles are used for PDF-export compatibility.
+ * When `isSidebar` is true, renders with white text (for colored sidebar backgrounds).
+ * When false, renders with dark text (for white main content area).
  */
-export function HeaderBlock({ data, accent }: BlockProps<ResumeData>) {
+export function HeaderBlock({ data, accent, isSidebar = false }: HeaderBlockProps) {
   const contacts: string[] = [
     data.email,
     data.phone,
@@ -23,18 +25,74 @@ export function HeaderBlock({ data, accent }: BlockProps<ResumeData>) {
     data.website,
   ].filter(Boolean) as string[];
 
+  const textColor = isSidebar ? "#ffffff" : "#1a1a2e";
+  const subColor = isSidebar ? "rgba(255,255,255,0.85)" : accent;
+  const contactColor = isSidebar ? "rgba(255,255,255,0.7)" : "#666";
+
+  if (isSidebar) {
+    // Sidebar mode: compact, white text, centered
+    return (
+      <div style={{ marginBottom: 20, textAlign: "center" }}>
+        {data.photo ? (
+          <img
+            src={data.photo}
+            alt={data.name}
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              objectFit: "cover",
+              margin: "0 auto 12px",
+              border: "3px solid rgba(255,255,255,0.3)",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)",
+              margin: "0 auto 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 28,
+              fontWeight: 700,
+              color: "#fff",
+              border: "3px solid rgba(255,255,255,0.3)",
+            }}
+          >
+            {data.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+          </div>
+        )}
+        <h1 style={{ fontSize: 18, fontWeight: 800, color: textColor, margin: 0, lineHeight: 1.2 }}>
+          {data.name}
+        </h1>
+        {data.title ? (
+          <p style={{ fontSize: 10, color: subColor, margin: "4px 0 0", fontWeight: 500 }}>
+            {data.title}
+          </p>
+        ) : null}
+        {contacts.length > 0 ? (
+          <div style={{ fontSize: 9, color: contactColor, marginTop: 8, lineHeight: 1.6 }}>
+            {contacts.map((c, i) => (
+              <div key={i} style={{ marginBottom: 2, wordBreak: "break-word" }}>{c}</div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Main content mode: large name, horizontal contact line
   return (
-    <header
-      style={{
-        marginBottom: 16,
-        breakInside: "avoid" as const,
-      }}
-    >
+    <header style={{ marginBottom: 16, breakInside: "avoid" as const }}>
       <h1
         style={{
           fontSize: 26,
           fontWeight: 800,
-          color: "#1a1a2e",
+          color: textColor,
           margin: 0,
           lineHeight: 1.15,
           letterSpacing: -0.3,
@@ -46,7 +104,7 @@ export function HeaderBlock({ data, accent }: BlockProps<ResumeData>) {
         <p
           style={{
             fontSize: 13,
-            color: accent,
+            color: subColor,
             fontWeight: 600,
             margin: "4px 0 0 0",
             letterSpacing: 0.2,
@@ -59,7 +117,7 @@ export function HeaderBlock({ data, accent }: BlockProps<ResumeData>) {
         <div
           style={{
             fontSize: 10,
-            color: "#666",
+            color: contactColor,
             marginTop: 6,
             lineHeight: 1.5,
             display: "flex",

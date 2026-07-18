@@ -1358,8 +1358,8 @@ export function ResumeBuilderModule() {
                 />
               </div>
 
-              {/* Status Bar — Live page metrics + overflow indicator (Phase 2 #6 + Phase 3 #8) */}
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t bg-card px-4 py-1.5 text-[11px] text-muted-foreground">
+              {/* Status Bar — Live page metrics + overflow indicator (hidden in print) */}
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t bg-card px-4 py-1.5 text-[11px] text-muted-foreground print:hidden">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-medium text-foreground">
                     {pageModel?.totalPages ?? 1} page{(pageModel?.totalPages ?? 1) > 1 ? 's' : ''}

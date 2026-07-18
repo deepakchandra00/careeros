@@ -51,16 +51,18 @@ import {
 export function BlockRenderer({
   block,
   accent,
+  isSidebar = false,
 }: {
   block: PageBlock;
   accent: string;
+  isSidebar?: boolean;
 }) {
   const data = block.data as any;
 
   switch (block.type) {
     // ── Contact / personal header ────────────────────────────────────────
     case BlockType.Contact:
-      return <HeaderBlock data={data as ResumeData} accent={accent} />;
+      return <HeaderBlock data={data as ResumeData} accent={accent} isSidebar={isSidebar} />;
 
     // ── Summary ──────────────────────────────────────────────────────────
     case BlockType.Summary:
@@ -97,7 +99,7 @@ export function BlockRenderer({
     // ── Skills ───────────────────────────────────────────────────────────
     case BlockType.Skills:
       if (data && data.isHeader) return null;
-      return <SkillsBlock data={Array.isArray(data) ? data : []} accent={accent} />;
+      return <SkillsBlock data={Array.isArray(data) ? data : []} accent={accent} isSidebar={isSidebar} />;
 
     // ── Projects ─────────────────────────────────────────────────────────
     case BlockType.Projects:
@@ -155,6 +157,7 @@ export function BlockRenderer({
           data={Array.isArray(data) ? data : []}
           accent={accent}
           title="Certifications"
+          isSidebar={isSidebar}
         />
       );
 
@@ -181,7 +184,7 @@ export function BlockRenderer({
     case BlockType.Languages:
       if (data && data.isHeader) return null;
       return (
-        <LanguagesBlock data={Array.isArray(data) ? data : []} accent={accent} />
+        <LanguagesBlock data={Array.isArray(data) ? data : []} accent={accent} isSidebar={isSidebar} />
       );
 
     case BlockType.Interests:

@@ -47,21 +47,25 @@ export function SummaryBlock({ data, accent }: BlockProps<SummaryBlockData>) {
 export function SectionTitle({
   children,
   accent,
+  isSidebar = false,
 }: {
   children: React.ReactNode;
   accent: string;
+  isSidebar?: boolean;
 }) {
   return (
     <h2
       style={{
         fontSize: 12,
         fontWeight: 700,
-        color: accent,
+        color: isSidebar ? "rgba(255,255,255,0.7)" : accent,
         textTransform: "uppercase",
         letterSpacing: 1.2,
         margin: "0 0 8px 0",
         paddingBottom: 4,
-        borderBottom: `1.5px solid ${accent}`,
+        borderBottom: isSidebar
+          ? "1.5px solid rgba(255,255,255,0.2)"
+          : `1.5px solid ${accent}`,
       }}
     >
       {children}

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { A4_WIDTH, A4_HEIGHT, type Page } from "@/lib/resume/layout-engine/types";
-import type { PageLayout } from "@/store/resume-store";
+import type { PageLayout, ResumeData } from "@/store/resume-store";
 import { TemplateBackground } from "./TemplateBackground";
 import { BlockRenderer } from "./BlockRenderer";
 import type { TemplatePattern } from "./template-layout";
@@ -10,26 +10,12 @@ import type { TemplatePattern } from "./template-layout";
 /**
  * PageRenderer — renders ONE A4 page from the PageModel.
  *
- * Architecture:
+ * FIX: Removed `overflow: hidden` from the content layer.
+ * Content flows naturally. The layout engine already decided which
+ * blocks belong on this page — no clipping needed.
  *
- *   ┌──────────────────────────────────────────────┐
- *   │  .resume-page  (794 × 1123, relative)        │
- *   │  ┌─────────┐                                 │
- *   │  │ bg layer│  ← TemplateBackground (absolute)│
- *   │  └─────────┘                                 │
- *   │  ┌─────────────────────────────────────────┐ │
- *   │  │ content layer (padded, zIndex:1)        │ │
- *   │  │   <BlockRenderer />  <BlockRenderer />   │ │
- *   │  │   <BlockRenderer />  ...                 │ │
- *   │  └─────────────────────────────────────────┘ │
- *   └──────────────────────────────────────────────┘
- *
- * The background fills the ENTIRE page (sidebar / header band / colors).
- * The content sits in a padded frame whose left/right padding is increased
- * by the sidebar width so content never overlaps the sidebar.
- *
- * No translateY. No clipping. Each page renders ONLY the blocks assigned to
- * it by the layout engine.
+ * FIX: Background + sidebar content rendered together.
+ * The sidebar shows contact/skills/etc. (not just a colored div).
  */
 export function PageRenderer({
   page,
@@ -39,37 +25,31 @@ export function PageRenderer({
   sidebarWidth = 0,
   showPageNumber = false,
   totalPages = 1,
+  sidebarBlocks = [],
 }: {
-  /** The page to render (from generatePageModel().pages[n]). */
   page: Page;
-  /** Accent color (hex). */
   accent: string;
-  /** User-adjustable page padding. */
   pageLayout: PageLayout;
-  /** Template structural pattern. */
   pattern: TemplatePattern;
-  /** Sidebar width in px (sidebar patterns only). */
   sidebarWidth?: number;
-  /** Show the "page / total" indicator (screen only). */
   showPageNumber?: boolean;
-  /** Total page count (for the page indicator). */
   totalPages?: number;
+  /** Blocks that should render in the sidebar (contact, skills, etc.) */
+  sidebarBlocks?: Page["blocks"];
 }) {
-  // Compute the content frame's padding. For sidebar patterns, shift the
-  // content away from the sidebar by adding the sidebar width to the
-  // corresponding side's padding.
   const isSidebarLeft = pattern === "sidebar-left";
   const isSidebarRight = pattern === "sidebar-right";
   const isHeaderBand = pattern === "header-band";
+  const hasSidebar = isSidebarLeft || isSidebarRight;
 
-  // For header-band patterns, reserve extra top padding so content starts
-  // below the band (the band is 120px tall by default).
   const headerBandHeight = isHeaderBand ? 120 : 0;
-
   const paddingTop = pageLayout.paddingTop + headerBandHeight;
   const paddingBottom = pageLayout.paddingBottom;
-  const paddingLeft = pageLayout.paddingLeft + (isSidebarLeft ? sidebarWidth : 0);
-  const paddingRight = pageLayout.paddingRight + (isSidebarRight ? sidebarWidth : 0);
+
+  // For sidebar layouts: main content is next to the sidebar
+  // For non-sidebar: content uses full width with padding
+  const mainPaddingLeft = hasSidebar && isSidebarLeft ? 0 : pageLayout.paddingLeft;
+  const mainPaddingRight = hasSidebar && isSidebarRight ? 0 : pageLayout.paddingRight;
 
   return (
     <div
@@ -77,10 +57,9 @@ export function PageRenderer({
       style={{
         width: A4_WIDTH,
         height: A4_HEIGHT,
-        overflow: "hidden",
+        overflow: "hidden", // Clip at PAGE level (not content level) — needed for A4 boundary
         position: "relative",
         boxSizing: "border-box",
-        // Print: each .resume-page becomes one PDF page.
         pageBreakAfter: page.pageNumber < totalPages ? "always" : "auto",
         breakAfter: page.pageNumber < totalPages ? "page" : "auto",
       }}
@@ -93,19 +72,40 @@ export function PageRenderer({
         headerHeight={headerBandHeight}
       />
 
-      {/* ── Content layer (padded frame, above background) ──────────── */}
+      {/* ── Sidebar content (for sidebar patterns) ──────────────────── */}
+      {hasSidebar && sidebarBlocks && sidebarBlocks.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: paddingTop,
+            bottom: paddingBottom,
+            [isSidebarLeft ? "left" : "right"]: 0,
+            width: sidebarWidth,
+            padding: "0 16px",
+            zIndex: 2,
+            color: "#ffffff",
+            overflow: "hidden",
+          }}
+        >
+          {sidebarBlocks.map((block) => (
+            <BlockRenderer key={block.id} block={block} accent={accent} isSidebar />
+          ))}
+        </div>
+      )}
+
+      {/* ── Main content layer (padded frame, NO overflow:hidden) ────── */}
       <div
         style={{
           position: "relative",
           zIndex: 1,
           paddingTop,
           paddingBottom,
-          paddingLeft,
-          paddingRight,
+          paddingLeft: hasSidebar && isSidebarLeft ? sidebarWidth + mainPaddingLeft : mainPaddingLeft,
+          paddingRight: hasSidebar && isSidebarRight ? sidebarWidth + mainPaddingRight : mainPaddingRight,
           height: "100%",
           boxSizing: "border-box",
-          // Allow children to flow naturally; no clipping, no transforms.
-          overflow: "hidden",
+          // NO overflow:hidden — content flows naturally
+          // The layout engine already decided which blocks fit on this page
         }}
       >
         {page.blocks.map((block) => (
@@ -113,7 +113,7 @@ export function PageRenderer({
         ))}
       </div>
 
-      {/* ── Page number indicator (screen only) ─────────────────────── */}
+      {/* ── Page number indicator (screen only, hidden in print) ────── */}
       {showPageNumber && totalPages > 1 ? (
         <div
           className="print:hidden"
@@ -127,7 +127,7 @@ export function PageRenderer({
             color: "#94a3b8",
           }}
         >
-          {page.pageNumber} / {totalPages}
+          Page {page.pageNumber} of {totalPages}
         </div>
       ) : null}
     </div>

@@ -10,26 +10,14 @@ import { SectionTitle } from "./SummaryBlock";
  * Languages are stored as a string[] in the resume data. We render them as a
  * single flowing paragraph for a compact, ATS-friendly look.
  */
-export function LanguagesBlock({ data, accent }: BlockProps<string[]>) {
+export function LanguagesBlock({ data, accent, isSidebar = false }: BlockProps<string[]> & { isSidebar?: boolean }) {
   const items = (data || []).filter((s) => s?.trim());
   if (items.length === 0) return null;
 
   return (
-    <section
-      style={{
-        marginBottom: 16,
-        breakInside: "avoid" as const,
-      }}
-    >
-      <SectionTitle accent={accent}>Languages</SectionTitle>
-      <p
-        style={{
-          fontSize: 10.5,
-          lineHeight: 1.6,
-          color: "#444",
-          margin: 0,
-        }}
-      >
+    <section style={{ marginBottom: 16, breakInside: "avoid" as const }}>
+      <SectionTitle accent={accent} isSidebar={isSidebar}>Languages</SectionTitle>
+      <p style={{ fontSize: 10.5, lineHeight: 1.6, color: isSidebar ? "rgba(255,255,255,0.85)" : "#444", margin: 0 }}>
         {items.join(", ")}
       </p>
     </section>
