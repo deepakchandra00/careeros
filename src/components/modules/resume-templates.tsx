@@ -100,6 +100,7 @@ import {
   PremiumCreativeTemplate,
   Premium2026GlassTemplate,
 } from "@/components/modules/premium-saas-templates";
+import { ResumeComTemplate } from "@/components/modules/resume-com-template";
 
 /* ============================================================
  * Catalog exports — template / font / accent option tables
@@ -452,6 +453,8 @@ export function ResumePreview({
     body = <PremiumCreativeTemplate data={data} sections={sections} accent={accent} />;
   } else if (template === "premium-2026-glass") {
     body = <Premium2026GlassTemplate data={data} sections={sections} accent={accent} />;
+  } else if (template === "resume-com") {
+    body = <ResumeComTemplate data={data} sections={sections} accent={accent} />;
   } else {
     body = <ModernTemplate data={data} sections={sections} accent={accent} />;
   }

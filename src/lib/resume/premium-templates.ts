@@ -658,4 +658,15 @@ export const PREMIUM_TEMPLATES: PremiumTemplatePreset[] = [
     category: "designer",
     premium: true,
   },
+  {
+    id: "resume-com",
+    name: "Resume.com Style",
+    description: "Clean two-column purple sidebar, Resume.com inspired",
+    base: "resume-com",
+    accent: "#6c5ce7",
+    font: "sans",
+    thumbnail: "/thumbnails/resume-com.png",
+    category: "premium",
+    premium: true,
+  },
 ];

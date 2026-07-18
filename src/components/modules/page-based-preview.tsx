@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { ResumeData, TemplateStyle, PageLayout, SectionSettings } from "@/store/resume-store";
-import { generatePageModel, BlockType, type PageModel, type PageBlock } from "@/lib/resume/layout-engine";
+import { generatePageModel } from "@/lib/resume/layout-engine";
 import { ResumePreview } from "@/components/modules/resume-templates";
 import { cn } from "@/lib/utils";
 
@@ -16,20 +16,19 @@ interface PageBasedPreviewProps {
   pageLayout: PageLayout;
   zoom?: number;
   className?: string;
-  /** Section IDs that should always start on a new page. */
   pageBreaks?: string[];
-  /** Per-section layout overrides (keepTogether / startOnNewPage). */
   sectionSettings?: Record<string, SectionSettings>;
 }
 
 /**
- * Page-Based Resume Preview — renders the PageModel as A4 pages.
+ * Page-Based Resume Preview with Layout Engine.
  *
- * Pipeline: Resume JSON → Layout Engine → PageModel → A4 Pages
+ * The layout engine calculates page count based on the content frame
+ * (page size minus padding). The template renders at full page size.
+ * Content is shifted vertically per page using translateY.
  *
- * The layout engine (pure TypeScript) decides which sections go on which page.
- * The background (sidebar, colors) fills every page.
- * Content is placed at absolute positions from the PageModel.
+ * NO content repetition. Each page shows a DIFFERENT portion of the resume.
+ * The template's background (sidebar, colors) fills every page naturally.
  */
 export function PageBasedPreview({
   data,
@@ -41,10 +40,8 @@ export function PageBasedPreview({
   pageBreaks,
   sectionSettings,
 }: PageBasedPreviewProps) {
-  // Generate the page model using the layout engine
   const sectionOrder = React.useMemo(() => {
-    const order = data.sectionOrder.filter((id) => sections[id] !== false);
-    return order;
+    return data.sectionOrder.filter((id) => sections[id] !== false);
   }, [data.sectionOrder, sections]);
 
   const pageModel = React.useMemo(() => {
@@ -56,6 +53,12 @@ export function PageBasedPreview({
       { pageBreaks, sectionSettings }
     );
   }, [data, sectionOrder, pageLayout, pageBreaks, sectionSettings]);
+
+  // Content height per page = A4 height minus top/bottom padding
+  const contentHeightPerPage = Math.max(
+    100,
+    A4_HEIGHT - pageLayout.paddingTop - pageLayout.paddingBottom
+  );
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -74,11 +77,12 @@ export function PageBasedPreview({
             totalPages={pageModel.totalPages}
             pageLayout={pageLayout}
           >
-            <PageContentRenderer
+            <PageContent
               data={data}
               style={style}
               sections={sections}
-              page={page}
+              pageIndex={page.pageNumber - 1}
+              contentHeightPerPage={contentHeightPerPage}
               pageLayout={pageLayout}
             />
           </A4Page>
@@ -100,7 +104,11 @@ function A4Page({
   pageLayout: PageLayout;
 }) {
   const isLast = pageNumber === totalPages;
-  const hasPadding = pageLayout.paddingTop > 0 || pageLayout.paddingBottom > 0 || pageLayout.paddingLeft > 0 || pageLayout.paddingRight > 0;
+  const hasPadding =
+    pageLayout.paddingTop > 0 ||
+    pageLayout.paddingBottom > 0 ||
+    pageLayout.paddingLeft > 0 ||
+    pageLayout.paddingRight > 0;
 
   return (
     <div
@@ -125,13 +133,12 @@ function A4Page({
             bottom: `${pageLayout.paddingBottom}px`,
             left: `${pageLayout.paddingLeft}px`,
             right: `${pageLayout.paddingRight}px`,
-            border: "1px dashed rgba(99,102,241,0.4)",
+            border: "1px dashed rgba(99,102,241,0.3)",
             borderRadius: "2px",
           }}
         />
       )}
 
-      {/* Page number */}
       {totalPages > 1 && (
         <div className="absolute bottom-1.5 right-3 z-20 text-[10px] font-medium text-slate-400 print:hidden">
           {pageNumber} / {totalPages}
@@ -142,47 +149,62 @@ function A4Page({
 }
 
 /**
- * Renders the content for a single page.
+ * Renders content for a single page.
  *
- * Uses a hidden measurement container to render the full template (for background),
- * then overlays content blocks from the PageModel at their absolute positions.
+ * CRITICAL FIX: The template renders ONCE per page, but shifted vertically
+ * by (pageIndex * contentHeightPerPage) so each page shows a DIFFERENT
+ * portion of the resume. This prevents content repetition.
  *
- * The template background fills the entire page. Content is positioned
- * within the padded content area using the PageModel's block coordinates.
+ * The template's background (sidebar, colors, gradients) fills the entire
+ * A4 page on every page because it renders at full size. Only the text
+ * content scrolls between pages.
+ *
+ * Padding is an INPUT to the layout engine (determines contentHeightPerPage),
+ * NOT a CSS hack applied to the template.
  */
-function PageContentRenderer({
+function PageContent({
   data,
   style,
   sections,
-  page,
-  pageLayout,
+  pageIndex,
+  contentHeightPerPage,
+  pageLayout: _pageLayout,
 }: {
   data: ResumeData;
   style: TemplateStyle;
   sections: Record<string, boolean>;
-  page: { pageNumber: number; blocks: PageBlock[] };
+  pageIndex: number;
+  contentHeightPerPage: number;
   pageLayout: PageLayout;
 }) {
+  // Calculate vertical offset: page 0 = 0px, page 1 = contentHeight, page 2 = 2*contentHeight
+  const verticalOffset = pageIndex * contentHeightPerPage;
+
   return (
-    <>
-      {/* Render the full template as background (sidebar, colors, decorations) */}
-      {/* The template fills the entire page. Content is positioned on top. */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+    // Outer container: clips to A4 page boundary (overflow hidden)
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: "hidden",
+      }}
+    >
+      {/* Inner container: holds the template, shifted up by verticalOffset */}
+      {/* This shows a DIFFERENT portion of the resume on each page */}
+      <div
+        style={{
+          position: "absolute",
+          top: `-${verticalOffset}px`,
+          left: 0,
+          right: 0,
+          width: `${A4_WIDTH}px`,
+        }}
+      >
         <ResumePreview data={data} style={style} sections={sections} />
       </div>
-
-      {/* Content overlay — white background to hide template text, then re-render content */}
-      {/* This approach renders the template once (for background) and then renders
-          only the content blocks for this page on top of it.
-          
-          For Phase 1 (compatibility), we use a simpler approach:
-          - The template renders fully (background + all content)
-          - We don't try to hide/re-show individual blocks
-          - The page model is used for page count calculation and print
-          - Each page shows the full template with content shifted for that page
-          
-          This is a transitional approach that works now and will be replaced
-          with proper background/content separation in Phase 2. */}
-    </>
+    </div>
   );
 }
