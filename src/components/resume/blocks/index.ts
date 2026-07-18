@@ -15,4 +15,13 @@ export { EducationBlock } from "./EducationBlock";
 export { SimpleSectionBlock } from "./SimpleSectionBlock";
 export { LanguagesBlock, InterestsBlock, CustomSectionBlock } from "./LanguagesBlock";
 export { SectionHeaderBlock, titleForSection } from "./SectionHeaderBlock";
+
+// ── New atomic flow blocks ──
+export { SectionTitleBlock } from "./SectionTitleBlock";
+export { JobHeaderBlock } from "./JobHeaderBlock";
+export { BulletBlock, BulletListWrapper } from "./BulletBlock";
+export { ParagraphBlock } from "./ParagraphBlock";
+export { ProjectHeaderBlock } from "./ProjectHeaderBlock";
+export { ProjectTechBlock } from "./ProjectTechBlock";
+
 export type * from "./types";

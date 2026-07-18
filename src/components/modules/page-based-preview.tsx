@@ -9,8 +9,7 @@ import type {
 } from "@/store/resume-store";
 import {
   generatePageModel,
-  type Insets,
-  type PageBlock,
+  type LayoutContext,
 } from "@/lib/resume/layout-engine";
 import { PageRenderer } from "@/components/resume/PageRenderer";
 import { getTemplateLayout } from "@/components/resume/template-layout";
@@ -33,10 +32,14 @@ interface PageBasedPreviewProps {
 /**
  * PageBasedPreview — block-based resume preview.
  *
- * Pipeline: Resume JSON → Layout Engine → PageModel → PageRenderer → A4 Pages
+ * Pipeline: Resume JSON → Flow Engine → PageModel → PageRenderer → A4 Pages
  *
- * Each page renders ONLY the blocks assigned to it by the layout engine.
- * Sidebar blocks (contact, skills, languages) are separated from main blocks.
+ * The flow engine flattens the resume into atomic blocks (section titles,
+ * job headers, bullets, paragraphs) and paginates them at the item level.
+ * Sidebar content is routed to the sidebar column and paginated independently.
+ *
+ * Each page renders ONLY the blocks assigned to it — no clipping, no
+ * hidden content, no "move whole section" behaviour.
  */
 export function PageBasedPreview({
   data,
@@ -52,73 +55,35 @@ export function PageBasedPreview({
     return data.sectionOrder.filter((id) => sections[id] !== false);
   }, [data.sectionOrder, sections]);
 
-  const insets: Insets = React.useMemo(
-    () => ({
-      top: pageLayout.paddingTop ?? 0,
-      bottom: pageLayout.paddingBottom ?? 0,
-      left: pageLayout.paddingLeft ?? 0,
-      right: pageLayout.paddingRight ?? 0,
-    }),
-    [pageLayout]
-  );
-
-  const pageModel = React.useMemo(() => {
-    return generatePageModel(
-      data,
-      sectionOrder,
-      { width: A4_WIDTH, height: A4_HEIGHT },
-      insets,
-      { pageBreaks, sectionSettings }
-    );
-  }, [data, sectionOrder, insets, pageBreaks, sectionSettings]);
-
   const { pattern, sidebarWidth } = React.useMemo(
     () => getTemplateLayout(style.template),
     [style.template]
   );
 
-  // Separate sidebar blocks from main content blocks
-  // Sidebar blocks: contact, skills, languages, certifications
-  // These render in the sidebar area (for sidebar templates)
-  const sidebarSectionIds = new Set(["personal", "skills", "languages", "certifications"]);
-  const isSidebarPattern = pattern === "sidebar-left" || pattern === "sidebar-right";
+  const layout: LayoutContext = React.useMemo(
+    () => ({
+      pattern,
+      sidebarWidth,
+      headerBandHeight: pattern === "header-band" ? 120 : 0,
+      padding: {
+        top: pageLayout.paddingTop ?? 0,
+        bottom: pageLayout.paddingBottom ?? 0,
+        left: pageLayout.paddingLeft ?? 0,
+        right: pageLayout.paddingRight ?? 0,
+      },
+      pageWidth: A4_WIDTH,
+      pageHeight: A4_HEIGHT,
+    }),
+    [pattern, sidebarWidth, pageLayout]
+  );
 
-  // Extract sidebar blocks from page 1 (they typically appear at the start)
-  const sidebarBlocks: PageBlock[] = React.useMemo(() => {
-    if (!isSidebarPattern) return [];
-    const allBlocks = pageModel.pages.flatMap((p) => p.blocks);
-    return allBlocks.filter((b) => {
-      // Check if this block belongs to a sidebar section
-      const blockData = b.data as { sectionType?: string; isHeader?: boolean };
-      if (blockData?.isHeader) {
-        // Check if the header is for a sidebar section
-        const sectionType = blockData.sectionType as string;
-        return sidebarSectionIds.has(sectionType);
-      }
-      return false;
+  const pageModel = React.useMemo(() => {
+    return generatePageModel(data, sectionOrder, {
+      layout,
+      pageBreaks,
+      sectionSettings,
     });
-  }, [pageModel, isSidebarPattern]);
-
-  // Filter out sidebar blocks from page blocks (so they don't render twice)
-  const filteredPages = React.useMemo(() => {
-    if (!isSidebarPattern) return pageModel.pages;
-    return pageModel.pages.map((page) => ({
-      ...page,
-      blocks: page.blocks.filter((b) => {
-        const blockData = b.data as { sectionType?: string; isHeader?: boolean };
-        if (blockData?.isHeader && sidebarSectionIds.has(blockData.sectionType as string)) {
-          return false; // Remove sidebar section headers from main content
-        }
-        // Also remove sidebar section content blocks
-        // Check by block type
-        const sidebarTypes = new Set(["contact", "skills", "languages", "certifications"]);
-        if (sidebarTypes.has(b.type)) {
-          return false;
-        }
-        return true;
-      }),
-    }));
-  }, [pageModel, isSidebarPattern]);
+  }, [data, sectionOrder, layout, pageBreaks, sectionSettings]);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -130,7 +95,7 @@ export function PageBasedPreview({
         }}
         className="flex flex-col items-center gap-4 print:!scale-100 print:!transform-none"
       >
-        {filteredPages.map((page) => (
+        {pageModel.pages.map((page) => (
           <PageRenderer
             key={page.pageNumber}
             page={page}
@@ -140,7 +105,6 @@ export function PageBasedPreview({
             sidebarWidth={sidebarWidth}
             showPageNumber
             totalPages={pageModel.totalPages}
-            sidebarBlocks={page.pageNumber === 1 ? sidebarBlocks : []}
           />
         ))}
       </div>

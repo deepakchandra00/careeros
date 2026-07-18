@@ -65,7 +65,8 @@ import { ResumeEditor } from "@/components/modules/resume-editor";
 import { PageBasedPreview } from "@/components/modules/page-based-preview";
 import { PageNavigator } from "@/components/modules/page-navigator";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { generatePageModel } from "@/lib/resume/layout-engine";
+import { generatePageModel, type LayoutContext } from "@/lib/resume/layout-engine";
+import { getTemplateLayout } from "@/components/resume/template-layout";
 import {
   ResumePreview,
   TEMPLATE_OPTIONS,
@@ -486,16 +487,27 @@ export function ResumeBuilderModule() {
     [data.sectionOrder, sections]
   );
 
-  const pageModel = React.useMemo(
-    () => generatePageModel(
-      data,
-      sectionOrder,
-      { width: 794, height: 1123 },
-      pageLayout,
-      { pageBreaks, sectionSettings }
-    ),
-    [data, sectionOrder, pageLayout, pageBreaks, sectionSettings]
-  );
+  const pageModel = React.useMemo(() => {
+    const { pattern, sidebarWidth } = getTemplateLayout(style.template);
+    const layout: LayoutContext = {
+      pattern,
+      sidebarWidth,
+      headerBandHeight: pattern === "header-band" ? 120 : 0,
+      padding: {
+        top: pageLayout.paddingTop ?? 0,
+        bottom: pageLayout.paddingBottom ?? 0,
+        left: pageLayout.paddingLeft ?? 0,
+        right: pageLayout.paddingRight ?? 0,
+      },
+      pageWidth: 794,
+      pageHeight: 1123,
+    };
+    return generatePageModel(data, sectionOrder, {
+      layout,
+      pageBreaks,
+      sectionSettings,
+    });
+  }, [data, sectionOrder, pageLayout, pageBreaks, sectionSettings, style.template]);
 
   const wordCount = React.useMemo(() => {
     const text = [

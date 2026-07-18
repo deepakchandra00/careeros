@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { A4_WIDTH, A4_HEIGHT, type Page } from "@/lib/resume/layout-engine/types";
-import type { PageLayout, ResumeData } from "@/store/resume-store";
+import type { PageLayout } from "@/store/resume-store";
 import { TemplateBackground } from "./TemplateBackground";
 import { BlockRenderer } from "./BlockRenderer";
 import type { TemplatePattern } from "./template-layout";
@@ -10,12 +10,16 @@ import type { TemplatePattern } from "./template-layout";
 /**
  * PageRenderer — renders ONE A4 page from the PageModel.
  *
- * FIX: Removed `overflow: hidden` from the content layer.
- * Content flows naturally. The layout engine already decided which
- * blocks belong on this page — no clipping needed.
+ * The flow engine assigns each page:
+ *   - `blocks`        → main content column (flows top-to-bottom)
+ *   - `sidebarBlocks` → sidebar column (for sidebar-left/right patterns)
  *
- * FIX: Background + sidebar content rendered together.
- * The sidebar shows contact/skills/etc. (not just a colored div).
+ * The sidebar column has NO overflow:hidden — content flows naturally.
+ * The page-level overflow:hidden clips only at the A4 boundary (needed
+ * for clean page breaks in print).
+ *
+ * For header-band patterns, the header (name/contacts) is part of the
+ * main content and renders below the colored band.
  */
 export function PageRenderer({
   page,
@@ -25,7 +29,6 @@ export function PageRenderer({
   sidebarWidth = 0,
   showPageNumber = false,
   totalPages = 1,
-  sidebarBlocks = [],
 }: {
   page: Page;
   accent: string;
@@ -34,8 +37,6 @@ export function PageRenderer({
   sidebarWidth?: number;
   showPageNumber?: boolean;
   totalPages?: number;
-  /** Blocks that should render in the sidebar (contact, skills, etc.) */
-  sidebarBlocks?: Page["blocks"];
 }) {
   const isSidebarLeft = pattern === "sidebar-left";
   const isSidebarRight = pattern === "sidebar-right";
@@ -46,10 +47,11 @@ export function PageRenderer({
   const paddingTop = pageLayout.paddingTop + headerBandHeight;
   const paddingBottom = pageLayout.paddingBottom;
 
-  // For sidebar layouts: main content is next to the sidebar
-  // For non-sidebar: content uses full width with padding
+  // For sidebar layouts: main content is next to the sidebar.
   const mainPaddingLeft = hasSidebar && isSidebarLeft ? 0 : pageLayout.paddingLeft;
   const mainPaddingRight = hasSidebar && isSidebarRight ? 0 : pageLayout.paddingRight;
+
+  const sidebarBlocks = page.sidebarBlocks || [];
 
   return (
     <div
@@ -57,7 +59,7 @@ export function PageRenderer({
       style={{
         width: A4_WIDTH,
         height: A4_HEIGHT,
-        overflow: "hidden", // Clip at PAGE level (not content level) — needed for A4 boundary
+        overflow: "hidden", // Clip at PAGE level — needed for clean A4 boundary in print
         position: "relative",
         boxSizing: "border-box",
         pageBreakAfter: page.pageNumber < totalPages ? "always" : "auto",
@@ -73,7 +75,7 @@ export function PageRenderer({
       />
 
       {/* ── Sidebar content (for sidebar patterns) ──────────────────── */}
-      {hasSidebar && sidebarBlocks && sidebarBlocks.length > 0 && (
+      {hasSidebar && sidebarBlocks.length > 0 && (
         <div
           style={{
             position: "absolute",
@@ -84,8 +86,6 @@ export function PageRenderer({
             padding: "0 16px",
             zIndex: 2,
             color: "#ffffff",
-            // NO overflow:hidden — sidebar content should flow naturally
-            // The page-level overflow:hidden clips at the A4 boundary
           }}
         >
           {sidebarBlocks.map((block) => (
@@ -94,7 +94,7 @@ export function PageRenderer({
         </div>
       )}
 
-      {/* ── Main content layer (padded frame, NO overflow:hidden) ────── */}
+      {/* ── Main content layer (padded frame) ───────────────────────── */}
       <div
         style={{
           position: "relative",
@@ -105,8 +105,6 @@ export function PageRenderer({
           paddingRight: hasSidebar && isSidebarRight ? sidebarWidth + mainPaddingRight : mainPaddingRight,
           height: "100%",
           boxSizing: "border-box",
-          // NO overflow:hidden — content flows naturally
-          // The layout engine already decided which blocks fit on this page
         }}
       >
         {page.blocks.map((block) => (
@@ -131,6 +129,26 @@ export function PageRenderer({
           Page {page.pageNumber} of {totalPages}
         </div>
       ) : null}
+
+      {/* ── CSS reset: eliminate unpredictable default browser margins ── */}
+      <style>{`
+        .resume-page p,
+        .resume-page h1,
+        .resume-page h2,
+        .resume-page h3,
+        .resume-page ul,
+        .resume-page ol,
+        .resume-page li,
+        .resume-page div {
+          margin-top: 0;
+        }
+        .resume-page ul,
+        .resume-page li {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+      `}</style>
     </div>
   );
 }

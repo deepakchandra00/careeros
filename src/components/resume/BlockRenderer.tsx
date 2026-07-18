@@ -7,6 +7,7 @@ import type {
   ProjectItem,
   EducationItem,
   ResumeData,
+  SimpleItem,
 } from "@/store/resume-store";
 import {
   HeaderBlock,
@@ -19,34 +20,33 @@ import {
   LanguagesBlock,
   InterestsBlock,
   CustomSectionBlock,
-  SectionHeaderBlock,
+  SectionTitleBlock,
+  JobHeaderBlock,
+  BulletBlock,
+  ParagraphBlock,
+  ProjectHeaderBlock,
+  ProjectTechBlock,
 } from "./blocks";
 
 /**
- * BlockRenderer — maps a PageBlock (from the layout engine) to its React
+ * BlockRenderer — maps a PageBlock (from the flow engine) to its React
  * component.
  *
- * The layout engine emits several flavors of blocks:
+ * The flow engine emits ATOMIC blocks:
  *
- *  1. Entry blocks — a single entry (one experience, one project, one
- *     education item). These are the common case when a section is split
- *     across pages.
+ *   - SectionTitle  → standalone section header (keepWithNext)
+ *   - JobHeader     → experience entry header (role/company/dates)
+ *   - Bullet        → single bullet point
+ *   - Paragraph     → text block (splittable across pages)
+ *   - ProjectHeader → project name + link
+ *   - ProjectTech   → tech-stack chips
+ *   - Contact       → name/title/contacts (HeaderBlock)
+ *   - EducationEntry → one education item
+ *   - Skills / Certifications / Languages / Awards / Publications / Interests
+ *                    → atomic section blocks (render their own title)
  *
- *  2. Section-header blocks — emitted when a section is split across pages.
- *     Identified by `data.isHeader === true`. Rendered as a standalone title.
- *
- *  3. Whole-section blocks — emitted when an entire section fits on one page.
- *     The block's `data` carries `{ items: [...] }` (packed by the parser).
- *     Rendered as a section header followed by the entry blocks.
- *
- *  4. Simple-section blocks — flat list sections (Skills, Certifications,
- *     Languages, Awards, Publications, Interests). The block's `data` IS the
- *     list itself.
- *
- *  5. Contact / Summary — single blocks with their own data shapes.
- *
- * Each block component receives ONLY its own data (never the full resume),
- * which keeps them reusable and PDF-export-safe.
+ * Each block component receives ONLY its own data, which keeps them
+ * reusable and PDF-export-safe.
  */
 export function BlockRenderer({
   block,
@@ -60,211 +60,110 @@ export function BlockRenderer({
   const data = block.data as any;
 
   switch (block.type) {
+    // ── Atomic flow blocks ───────────────────────────────────────────────
+
+    case BlockType.SectionTitle:
+      return <SectionTitleBlock data={data} accent={accent} />;
+
+    case BlockType.JobHeader:
+      return <JobHeaderBlock data={data as ExperienceItem} accent={accent} />;
+
+    case BlockType.Bullet:
+      return <BulletBlock data={data} accent={accent} />;
+
+    case BlockType.Paragraph:
+      return <ParagraphBlock data={data} continued={block.continued} />;
+
+    case BlockType.ProjectHeader:
+      return <ProjectHeaderBlock data={data as ProjectItem} accent={accent} />;
+
+    case BlockType.ProjectTech:
+      return <ProjectTechBlock data={data} />;
+
     // ── Contact / personal header ────────────────────────────────────────
     case BlockType.Contact:
       return <HeaderBlock data={data as ResumeData} accent={accent} isSidebar={isSidebar} />;
 
-    // ── Summary ──────────────────────────────────────────────────────────
+    // ── Legacy summary (unused by flow engine, kept for safety) ──────────
     case BlockType.Summary:
-      // Summary is never split — `data` is always { text }.
-      if (data && data.isHeader) return null;
       return <SummaryBlock data={data ?? { text: "" }} accent={accent} />;
 
-    // ── Experience ───────────────────────────────────────────────────────
-    case BlockType.Experience:
-      // Split-section header (emitted by paginator).
-      if (data && data.isHeader) {
-        return (
-          <SectionHeaderBlock
-            accent={accent}
-            sectionType={BlockType.Experience}
-            isContinuation={!!data.isContinuation}
-          />
-        );
-      }
-      // Whole-section block (fits on one page). Render header + entries.
+    // ── Skills (atomic — renders own title) ──────────────────────────────
+    case BlockType.Skills: {
+      const skills: string[] = Array.isArray(data?.skills) ? data.skills : Array.isArray(data) ? data : [];
+      const sidebar = data?.isSidebar ?? isSidebar;
+      return <SkillsBlock data={skills} accent={accent} isSidebar={sidebar} />;
+    }
+
+    // ── Education entry (atomic) ─────────────────────────────────────────
+    case BlockType.EducationEntry:
+      return <EducationBlock data={data as EducationItem} accent={accent} />;
+
+    // ── Legacy whole-education section (unused by flow engine) ───────────
+    case BlockType.Education: {
       if (data && Array.isArray(data.items)) {
         return (
-          <ExperienceSectionBlock
-            items={data.items as ExperienceItem[]}
-            accent={accent}
-          />
+          <>
+            <SectionTitleBlock data={{ title: "Education", isSidebar }} accent={accent} />
+            {data.items.map((item: EducationItem, i: number) => (
+              <EducationBlock key={item.id || i} data={item} accent={accent} />
+            ))}
+          </>
         );
       }
       return null;
+    }
 
+    // ── Simple list sections (atomic — render own title) ─────────────────
+    case BlockType.Certifications:
+    case BlockType.Awards:
+    case BlockType.Publications: {
+      const items: SimpleItem[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      const title = data?.title ?? "Section";
+      return (
+        <SimpleSectionBlock
+          data={items}
+          accent={accent}
+          title={title}
+          isSidebar={data?.isSidebar ?? isSidebar}
+        />
+      );
+    }
+
+    case BlockType.Languages: {
+      const items: string[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      return <LanguagesBlock data={items} accent={accent} isSidebar={data?.isSidebar ?? isSidebar} />;
+    }
+
+    case BlockType.Interests: {
+      const items: string[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      return <InterestsBlock data={items} accent={accent} />;
+    }
+
+    // ── Custom section (atomic — renders own title) ──────────────────────
+    case BlockType.CustomSection: {
+      const items: SimpleItem[] = Array.isArray(data?.items) ? data.items : [];
+      return (
+        <CustomSectionBlock
+          data={{ title: data?.title ?? "Section", items }}
+          accent={accent}
+        />
+      );
+    }
+
+    // ── Legacy entry blocks (unused by flow engine, kept for safety) ─────
     case BlockType.ExperienceEntry:
       return <ExperienceBlock data={data as ExperienceItem} accent={accent} />;
-
-    // ── Skills ───────────────────────────────────────────────────────────
-    case BlockType.Skills:
-      if (data && data.isHeader) return null;
-      return <SkillsBlock data={Array.isArray(data) ? data : []} accent={accent} isSidebar={isSidebar} />;
-
-    // ── Projects ─────────────────────────────────────────────────────────
-    case BlockType.Projects:
-      if (data && data.isHeader) {
-        return (
-          <SectionHeaderBlock
-            accent={accent}
-            sectionType={BlockType.Projects}
-            isContinuation={!!data.isContinuation}
-          />
-        );
-      }
-      if (data && Array.isArray(data.items)) {
-        return (
-          <ProjectsSectionBlock
-            items={data.items as ProjectItem[]}
-            accent={accent}
-          />
-        );
-      }
-      return null;
 
     case BlockType.ProjectEntry:
       return <ProjectsBlock data={data as ProjectItem} accent={accent} />;
 
-    // ── Education ────────────────────────────────────────────────────────
-    case BlockType.Education:
-      if (data && data.isHeader) {
-        return (
-          <SectionHeaderBlock
-            accent={accent}
-            sectionType={BlockType.Education}
-            isContinuation={!!data.isContinuation}
-          />
-        );
-      }
-      if (data && Array.isArray(data.items)) {
-        return (
-          <EducationSectionBlock
-            items={data.items as EducationItem[]}
-            accent={accent}
-          />
-        );
-      }
+    case BlockType.Experience:
+    case BlockType.Projects:
+      // Legacy whole-section blocks — not emitted by the flow engine.
       return null;
-
-    case BlockType.EducationEntry:
-      return <EducationBlock data={data as EducationItem} accent={accent} />;
-
-    // ── Simple list sections ─────────────────────────────────────────────
-    case BlockType.Certifications:
-      if (data && data.isHeader) return null;
-      return (
-        <SimpleSectionBlock
-          data={Array.isArray(data) ? data : []}
-          accent={accent}
-          title="Certifications"
-          isSidebar={isSidebar}
-        />
-      );
-
-    case BlockType.Awards:
-      if (data && data.isHeader) return null;
-      return (
-        <SimpleSectionBlock
-          data={Array.isArray(data) ? data : []}
-          accent={accent}
-          title="Achievements"
-        />
-      );
-
-    case BlockType.Publications:
-      if (data && data.isHeader) return null;
-      return (
-        <SimpleSectionBlock
-          data={Array.isArray(data) ? data : []}
-          accent={accent}
-          title="Publications"
-        />
-      );
-
-    case BlockType.Languages:
-      if (data && data.isHeader) return null;
-      return (
-        <LanguagesBlock data={Array.isArray(data) ? data : []} accent={accent} isSidebar={isSidebar} />
-      );
-
-    case BlockType.Interests:
-      if (data && data.isHeader) return null;
-      return (
-        <InterestsBlock data={Array.isArray(data) ? data : []} accent={accent} />
-      );
-
-    // ── Custom section ───────────────────────────────────────────────────
-    case BlockType.CustomSection:
-      if (data && data.isHeader) return null;
-      return <CustomSectionBlock data={data} accent={accent} />;
 
     default:
       return null;
   }
-}
-
-/**
- * ExperienceSectionBlock — renders a whole Experience section (header + all
- * entries) when the section fits on a single page.
- */
-function ExperienceSectionBlock({
-  items,
-  accent,
-}: {
-  items: ExperienceItem[];
-  accent: string;
-}) {
-  if (!items || items.length === 0) return null;
-  return (
-    <section style={{ marginBottom: 16 }}>
-      <SectionHeaderBlock accent={accent} sectionType={BlockType.Experience} />
-      {items.map((item, i) => (
-        <ExperienceBlock key={item.id || i} data={item} accent={accent} />
-      ))}
-    </section>
-  );
-}
-
-/**
- * ProjectsSectionBlock — renders a whole Projects section (header + all
- * entries) when the section fits on a single page.
- */
-function ProjectsSectionBlock({
-  items,
-  accent,
-}: {
-  items: ProjectItem[];
-  accent: string;
-}) {
-  if (!items || items.length === 0) return null;
-  return (
-    <section style={{ marginBottom: 16 }}>
-      <SectionHeaderBlock accent={accent} sectionType={BlockType.Projects} />
-      {items.map((item, i) => (
-        <ProjectsBlock key={item.id || i} data={item} accent={accent} />
-      ))}
-    </section>
-  );
-}
-
-/**
- * EducationSectionBlock — renders a whole Education section (header + all
- * entries) when the section fits on a single page.
- */
-function EducationSectionBlock({
-  items,
-  accent,
-}: {
-  items: EducationItem[];
-  accent: string;
-}) {
-  if (!items || items.length === 0) return null;
-  return (
-    <section style={{ marginBottom: 16 }}>
-      <SectionHeaderBlock accent={accent} sectionType={BlockType.Education} />
-      {items.map((item, i) => (
-        <EducationBlock key={item.id || i} data={item} accent={accent} />
-      ))}
-    </section>
-  );
 }

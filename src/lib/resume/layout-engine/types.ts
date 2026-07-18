@@ -1,21 +1,39 @@
 /**
  * Layout Engine Types — Pure TypeScript, no React, no DOM.
  *
- * This module defines the data structures used by the layout pipeline:
+ * REDESIGNED around flow-based pagination.
  *
- * Resume JSON → Parser → Measurer → Paginator → PageModel → React Renderer
+ * The resume is flattened into a list of ATOMIC renderable units (FlowNodes):
+ *
+ *   Resume
+ *   ├── SectionTitle  ("EXPERIENCE")
+ *   ├── JobHeader      (role · company · dates)
+ *   ├── Bullet         (one bullet point)
+ *   ├── Bullet
+ *   ├── JobHeader
+ *   ├── Bullet
+ *   ...
+ *
+ * The paginator walks this flat list and places each atom on a page,
+ * filling every page to 100% before starting a new one. Paragraphs can
+ * split mid-text; bullets flow individually; section/job headers stick
+ * to their following content (keepWithNext).
+ *
+ * Pipeline:
+ *   Resume JSON → buildFlow() → FlowNode[] → paginate() → PageModel
  */
 
-/** Block type enum — safer than string literals */
+/** Block type enum — identifies which React component renders a block */
 export enum BlockType {
+  // ── Legacy section types (still used by simple/atomic sections) ──
   Contact = "contact",
-  Summary = "summary",
-  Experience = "experience",
+  Summary = "summary",           // legacy: whole-summary block (unused by flow engine)
+  Experience = "experience",     // legacy: whole-experience section (unused by flow engine)
   ExperienceEntry = "experience_entry",
   Skills = "skills",
-  Projects = "projects",
+  Projects = "projects",         // legacy: whole-projects section (unused by flow engine)
   ProjectEntry = "project_entry",
-  Education = "education",
+  Education = "education",       // legacy: whole-education section (unused by flow engine)
   EducationEntry = "education_entry",
   Certifications = "certifications",
   Languages = "languages",
@@ -23,6 +41,20 @@ export enum BlockType {
   Publications = "publications",
   Interests = "interests",
   CustomSection = "custom_section",
+
+  // ── Atomic flow units (emitted by the flow engine) ──
+  /** A standalone section title (e.g. "EXPERIENCE", "EDUCATION"). */
+  SectionTitle = "section_title",
+  /** An experience entry header: role, company, dates, location. No bullets. */
+  JobHeader = "job_header",
+  /** A single bullet point. */
+  Bullet = "bullet",
+  /** A text paragraph (summary text, project description). Splittable. */
+  Paragraph = "paragraph",
+  /** A project entry header: name + link. */
+  ProjectHeader = "project_header",
+  /** Tech-stack chips for a project. */
+  ProjectTech = "project_tech",
 }
 
 /** Insets for padding/margins */
@@ -33,106 +65,69 @@ export interface Insets {
   left: number;
 }
 
-/** Pagination rules for a block */
-export interface PaginationRules {
-  /** Don't split this block across pages */
-  keepTogether: boolean;
-  /** Keep this block with the next one (e.g., section header with first entry) */
-  keepWithNext: boolean;
-  /** Allow splitting this block into smaller chunks */
-  allowSplit: boolean;
-  /** Minimum lines at the start of a block on a new page (prevent orphans) */
-  widowLines: number;
-  /** Minimum lines at the end of a block before a page break (prevent widows) */
-  orphanLines: number;
-}
-
-/** A layout node — a unit of content that the paginator can place on a page */
-export interface LayoutNode {
+/**
+ * FlowNode — the smallest renderable unit.
+ *
+ * Produced by `buildFlow()`. Each node carries its own measured height so
+ * the paginator can decide placement without re-measuring.
+ */
+export interface FlowNode {
   id: string;
   type: BlockType;
-  /** Estimated height in pixels (computed by the measurer) */
-  estimatedHeight: number;
-  /** Spacing above this block */
-  marginTop: number;
-  /** Spacing below this block */
-  marginBottom: number;
-  /** Pagination rules for this block */
-  rules: PaginationRules;
-  /** Child nodes (for splittable blocks like Experience) */
-  children?: LayoutNode[];
-  /** The actual data to render (section data, entry data, etc.) */
+  /** The data passed to the React block component. */
   data: unknown;
+  /** Measured height in pixels (including internal margins). */
+  height: number;
+  /** Keep this node with the next one (section titles, job headers). */
+  keepWithNext?: boolean;
+  /** This node's text can be split across pages (paragraphs). */
+  splittable?: boolean;
+  /** Force a page break before this node (manual break). */
+  forceBreak?: boolean;
+  /** Which column this node belongs to. */
+  column?: "main" | "sidebar";
+  /** Section ID for grouping (keepTogether / page breaks). */
+  sectionId?: string;
+
+  // ── Splittable-text metadata (only for splittable nodes) ──
+  text?: string;
+  lineHeight?: number;
+  charsPerLine?: number;
 }
 
-/** A block placed on a page — has absolute position */
+/**
+ * RenderedBlock — a FlowNode that has been placed on a page.
+ *
+ * This is what the React BlockRenderer receives. It's a slimmed-down
+ * FlowNode (no pagination metadata, just render data).
+ */
 export interface PageBlock {
   id: string;
   type: BlockType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
   data: unknown;
+  height: number;
+  /** True if this block is a continuation of content from the previous page. */
+  continued?: boolean;
+  /** Section ID (for highlighting / inspector). */
+  sectionId?: string;
 }
 
 /** A single page in the page model */
 export interface Page {
   pageNumber: number;
+  /** Main content column blocks. */
   blocks: PageBlock[];
+  /** Sidebar column blocks (sidebar templates only). */
+  sidebarBlocks: PageBlock[];
 }
 
-/** The complete page model — the output of the pagination engine */
+/** The complete page model — the output of the flow engine */
 export interface PageModel {
-  version: 1;
+  version: 2;
   pages: Page[];
   totalPages: number;
-}
-
-/** Template definition — shared by HTML, DOCX, PDF */
-export interface TemplateDefinition {
-  id: string;
-  version: 1;
-  pattern: "sidebar-left" | "sidebar-right" | "header-band" | "single-column";
-  theme: {
-    headerColor: string;
-    fontFamily: string;
-    sidebarBg?: string;
-    sidebarText?: string;
-  };
-  layout: {
-    page: { width: number; height: number };
-    sidebar?: { width: number; background: string; textColor: string };
-    contentArea: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      minPadding: Insets;
-      maxPadding: Insets;
-    };
-  };
 }
 
 /** Default page dimensions (A4 at 96 DPI) */
 export const A4_WIDTH = 794;
 export const A4_HEIGHT = 1123;
-
-/** Default pagination rules per block type */
-export const DEFAULT_PAGINATION_RULES: Record<BlockType, PaginationRules> = {
-  [BlockType.Contact]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Summary]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Experience]: { keepTogether: false, keepWithNext: false, allowSplit: true, widowLines: 2, orphanLines: 2 },
-  [BlockType.ExperienceEntry]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Skills]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Projects]: { keepTogether: false, keepWithNext: false, allowSplit: true, widowLines: 2, orphanLines: 2 },
-  [BlockType.ProjectEntry]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Education]: { keepTogether: false, keepWithNext: false, allowSplit: true, widowLines: 1, orphanLines: 1 },
-  [BlockType.EducationEntry]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Certifications]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Languages]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Awards]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Publications]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.Interests]: { keepTogether: true, keepWithNext: false, allowSplit: false, widowLines: 0, orphanLines: 0 },
-  [BlockType.CustomSection]: { keepTogether: false, keepWithNext: false, allowSplit: true, widowLines: 1, orphanLines: 1 },
-};
