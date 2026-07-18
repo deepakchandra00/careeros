@@ -56,6 +56,9 @@ import { ModuleHeader, AIButton } from "@/components/shared/blocks";
 import { useResumeStore, type SectionId } from "@/store/resume-store";
 import { ResumeEditor } from "@/components/modules/resume-editor";
 import { PageBasedPreview } from "@/components/modules/page-based-preview";
+import { PageNavigator } from "@/components/modules/page-navigator";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { generatePageModel } from "@/lib/resume/layout-engine";
 import {
   ResumePreview,
   TEMPLATE_OPTIONS,
@@ -297,6 +300,7 @@ export function ResumeBuilderModule() {
     DEFAULT_SECTIONS
   );
   const [zoom, setZoom] = React.useState(0.75);
+  const [currentPage, setCurrentPage] = React.useState(1);
   const [importing, setImporting] = React.useState(false);
   const [exportingDocx, setExportingDocx] = React.useState(false);
   const [exportingPdf, setExportingPdf] = React.useState(false);
@@ -311,6 +315,39 @@ export function ResumeBuilderModule() {
   const [templateSearch, setTemplateSearch] = React.useState("");
   const [templateCategory, setTemplateCategory] = React.useState("All");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Compute page model, word count, and ATS score
+  const sectionOrder = React.useMemo(
+    () => data.sectionOrder.filter((id) => sections[id] !== false),
+    [data.sectionOrder, sections]
+  );
+
+  const pageModel = React.useMemo(
+    () => generatePageModel(data, sectionOrder, { width: 794, height: 1123 }, pageLayout),
+    [data, sectionOrder, pageLayout]
+  );
+
+  const wordCount = React.useMemo(() => {
+    const text = [
+      data.name, data.title, data.summary,
+      ...data.experience.flatMap((e) => [e.role, e.company, ...e.bullets]),
+      ...data.projects.flatMap((p) => [p.name, p.description]),
+      ...data.skills,
+      ...data.education.flatMap((e) => [e.degree, e.school]),
+    ].filter(Boolean).join(" ");
+    return text.split(/\s+/).filter(Boolean).length;
+  }, [data]);
+
+  const atsScore = React.useMemo(() => {
+    let score = 50;
+    if (data.summary?.length > 50) score += 10;
+    if (data.experience.length >= 2) score += 15;
+    if (data.skills.length >= 8) score += 10;
+    if (data.projects.length >= 1) score += 5;
+    if (data.email && data.phone) score += 5;
+    if (data.linkedin || data.github) score += 5;
+    return Math.min(100, score);
+  }, [data]);
 
   const toggleSection = React.useCallback((id: string) => {
     setSections((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -856,19 +893,73 @@ export function ResumeBuilderModule() {
         </CardContent>
       </Card>
 
-      {/* Editor + Preview */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
-        {/* Editor */}
-        <div className="lg:max-h-[calc(100vh-15rem)] lg:overflow-y-auto lg:pr-1 scroll-thin">
-          <ResumeEditor />
-        </div>
+      {/* Editor + Preview — Resizable Split Layout */}
+      <div className="h-[calc(100vh-12rem)] min-h-[500px] overflow-hidden rounded-xl border">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          {/* Left: Editor Panel */}
+          <ResizablePanel defaultSize={38} minSize={25} maxSize={60} className="overflow-hidden">
+            <div className="h-full overflow-y-auto scroll-thin p-4">
+              <ResumeEditor />
+            </div>
+          </ResizablePanel>
 
-        {/* Preview — A4 page-based with automatic page reflow */}
-        <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto scroll-thin">
-          <div className="flex justify-center rounded-xl bg-muted/40 p-4 sm:p-8">
-            <PageBasedPreview data={data} style={style} sections={sections} pageLayout={pageLayout} zoom={zoom} />
-          </div>
-        </div>
+          <ResizableHandle withHandle />
+
+          {/* Right: Canvas Preview (the hero) */}
+          <ResizablePanel defaultSize={62} minSize={40} className="overflow-hidden">
+            <div className="flex h-full flex-col">
+              {/* Canvas area */}
+              <div data-preview-scroll className="flex-1 overflow-auto scroll-thin bg-muted/30 p-4 sm:p-6">
+                <div className="flex justify-center">
+                  <PageBasedPreview
+                    data={data}
+                    style={style}
+                    sections={sections}
+                    pageLayout={pageLayout}
+                    zoom={zoom}
+                  />
+                </div>
+              </div>
+
+              {/* Page Navigation */}
+              <div className="border-t bg-card/50 px-4 py-2">
+                <PageNavigator
+                  totalPages={pageModel?.totalPages ?? 1}
+                  currentPage={currentPage}
+                  onPageClick={(page) => {
+                    // Scroll to the page in the preview
+                    const previewArea = document.querySelector('[data-preview-scroll]');
+                    if (previewArea) {
+                      const pages = previewArea.querySelectorAll('.resume-page');
+                      const targetPage = pages[page - 1];
+                      if (targetPage) {
+                        targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        setCurrentPage(page);
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Status Bar */}
+              <div className="flex items-center justify-between border-t bg-card px-4 py-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-3">
+                  <span>{pageModel?.totalPages ?? 1} page{(pageModel?.totalPages ?? 1) > 1 ? 's' : ''}</span>
+                  <span>·</span>
+                  <span>{wordCount} words</span>
+                  <span>·</span>
+                  <span>~{Math.ceil(wordCount / 200)} min read</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span>ATS: {atsScore}%</span>
+                  {pageLayout.paddingTop > 0 || pageLayout.paddingBottom > 0 ? (
+                    <span className="text-primary">· Custom padding</span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
       {/* Live import progress overlay */}
