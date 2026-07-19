@@ -322,26 +322,53 @@ function buildMeasureRequests(
   }[] = [];
 
   regions.forEach((r) => {
-    const innerWidth = r.width - r.padding * 2;
+    const fullWidth = r.width - r.padding * 2;
+    // In timeline mode, content blocks are rendered inside a 2-column grid
+    // (timelineWidth | 1fr) with a columnGap. The content column is narrower
+    // than the full region width, so we must measure at the narrower width
+    // to get correct heights. If we measure at the full width, the measured
+    // heights are too short (less wrapping), and the rendered content
+    // overflows the page (content hiding in footer area).
+    const timelineContentWidth =
+      fullWidth - theme.timelineWidth - spacing.columnGap;
+    const isTimeline = theme.sectionStyle === "timeline" && r.variant === "main";
+    // In card mode, content blocks are rendered inside a card div with padding.
+    // Measure at the narrower width (fullWidth - 2 * cardPadding) to get correct
+    // heights.
+    const isCard = theme.sectionStyle === "card" && r.variant === "main";
+    const cardContentWidth = fullWidth - theme.cardPadding * 2;
     const ctx = { theme, spacing, variant: r.variant };
     r.groups.forEach((group, gi) => {
       group.blocks.forEach((block, bi) => {
+        // In timeline mode, sectionTitle blocks are rendered as labels in the
+        // left column (at timelineWidth). Content blocks are rendered in the
+        // right column (at timelineContentWidth).
+        // In card mode, sectionTitle blocks render at fullWidth. Content blocks
+        // render at cardContentWidth (inside the card padding).
+        const measureWidth =
+          isTimeline && block.kind !== "sectionTitle"
+            ? timelineContentWidth
+            : isTimeline && block.kind === "sectionTitle"
+              ? theme.timelineWidth
+              : isCard && block.kind !== "sectionTitle"
+                ? cardContentWidth
+                : fullWidth;
         requests.push({
           key: `${r.key}:${gi}:${bi}`,
-          width: innerWidth,
+          width: measureWidth,
           variant: r.variant,
           node: <BlockView block={block} ctx={ctx} />,
         });
         if (block.kind === "entry" && block.entry.bullets.length > 1) {
           requests.push({
             key: `${r.key}:${gi}:${bi}:h0`,
-            width: innerWidth,
+            width: measureWidth,
             variant: r.variant,
             node: <BlockView block={{ kind: "entry", entry: { ...block.entry, bullets: [] } }} ctx={ctx} />,
           });
           requests.push({
             key: `${r.key}:${gi}:${bi}:h1`,
-            width: innerWidth,
+            width: measureWidth,
             variant: r.variant,
             node: <BlockView block={{ kind: "entry", entry: { ...block.entry, bullets: block.entry.bullets.slice(0, 1) } }} ctx={ctx} />,
           });
@@ -555,10 +582,28 @@ export function ResumeDocument({
           rm.region.height -
           (footerHeight > 0 ? footerHeight + template.spacing.sectionGap : 0);
       }
+      // In timeline mode, the 2-column grid can introduce minor alignment
+      // overhead (row height = max(label, content)). Subtract a small safety
+      // margin per section to prevent content from overflowing into the footer.
+      if (template.theme.sectionStyle === "timeline" && rm.region.key === "main") {
+        const sectionCount = rm.groups.filter(
+          (g) => g.group.blocks.some((b) => b.kind === "sectionTitle"),
+        ).length;
+        available -= sectionCount * 4; // 4px per section as safety margin
+      }
+      // In card mode, each card adds padding (top + bottom) that isn't in the
+      // measured heights. Only count sections (groups with a sectionTitle block),
+      // not individual entry groups.
+      if (template.theme.sectionStyle === "card" && rm.region.key === "main") {
+        const sectionCount = rm.groups.filter(
+          (g) => g.group.blocks.some((b) => b.kind === "sectionTitle"),
+        ).length;
+        available -= sectionCount * template.theme.cardPadding * 2;
+      }
       out[rm.region.key] = paginateRegion(rm, available, template.spacing);
     });
     return out;
-  }, [allMeasured, bodyRMs, headerHeight, footerHeight, template.spacing]);
+  }, [allMeasured, bodyRMs, headerHeight, footerHeight, template.spacing, template.theme.sectionStyle]);
 
   const totalPages = useMemo(() => {
     if (!allMeasured) return 1;
@@ -677,6 +722,11 @@ function PageView({
     if (t.sectionStyle === "timeline" && variant === "main") {
       return renderTimelineBlocks(placed);
     }
+    // Card section style: group blocks by section, render the section title
+    // normally, then wrap all content blocks in a card (background + padding).
+    if (t.sectionStyle === "card" && variant === "main") {
+      return renderCardBlocks(placed);
+    }
     return (
       <>
         {placed.map((pb, i) => (
@@ -684,6 +734,62 @@ function PageView({
             <BlockView block={pb.block} ctx={{ theme: t, spacing: s, variant }} />
           </div>
         ))}
+      </>
+    );
+  };
+
+  // Card renderer: groups blocks by section (sectionTitle starts a new group).
+  // The section title renders normally. Content blocks are wrapped in a div
+  // with the card background, padding, and border-radius.
+  const renderCardBlocks = (placed: PlacedBlock[]) => {
+    const groups: { title: PlacedBlock | null; content: PlacedBlock[] }[] = [];
+    let current: { title: PlacedBlock | null; content: PlacedBlock[] } = {
+      title: null,
+      content: [],
+    };
+    for (const pb of placed) {
+      if (pb.block.kind === "sectionTitle") {
+        if (current.title || current.content.length) groups.push(current);
+        current = { title: pb, content: [] };
+      } else {
+        current.content.push(pb);
+      }
+    }
+    if (current.title || current.content.length) groups.push(current);
+
+    return (
+      <>
+        {groups.map((g, i) => {
+          const ctx = { theme: t, spacing: s, variant: "main" as Variant };
+          return (
+            <div key={i}>
+              {g.title && (
+                <div style={{ marginTop: g.title.topGap }}>
+                  <BlockView block={g.title.block} ctx={ctx} />
+                </div>
+              )}
+              {g.content.length > 0 && (
+                <div
+                  style={{
+                    background: t.cardBg,
+                    borderRadius: t.cardRadius,
+                    padding: t.cardPadding,
+                    marginTop: 0,
+                  }}
+                >
+                  {g.content.map((pb, j) => (
+                    <div
+                      key={j}
+                      style={{ marginTop: j === 0 ? 0 : pb.topGap }}
+                    >
+                      <BlockView block={pb.block} ctx={ctx} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </>
     );
   };
@@ -841,6 +947,10 @@ function TimelineRow({
 }) {
   const ctx = { theme, spacing, variant: "main" as const };
   const dotSize = 12;
+  // Use the title block's topGap as the row's top margin. This preserves the
+  // section gap that the pagination engine already computed, so the total
+  // height matches the measurement (no extra paddingBottom that causes overflow).
+  const rowTopGap = group.title?.topGap ?? 0;
 
   return (
     <>
@@ -849,7 +959,7 @@ function TimelineRow({
         style={{
           position: "relative",
           paddingRight: dotSize + 6,
-          paddingBottom: spacing.sectionGap,
+          marginTop: rowTopGap,
           textAlign: "right",
         }}
       >
@@ -883,10 +993,14 @@ function TimelineRow({
         )}
       </div>
 
-      {/* Right column: content blocks */}
-      <div style={{ paddingBottom: spacing.sectionGap }}>
+      {/* Right column: content blocks.
+          Content blocks already have their topGap from pagination, which
+          includes inter-block gaps. The first content block's topGap is 0
+          (since the sectionGap was on the title block, which we used as
+          rowTopGap above). */}
+      <div>
         {group.content.map((pb, i) => (
-          <div key={i} style={{ marginTop: pb.topGap }}>
+          <div key={i} style={{ marginTop: i === 0 ? 0 : pb.topGap }}>
             <BlockView block={pb.block} ctx={ctx} />
           </div>
         ))}

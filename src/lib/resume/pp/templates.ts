@@ -40,16 +40,22 @@ export type Theme = {
   headingWeight: number;
   sectionTitleTransform: "uppercase" | "none";
   sectionTitleStyle: "underline" | "bar" | "plain" | "chip";
-  bulletStyle: "dot" | "dash" | "square";
+  bulletStyle: "dot" | "dash" | "square" | "arrow";
   radius: number; // px
   accentBar: boolean;
   // CareerOS extension: photo shape for the profile header
   photoShape: "none" | "circle" | "square";
   // ── ATS Pro template extensions ──
   /** Profile header visual style. */
-  profileStyle: "plain" | "pro-3col" | "timeline-header";
-  /** Section rendering style — "timeline" wraps each section in a 2-col row. */
-  sectionStyle: "plain" | "timeline";
+  profileStyle: "plain" | "pro-3col" | "timeline-header" | "executive";
+  /** Section rendering style — "timeline" wraps each section in a 2-col row,
+   * "card" wraps content blocks in a background card. */
+  sectionStyle: "plain" | "timeline" | "card";
+  /** Section title icon treatment. */
+  sectionIcon: "none" | "circle" | "circle-dark";
+  /** When true, a horizontal divider line fills the remaining width after the
+   * section title. */
+  sectionDivider: boolean;
   /** When true, the summary is rendered inside the profile header (not as a
    * standalone section). The engine skips the "summary" section. */
   showSummaryInHeader: boolean;
@@ -71,6 +77,19 @@ export type Theme = {
   timelineDotColor: string;
   /** Timeline vertical line color. */
   timelineLineColor: string;
+  /** Dark header background color (for executive profileStyle). */
+  headerBg: string;
+  /** Text color on dark header (for executive profileStyle). */
+  headerText: string;
+  /** Background color for card-style sections (e.g. education box). */
+  cardBg: string;
+  /** Padding inside card-style sections. */
+  cardPadding: number;
+  /** Border radius for card-style sections. */
+  cardRadius: number;
+  /** Heading text shown before bullets in entries (e.g. "Tasks / Achievements").
+   * Empty string = no heading. */
+  entryBulletHeading: string;
 };
 
 export type Spacing = {
@@ -127,6 +146,8 @@ const baseTheme: Theme = {
   // ATS Pro defaults (no-op for base templates)
   profileStyle: "plain",
   sectionStyle: "plain",
+  sectionIcon: "none",
+  sectionDivider: false,
   showSummaryInHeader: false,
   avatarInitial: false,
   avatarShape: "circle",
@@ -137,17 +158,25 @@ const baseTheme: Theme = {
   timelineWidth: 170,
   timelineDotColor: "#f4b400",
   timelineLineColor: "#d8d8d8",
+  headerBg: "#0f172a",
+  headerText: "#ffffff",
+  cardBg: "#f7f7f7",
+  cardPadding: 20,
+  cardRadius: 8,
+  entryBulletHeading: "",
 };
 
 // ATS-safe font stacks (CareerOS extension).
 const SANS = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
 const SERIF = 'Georgia, "Times New Roman", Times, serif';
 const MONO = '"Courier New", Courier, monospace';
+const NUNITO = '"Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
 
 // Map our CareerOS font shorthand to actual CSS font stacks.
 export function fontStack(font: "sans" | "serif" | "mono" | string): string {
   if (font === "serif") return SERIF;
   if (font === "mono") return MONO;
+  if (font === "nunito") return NUNITO;
   return SANS;
 }
 
@@ -536,6 +565,63 @@ export const templates: Template[] = [
       pageMarginBottom: 30,
       pageMarginLeft: 28,
       sectionGap: 22,
+      entryGap: 22,
+      bulletGap: 6,
+    },
+  }),
+
+  // ── Modern Executive ──
+  // Dark split header with overlapping circular photo + timeline diamond.
+  // Section titles with dark circular icons + divider line.
+  // Education in a light gray card. Arrow bullet points.
+  tpl({
+    id: "modern-executive",
+    name: "Modern Executive",
+    description: "Dark header · photo · timeline diamond · arrow bullets",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["experience", "projects", "education", "skills", "certifications", "languages", "interests"],
+    theme: {
+      ...baseTheme,
+      primary: "#374151",
+      accent: "#2F8A94",
+      text: "#222222",
+      muted: "#6B7280",
+      divider: "#D7DCE2",
+      bodyFont: NUNITO,
+      headingFont: NUNITO,
+      sectionTitleStyle: "plain",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      bulletStyle: "arrow",
+      radius: 6,
+      photoShape: "none",
+      profileStyle: "executive",
+      sectionStyle: "card",
+      sectionIcon: "circle-dark",
+      sectionDivider: true,
+      showSummaryInHeader: true,
+      avatarInitial: true,
+      avatarShape: "circle",
+      avatarSize: 96,
+      chipStyle: "rounded",
+      chipBg: "#F1F3F5",
+      chipText: "#222222",
+      headerBg: "#374151",
+      headerText: "#ffffff",
+      cardBg: "#F7F7F7",
+      cardPadding: 20,
+      cardRadius: 8,
+      entryBulletHeading: "Tasks / Achievements",
+      baseSize: 13,
+    },
+    spacing: {
+      ...baseSpacing,
+      pageMarginTop: 32,
+      pageMarginRight: 40,
+      pageMarginBottom: 50,
+      pageMarginLeft: 40,
+      sectionGap: 28,
       entryGap: 22,
       bulletGap: 6,
     },
