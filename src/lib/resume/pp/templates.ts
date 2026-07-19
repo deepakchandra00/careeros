@@ -45,6 +45,32 @@ export type Theme = {
   accentBar: boolean;
   // CareerOS extension: photo shape for the profile header
   photoShape: "none" | "circle" | "square";
+  // ── ATS Pro template extensions ──
+  /** Profile header visual style. */
+  profileStyle: "plain" | "pro-3col" | "timeline-header";
+  /** Section rendering style — "timeline" wraps each section in a 2-col row. */
+  sectionStyle: "plain" | "timeline";
+  /** When true, the summary is rendered inside the profile header (not as a
+   * standalone section). The engine skips the "summary" section. */
+  showSummaryInHeader: boolean;
+  /** When true and no photo is set, show the person's initial in the avatar. */
+  avatarInitial: boolean;
+  /** Avatar shape for the initial (when avatarInitial is true). */
+  avatarShape: "circle" | "square";
+  /** Avatar size in px. */
+  avatarSize: number;
+  /** Chip style for skills / tech tags. */
+  chipStyle: "none" | "rounded" | "pill";
+  /** Chip background color. */
+  chipBg: string;
+  /** Chip text color. */
+  chipText: string;
+  /** Left column width for the timeline section style. */
+  timelineWidth: number; // px
+  /** Timeline dot color. */
+  timelineDotColor: string;
+  /** Timeline vertical line color. */
+  timelineLineColor: string;
 };
 
 export type Spacing = {
@@ -98,6 +124,19 @@ const baseTheme: Theme = {
   radius: 4,
   accentBar: true,
   photoShape: "none",
+  // ATS Pro defaults (no-op for base templates)
+  profileStyle: "plain",
+  sectionStyle: "plain",
+  showSummaryInHeader: false,
+  avatarInitial: false,
+  avatarShape: "circle",
+  avatarSize: 48,
+  chipStyle: "none",
+  chipBg: "#f1f5f9",
+  chipText: "#0f172a",
+  timelineWidth: 170,
+  timelineDotColor: "#f4b400",
+  timelineLineColor: "#d8d8d8",
 };
 
 // ATS-safe font stacks (CareerOS extension).
@@ -407,6 +446,99 @@ export const templates: Template[] = [
     footerSections: ["references", "languages"],
     theme: { ...baseTheme, accent: "#334155" },
     spacing: { ...baseSpacing, footerHeight: 90 },
+  }),
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ATS Pro templates — from dummy/ folder in careeros repo
+  // ════════════════════════════════════════════════════════════════════════
+
+  tpl({
+    id: "professional-one-column",
+    name: "Professional One Column",
+    description: "3-column header · avatar · summary in header",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["experience", "projects", "education", "skills", "certifications", "languages", "interests"],
+    theme: {
+      ...baseTheme,
+      primary: "#24364B",
+      accent: "#3C7A89",
+      text: "#222222",
+      muted: "#6B7280",
+      divider: "#D9D9D9",
+      bodyFont: SANS,
+      headingFont: SANS,
+      sectionTitleStyle: "underline",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      photoShape: "none",
+      profileStyle: "pro-3col",
+      sectionStyle: "plain",
+      showSummaryInHeader: true,
+      avatarInitial: true,
+      avatarShape: "circle",
+      avatarSize: 90,
+      chipStyle: "rounded",
+      chipBg: "#F1F3F5",
+      chipText: "#222222",
+      baseSize: 14,
+    },
+    spacing: {
+      ...baseSpacing,
+      pageMarginTop: 28,
+      pageMarginRight: 32,
+      pageMarginBottom: 28,
+      pageMarginLeft: 32,
+      sectionGap: 24,
+      entryGap: 20,
+      bulletGap: 6,
+    },
+  }),
+
+  tpl({
+    id: "professional-timeline",
+    name: "Professional Timeline",
+    description: "Centered header · timeline labels · gold dots",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["experience", "education", "projects", "skills", "certifications", "languages", "interests"],
+    theme: {
+      ...baseTheme,
+      primary: "#222222",
+      accent: "#7B2CBF",
+      text: "#222222",
+      muted: "#666666",
+      divider: "#E5E5E5",
+      bodyFont: SANS,
+      headingFont: SANS,
+      sectionTitleStyle: "plain",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      photoShape: "none",
+      profileStyle: "timeline-header",
+      sectionStyle: "timeline",
+      showSummaryInHeader: false,
+      avatarInitial: true,
+      avatarShape: "square",
+      avatarSize: 48,
+      chipStyle: "pill",
+      chipBg: "#F1F1F3",
+      chipText: "#333333",
+      timelineWidth: 170,
+      timelineDotColor: "#F4B400",
+      timelineLineColor: "#D8D8D8",
+      baseSize: 14,
+    },
+    spacing: {
+      ...baseSpacing,
+      pageMarginTop: 30,
+      pageMarginRight: 28,
+      pageMarginBottom: 30,
+      pageMarginLeft: 28,
+      sectionGap: 22,
+      entryGap: 22,
+      bulletGap: 6,
+    },
   }),
 ];
 

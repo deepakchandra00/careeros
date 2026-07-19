@@ -83,6 +83,88 @@ function Photo({
   );
 }
 
+// Avatar element — shows the person's initial in a circle or square when no
+// photo is available and theme.avatarInitial is true.
+function Avatar({
+  profile,
+  theme,
+  size,
+}: {
+  profile: Resume["profile"];
+  theme: Theme;
+  size?: number;
+}) {
+  const s = size ?? theme.avatarSize;
+  const initial = (profile.fullName || "?").trim().charAt(0).toUpperCase();
+  return (
+    <div
+      aria-hidden
+      style={{
+        width: s,
+        height: s,
+        borderRadius: theme.avatarShape === "circle" ? "50%" : theme.radius,
+        background: theme.chipBg,
+        color: theme.primary,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: s * 0.38,
+        fontWeight: 700,
+        lineHeight: 1,
+        flexShrink: 0,
+        border: `1px solid ${theme.divider}`,
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
+
+// PhotoOrAvatar — shows a photo if available, else an initial avatar (if enabled).
+function PhotoOrAvatar({
+  profile,
+  theme,
+  size,
+}: {
+  profile: Resume["profile"];
+  theme: Theme;
+  size: number;
+}) {
+  if (profile.photo && theme.photoShape !== "none") {
+    return <Photo profile={profile} theme={theme} size={size} />;
+  }
+  if (theme.avatarInitial) {
+    return <Avatar profile={profile} theme={theme} size={size} />;
+  }
+  return null;
+}
+
+// Chip element — for skills / tech tags.
+function Chip({
+  children,
+  theme,
+}: {
+  children: React.ReactNode;
+  theme: Theme;
+}) {
+  if (theme.chipStyle === "none") return <>{children}</>;
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "8px 12px",
+        borderRadius: theme.chipStyle === "pill" ? 999 : 6,
+        background: theme.chipBg,
+        color: theme.chipText,
+        fontSize: 13,
+        lineHeight: 1,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
   const { theme, spacing, variant } = ctx;
   const isSidebarTinted = variant === "sidebar" && theme.sidebarBg !== "transparent";
@@ -94,69 +176,13 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
       return <h2 style={sectionTitleStyle(theme, variant)}>{block.text}</h2>;
 
     case "profileHeader": {
-      const p = block.profile;
-      const items = [
-        p.email && { icon: Mail, text: p.email },
-        p.phone && { icon: Phone, text: p.phone },
-        p.location && { icon: MapPin, text: p.location },
-        p.website && { icon: Globe, text: p.website },
-        ...p.links.map((l) => ({ icon: LinkIcon, text: `${l.label}: ${l.url}` })),
-      ].filter(Boolean) as { icon: typeof Mail; text: string }[];
-      const hasPhoto = theme.photoShape !== "none" && Boolean(p.photo);
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: hasPhoto ? 14 : 0 }}>
-            {hasPhoto && <Photo profile={p} theme={theme} size={56} />}
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div
-                style={{
-                  fontFamily: "var(--r-heading-font)",
-                  fontSize: `${theme.baseSize + 12}px`,
-                  fontWeight: theme.headingWeight,
-                  color: theme.primary,
-                  lineHeight: 1.1,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {p.fullName || "Your Name"}
-              </div>
-              {p.headline && (
-                <div
-                  style={{
-                    fontFamily: "var(--r-body-font)",
-                    fontSize: `${theme.baseSize + 1}px`,
-                    color: theme.accent,
-                    fontWeight: 500,
-                  }}
-                >
-                  {p.headline}
-                </div>
-              )}
-            </div>
-          </div>
-          {items.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "4px 14px",
-                color: mutedColor,
-                fontSize: `${theme.baseSize - 0.5}px`,
-                marginTop: 2,
-              }}
-            >
-              {items.map((it, i) => (
-                <span
-                  key={i}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-                >
-                  <it.icon size={11} strokeWidth={2} />
-                  <span>{it.text}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProfileHeader
+          profile={block.profile}
+          summary={block.summary}
+          theme={theme}
+          mutedColor={mutedColor}
+        />
       );
     }
 
@@ -407,6 +433,34 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
       );
 
     case "skillGrid":
+      // When chipStyle is enabled, render each skill as a chip (matching the
+      // Professional One Column / Timeline templates from the dummy/ folder).
+      if (theme.chipStyle !== "none") {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {block.groups.map((g, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: theme.muted,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  {g.category}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {g.items.map((s, j) => (
+                    <Chip key={j} theme={theme}>{s}</Chip>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
       return (
         <div
           style={{
@@ -506,4 +560,248 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
         <div style={{ height: 1, background: theme.divider, width: "100%" }} />
       );
   }
+}
+
+// ── Profile header renderer (with ATS Pro profileStyle branches) ───────────
+
+function ProfileHeader({
+  profile,
+  summary,
+  theme,
+  mutedColor,
+}: {
+  profile: Resume["profile"];
+  summary?: string;
+  theme: Theme;
+  mutedColor: string;
+}) {
+  const p = profile;
+  const contactItems = [
+    p.email && { icon: Mail, text: p.email },
+    p.phone && { icon: Phone, text: p.phone },
+    p.location && { icon: MapPin, text: p.location },
+    p.website && { icon: Globe, text: p.website },
+    ...p.links.map((l) => ({ icon: LinkIcon, text: `${l.label}: ${l.url}` })),
+  ].filter(Boolean) as { icon: typeof Mail; text: string }[];
+
+  // ── Pro 3-column: name+summary | avatar | contacts ──
+  if (theme.profileStyle === "pro-3col") {
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "55% 15% 30%",
+          alignItems: "center",
+          gap: 16,
+          paddingBottom: 20,
+          borderBottom: `1px solid ${theme.divider}`,
+          marginBottom: 20,
+        }}
+      >
+        {/* Left: name + title + summary */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div
+            style={{
+              fontFamily: "var(--r-heading-font)",
+              fontSize: `${theme.baseSize + 18}px`,
+              fontWeight: theme.headingWeight,
+              color: theme.primary,
+              lineHeight: 1.15,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {p.fullName || "Your Name"}
+          </div>
+          {p.headline && (
+            <div
+              style={{
+                fontSize: `${theme.baseSize + 6}px`,
+                fontWeight: 500,
+                color: theme.accent,
+              }}
+            >
+              {p.headline}
+            </div>
+          )}
+          {summary && (
+            <p
+              style={{
+                margin: "8px 0 0",
+                fontSize: `${theme.baseSize}px`,
+                lineHeight: 1.55,
+                color: theme.text,
+                width: "95%",
+                display: "-webkit-box",
+                WebkitLineClamp: 7,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {summary}
+            </p>
+          )}
+        </div>
+
+        {/* Center: avatar (photo or initial) */}
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <PhotoOrAvatar profile={p} theme={theme} size={theme.avatarSize} />
+        </div>
+
+        {/* Right: contact rows */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            alignItems: "flex-end",
+          }}
+        >
+          {contactItems.map((it, i) => (
+            <span
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                color: theme.text,
+              }}
+            >
+              <span style={{ color: theme.accent, display: "inline-flex" }}>
+                <it.icon size={14} strokeWidth={1.6} />
+              </span>
+              <span style={{ wordBreak: "break-word" }}>{it.text}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Timeline header: centered avatar + name + email ──
+  if (theme.profileStyle === "timeline-header") {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 8,
+          paddingBottom: 20,
+          borderBottom: `1px solid ${theme.divider}`,
+          marginBottom: 24,
+        }}
+      >
+        <PhotoOrAvatar profile={p} theme={theme} size={theme.avatarSize} />
+        <div
+          style={{
+            fontFamily: "var(--r-heading-font)",
+            fontSize: `${theme.baseSize + 28}px`,
+            fontWeight: theme.headingWeight,
+            color: theme.primary,
+            lineHeight: 1.1,
+            letterSpacing: "-0.5px",
+            textAlign: "center",
+          }}
+        >
+          {p.fullName || "Your Name"}
+        </div>
+        {p.headline && (
+          <div
+            style={{
+              fontSize: `${theme.baseSize + 3}px`,
+              fontWeight: 500,
+              color: theme.accent,
+              textAlign: "center",
+            }}
+          >
+            {p.headline}
+          </div>
+        )}
+        {contactItems.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "4px 14px",
+              justifyContent: "center",
+              color: mutedColor,
+              fontSize: `${theme.baseSize + 1}px`,
+              marginTop: 4,
+            }}
+          >
+            {contactItems.map((it, i) => (
+              <span
+                key={i}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+              >
+                <it.icon size={13} strokeWidth={1.6} />
+                <span>{it.text}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Plain profile header (default) ──
+  const hasPhoto = theme.photoShape !== "none" && Boolean(p.photo);
+  const hasAvatar = theme.avatarInitial;
+  const showLeftVisual = hasPhoto || hasAvatar;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: showLeftVisual ? 14 : 0 }}>
+        {showLeftVisual && <PhotoOrAvatar profile={p} theme={theme} size={56} />}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div
+            style={{
+              fontFamily: "var(--r-heading-font)",
+              fontSize: `${theme.baseSize + 12}px`,
+              fontWeight: theme.headingWeight,
+              color: theme.primary,
+              lineHeight: 1.1,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {p.fullName || "Your Name"}
+          </div>
+          {p.headline && (
+            <div
+              style={{
+                fontFamily: "var(--r-body-font)",
+                fontSize: `${theme.baseSize + 1}px`,
+                color: theme.accent,
+                fontWeight: 500,
+              }}
+            >
+              {p.headline}
+            </div>
+          )}
+        </div>
+      </div>
+      {contactItems.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "4px 14px",
+            color: mutedColor,
+            fontSize: `${theme.baseSize - 0.5}px`,
+            marginTop: 2,
+          }}
+        >
+          {contactItems.map((it, i) => (
+            <span
+              key={i}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              <it.icon size={11} strokeWidth={2} />
+              <span>{it.text}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

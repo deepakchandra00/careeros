@@ -75,11 +75,29 @@ export function resolveRegions(resume: Resume, template: Template) {
   const contentW = pageW - s.pageMarginLeft - s.pageMarginRight;
   const contentH = pageH - s.pageMarginTop - s.pageMarginBottom;
 
+  // When showSummaryInHeader is true, the summary is rendered inside the
+  // profile header (not as a standalone section). Skip it from mainSections.
+  const mainSections = template.theme.showSummaryInHeader
+    ? template.mainSections.filter((id) => id !== "summary")
+    : template.mainSections;
+
   const headerGroups = buildGroupsFor(resume, template.headerSections, "header");
-  const mainGroups = buildGroupsFor(resume, template.mainSections, "main");
+  const mainGroups = buildGroupsFor(resume, mainSections, "main");
   const sidebarGroups = buildGroupsFor(resume, template.sidebarSections, "sidebar");
   const secondGroups = buildGroupsFor(resume, template.secondSidebarSections, "sidebar");
   const footerGroups = buildGroupsFor(resume, template.footerSections, "main");
+
+  // When showSummaryInHeader is true, inject the summary text into the
+  // profileHeader block so it renders inside the header.
+  if (template.theme.showSummaryInHeader && resume.summary.trim()) {
+    for (const g of [...headerGroups, ...mainGroups]) {
+      for (const b of g.blocks) {
+        if (b.kind === "profileHeader") {
+          b.summary = resume.summary;
+        }
+      }
+    }
+  }
 
   const regions: Region[] = [];
   const layout: LayoutKind = template.layout;
@@ -653,15 +671,71 @@ function PageView({
     boxSizing: "border-box",
   };
 
-  const renderPlacedBlocks = (placed: PlacedBlock[], variant: Variant) => (
-    <>
-      {placed.map((pb, i) => (
-        <div key={i} style={{ marginTop: pb.topGap }}>
-          <BlockView block={pb.block} ctx={{ theme: t, spacing: s, variant }} />
-        </div>
-      ))}
-    </>
-  );
+  const renderPlacedBlocks = (placed: PlacedBlock[], variant: Variant) => {
+    // Timeline section style: group blocks by section and render each section
+    // as a 2-column row (label on left, content on right) with a vertical line.
+    if (t.sectionStyle === "timeline" && variant === "main") {
+      return renderTimelineBlocks(placed);
+    }
+    return (
+      <>
+        {placed.map((pb, i) => (
+          <div key={i} style={{ marginTop: pb.topGap }}>
+            <BlockView block={pb.block} ctx={{ theme: t, spacing: s, variant }} />
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  // Timeline renderer: wraps each section (sectionTitle + its content blocks)
+  // in a 2-column grid row. A single absolutely-positioned vertical line spans
+  // the entire region. Section titles render as labels on the left with a dot.
+  const renderTimelineBlocks = (placed: PlacedBlock[]) => {
+    // Group blocks by section — a sectionTitle block starts a new group.
+    const groups: { title: PlacedBlock | null; content: PlacedBlock[] }[] = [];
+    let current: { title: PlacedBlock | null; content: PlacedBlock[] } = {
+      title: null,
+      content: [],
+    };
+    for (const pb of placed) {
+      if (pb.block.kind === "sectionTitle") {
+        if (current.title || current.content.length) groups.push(current);
+        current = { title: pb, content: [] };
+      } else {
+        current.content.push(pb);
+      }
+    }
+    if (current.title || current.content.length) groups.push(current);
+
+    return (
+      <div
+        style={{
+          position: "relative",
+          display: "grid",
+          gridTemplateColumns: `${t.timelineWidth}px 1fr`,
+          columnGap: s.columnGap,
+          alignItems: "start",
+        }}
+      >
+        {/* The ONLY absolutely-positioned element — the vertical timeline line */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: t.timelineWidth - 6,
+            width: 2,
+            background: t.timelineLineColor,
+          }}
+        />
+        {groups.map((g, i) => (
+          <TimelineRow key={i} group={g} theme={t} spacing={s} />
+        ))}
+      </div>
+    );
+  };
 
   // Render header/footer inline: they aren't paginated (single-page slots).
   const renderStaticRegion = (rm: RegionMeasure, variant: Variant) => {
@@ -747,5 +821,76 @@ function PageView({
         );
       })}
     </div>
+  );
+}
+
+// ── Timeline row renderer ───────────────────────────────────────────────────
+//
+// A single timeline row: section label on the left column (with a dot on the
+// timeline), content on the right. CSS Grid keeps label + content aligned to
+// the same baseline; the dot is placed at the label baseline.
+
+function TimelineRow({
+  group,
+  theme,
+  spacing,
+}: {
+  group: { title: PlacedBlock | null; content: PlacedBlock[] };
+  theme: Theme;
+  spacing: Spacing;
+}) {
+  const ctx = { theme, spacing, variant: "main" as const };
+  const dotSize = 12;
+
+  return (
+    <>
+      {/* Left column: section label + timeline dot */}
+      <div
+        style={{
+          position: "relative",
+          paddingRight: dotSize + 6,
+          paddingBottom: spacing.sectionGap,
+          textAlign: "right",
+        }}
+      >
+        {/* Timeline dot */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            right: -dotSize / 2,
+            top: 4,
+            width: dotSize,
+            height: dotSize,
+            borderRadius: "50%",
+            background: theme.timelineDotColor,
+            boxShadow: "0 0 0 3px white",
+          }}
+        />
+        {group.title && (
+          <div
+            style={{
+              fontSize: 17,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+              color: "#222222",
+              lineHeight: 1.2,
+            }}
+          >
+            {group.title.block.kind === "sectionTitle" && group.title.block.text}
+          </div>
+        )}
+      </div>
+
+      {/* Right column: content blocks */}
+      <div style={{ paddingBottom: spacing.sectionGap }}>
+        {group.content.map((pb, i) => (
+          <div key={i} style={{ marginTop: pb.topGap }}>
+            <BlockView block={pb.block} ctx={ctx} />
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

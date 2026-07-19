@@ -19,6 +19,9 @@ const TEMPLATE_MAP: Record<string, string> = {
   twoColumn: "twoColumn",
   threeColumn: "threeColumn",
   headerTwoCol: "headerTwoCol",
+  // ATS Pro templates (from dummy/ folder in careeros repo)
+  "professional-one-column": "professional-one-column",
+  "professional-timeline": "professional-timeline",
   // Legacy aliases (kept so old localStorage values don't break) — all map to
   // a PagePerfect base layout.
   "software-engineer": "leftSidebar",
