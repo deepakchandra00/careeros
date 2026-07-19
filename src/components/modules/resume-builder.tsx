@@ -65,16 +65,7 @@ import { ResumeEditor } from "@/components/modules/resume-editor";
 import { PageBasedPreview } from "@/components/modules/page-based-preview";
 import { PageNavigator } from "@/components/modules/page-navigator";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { generatePageModel, type LayoutContext } from "@/lib/resume/layout-engine";
-import { getTemplateLayout } from "@/components/resume/template-layout";
-import {
-  ResumePreview,
-  TEMPLATE_OPTIONS,
-  FONT_OPTIONS,
-  ACCENT_OPTIONS,
-} from "@/components/modules/resume-templates";
-import { TEMPLATE_PRESETS, type TemplatePreset } from "@/lib/resume/template-presets";
-import { PREMIUM_TEMPLATES, type PremiumTemplatePreset } from "@/lib/resume/premium-templates";
+import { templates as PP_TEMPLATES } from "@/lib/resume/pp";
 import { extractTextFromFile } from "@/lib/resume/extract";
 import { exportResumeDocx } from "@/lib/resume/export-docx";
 import { exportResumePdf } from "@/lib/resume/export-pdf";
@@ -91,6 +82,41 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+// ---------- Template / font / accent options (PagePerfect engine) ----------
+// The old per-template registry (60+ components) has been removed. Templates are
+// now pure-config objects in src/lib/resume/pp/templates.ts. Adding a template
+// = adding one config object, zero rendering code.
+const TEMPLATE_OPTIONS = PP_TEMPLATES.map((t) => ({
+  id: t.id,
+  name: t.name,
+  description: t.description,
+  accent: t.theme.accent,
+  layout: t.layout,
+}));
+
+const FONT_OPTIONS: { id: string; name: string; stack: string }[] = [
+  { id: "sans", name: "Sans", stack: "Inter, system-ui, sans-serif" },
+  { id: "serif", name: "Serif", stack: "Georgia, serif" },
+  { id: "mono", name: "Mono", stack: "Courier New, monospace" },
+];
+
+const ACCENT_OPTIONS = [
+  "#10b981", "#2563eb", "#7c3aed", "#e11d48", "#f97316",
+  "#0891b2", "#059669", "#b45309", "#0f172a", "#374151",
+];
+
+// Type kept for compatibility with code that references TemplatePreset.
+type TemplatePreset = {
+  id: string;
+  name: string;
+  description: string;
+  accent: string;
+  layout: string;
+};
+const TEMPLATE_PRESETS: TemplatePreset[] = TEMPLATE_OPTIONS;
+type PremiumTemplatePreset = TemplatePreset;
+const PREMIUM_TEMPLATES: PremiumTemplatePreset[] = [];
 
 // ---------- AI Layout Assistant presets ----------
 /**
@@ -477,7 +503,6 @@ export function ResumeBuilderModule() {
   >([]);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
   const [templateSearch, setTemplateSearch] = React.useState("");
-  const [templateCategory, setTemplateCategory] = React.useState("All");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const previewScrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -487,28 +512,11 @@ export function ResumeBuilderModule() {
     [data.sectionOrder, sections]
   );
 
-  const pageModel = React.useMemo(() => {
-    const { pattern, sidebarWidth } = getTemplateLayout(style.template);
-    const layout: LayoutContext = {
-      pattern,
-      sidebarWidth,
-      headerBandHeight: pattern === "header-band" ? 120 : 0,
-      padding: {
-        top: pageLayout.paddingTop ?? 0,
-        bottom: pageLayout.paddingBottom ?? 0,
-        left: pageLayout.paddingLeft ?? 0,
-        right: pageLayout.paddingRight ?? 0,
-      },
-      pageWidth: 794,
-      pageHeight: 1123,
-      accent: style.accent,
-    };
-    return generatePageModel(data, sectionOrder, {
-      layout,
-      pageBreaks,
-      sectionSettings,
-    });
-  }, [data, sectionOrder, pageLayout, pageBreaks, sectionSettings, style.template, style.accent]);
+  // The actual page model is computed inside <PageBasedPreview> via the
+  // PagePerfect engine (real DOM measurement + entry-splitting pagination). We
+  // receive the total page count back through onPageCount so the page navigator
+  // + overflow warning stay in sync with the real rendered pages.
+  const [totalPages, setTotalPages] = React.useState(1);
 
   const wordCount = React.useMemo(() => {
     const text = [
@@ -527,8 +535,8 @@ export function ResumeBuilderModule() {
   const estimatedPdfKb = React.useMemo(() => {
     // Crude estimate: ~1KB per 100 chars + 30KB base per page
     const base = 30 + Math.ceil(charCount / 100);
-    return base * (pageModel?.totalPages ?? 1);
-  }, [charCount, pageModel]);
+    return base * totalPages;
+  }, [charCount, totalPages]);
 
   const atsScore = React.useMemo(() => {
     let score = 50;
@@ -973,11 +981,9 @@ export function ResumeBuilderModule() {
               onClick={() => setTemplatePickerOpen(true)}
             >
               <span className="size-3 rounded-sm" style={{ background: style.accent }} />
-              {TEMPLATE_PRESETS.find(
-                (p) => p.base === style.template && p.accent === style.accent && p.font === style.font
-              )?.name ?? TEMPLATE_OPTIONS.find((t) => t.id === style.template)?.name ?? "Modern"}
+              {TEMPLATE_OPTIONS.find((t) => t.id === style.template)?.name ?? "Modern"}
               <span className="ml-1 rounded bg-primary/10 px-1 text-[10px] font-medium text-primary">
-                {TEMPLATE_PRESETS.length}+
+                {TEMPLATE_OPTIONS.length}
               </span>
               <ChevronDown className="size-3.5" />
             </Button>
@@ -1347,6 +1353,7 @@ export function ResumeBuilderModule() {
                     zoom={zoom}
                     pageBreaks={pageBreaks}
                     sectionSettings={sectionSettings}
+                    onPageCount={setTotalPages}
                   />
                 </div>
               </div>
@@ -1354,7 +1361,7 @@ export function ResumeBuilderModule() {
               {/* Page Navigation */}
               <div className="border-t bg-card/50 px-4 py-2">
                 <PageNavigator
-                  totalPages={pageModel?.totalPages ?? 1}
+                  totalPages={totalPages}
                   currentPage={currentPage}
                   onPageClick={(page) => {
                     // Scroll to the page in the preview
@@ -1375,7 +1382,7 @@ export function ResumeBuilderModule() {
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t bg-card px-4 py-1.5 text-[11px] text-muted-foreground print:hidden">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-medium text-foreground">
-                    {pageModel?.totalPages ?? 1} page{(pageModel?.totalPages ?? 1) > 1 ? 's' : ''}
+                    {totalPages} page{totalPages > 1 ? 's' : ''}
                   </span>
                   <span>·</span>
                   <span>{wordCount} words</span>
@@ -1390,10 +1397,10 @@ export function ResumeBuilderModule() {
                 </div>
                 <div className="flex items-center gap-3">
                   {/* Overflow indicator (Phase 2 #6) */}
-                  {(pageModel?.totalPages ?? 1) > 1 ? (
+                  {totalPages > 1 ? (
                     <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                       <AlertTriangle className="size-3" />
-                      Content overflows to {pageModel?.totalPages} pages
+                      Content overflows to {totalPages} pages
                     </span>
                   ) : tallestSection && tallestSection.words > 220 ? (
                     <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800 capitalize dark:bg-amber-950 dark:text-amber-300">
@@ -1468,53 +1475,24 @@ export function ResumeBuilderModule() {
           <DialogHeader className="border-b p-4">
             <DialogTitle>Choose a template</DialogTitle>
             <DialogDescription>
-              {PREMIUM_TEMPLATES.length + TEMPLATE_PRESETS.length} templates — search or filter by category.
+              {TEMPLATE_PRESETS.length} ATS-friendly templates — powered by the PagePerfect engine.
             </DialogDescription>
           </DialogHeader>
 
-          {/* Search + category tabs */}
-          <div className="border-b p-3 space-y-2">
+          {/* Search */}
+          <div className="border-b p-3">
             <Input
-              placeholder="Search templates… (e.g. 'engineer', 'purple', 'serif')"
+              placeholder="Search templates…"
               value={templateSearch}
               onChange={(e) => setTemplateSearch(e.target.value)}
               className="h-9"
             />
-            <div className="flex flex-wrap gap-1.5">
-              {["All", "Premium", "Pro", "Tech", "Luxury", "Designer", "Featured", "Modern", "ATS", "Executive", "Minimal", "Creative", "Engineer"].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setTemplateCategory(cat)}
-                  className={cn(
-                    "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                    templateCategory === cat
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  )}
-                >
-                  {cat === "Premium" && "✨ "}
-                  {cat === "Pro" && "🎨 "}
-                  {cat === "Tech" && "⚡ "}
-                  {cat === "Luxury" && "💎 "}
-                  {cat === "Designer" && "🏆 "}
-                  {cat}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Template grid with thumbnails */}
+          {/* Template grid with CSS mini-previews */}
           <div className="scroll-thin max-h-[58vh] overflow-y-auto p-3">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {/* Premium / Pro / Tech / Luxury templates with real image thumbnails */}
-              {PREMIUM_TEMPLATES
-                .filter((p) => {
-                  if (templateCategory === "All") return true;
-                  if (["Premium", "Pro", "Tech", "Luxury", "Designer"].includes(templateCategory)) {
-                    return p.category === templateCategory.toLowerCase();
-                  }
-                  return false; // standard categories handled below
-                })
+              {TEMPLATE_PRESETS
                 .filter((p) => {
                   if (!templateSearch.trim()) return true;
                   const q = templateSearch.toLowerCase();
@@ -1524,85 +1502,26 @@ export function ResumeBuilderModule() {
                   <button
                     key={preset.id}
                     onClick={() => {
-                      setStyle({ template: preset.base, accent: preset.accent, font: preset.font });
+                      setStyle({ template: preset.id, accent: preset.accent, font: style.font });
                       setTemplatePickerOpen(false);
                       setTemplateSearch("");
                     }}
                     className={cn(
                       "group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md",
-                      style.template === preset.base && style.accent === preset.accent && style.font === preset.font
+                      style.template === preset.id
                         && "border-primary ring-2 ring-primary"
                     )}
                   >
-                    <div className="aspect-[3/4] overflow-hidden bg-muted">
-                      <img
-                        src={preset.thumbnail}
-                        alt={preset.name}
-                        className="h-full w-full object-cover object-top transition-transform group-hover:scale-105"
-                      />
+                    {/* CSS mini-preview */}
+                    <div className="aspect-[3/4] bg-white p-1.5">
+                      <TemplateMiniPreview preset={preset} />
                     </div>
                     <div className="p-2">
-                      <div className="flex items-center gap-1">
-                        <p className="truncate text-xs font-medium">{preset.name}</p>
-                      </div>
+                      <p className="truncate text-xs font-medium">{preset.name}</p>
                       <p className="truncate text-[10px] text-muted-foreground">{preset.description}</p>
                     </div>
-                    <span className={cn(
-                      "absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white shadow",
-                      preset.category === "designer" ? "bg-emerald-600" :
-                      preset.category === "luxury" ? "bg-rose-600" :
-                      preset.category === "tech" ? "bg-violet-600" :
-                      preset.category === "pro" ? "bg-sky-600" :
-                      "bg-amber-500"
-                    )}>
-                      {preset.category === "luxury" ? "LUXURY" :
-                       preset.category === "designer" ? "DESIGNER" :
-                       preset.category === "tech" ? "TECH" :
-                       preset.category === "pro" ? "PRO" :
-                       "PREMIUM"}
-                    </span>
                   </button>
                 ))}
-
-              {/* Standard templates with CSS mini-preview */}
-              {(templateCategory === "All" || (templateCategory !== "Premium" && templateCategory !== "Pro" && templateCategory !== "Tech" && templateCategory !== "Luxury" && templateCategory !== "Designer" && templateCategory !== "Featured")) &&
-                TEMPLATE_PRESETS
-                  .filter((p) => {
-                    if (templateCategory === "All" || templateCategory === "Featured") {
-                      return templateCategory === "Featured" ? p.category === "Featured" : true;
-                    }
-                    return p.category === templateCategory;
-                  })
-                  .filter((p) => {
-                    if (!templateSearch.trim()) return true;
-                    const q = templateSearch.toLowerCase();
-                    return p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
-                  })
-                  .slice(0, templateCategory === "All" ? 60 : 120) // limit for performance
-                  .map((preset) => (
-                    <button
-                      key={preset.id}
-                      onClick={() => {
-                        setStyle({ template: preset.base, accent: preset.accent, font: preset.font });
-                        setTemplatePickerOpen(false);
-                        setTemplateSearch("");
-                      }}
-                      className={cn(
-                        "group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md",
-                        style.template === preset.base && style.accent === preset.accent && style.font === preset.font
-                          && "border-primary ring-2 ring-primary"
-                      )}
-                    >
-                      {/* CSS mini-preview */}
-                      <div className="aspect-[3/4] bg-white p-1.5">
-                        <TemplateMiniPreview preset={preset} />
-                      </div>
-                      <div className="p-2">
-                        <p className="truncate text-xs font-medium">{preset.name}</p>
-                        <p className="truncate text-[10px] text-muted-foreground">{preset.description}</p>
-                      </div>
-                    </button>
-                  ))}
             </div>
           </div>
         </DialogContent>
@@ -1707,10 +1626,11 @@ export function ResumeBuilderModule() {
 
 function TemplateMiniPreview({ preset }: { preset: TemplatePreset }) {
   const accent = preset.accent;
-  const isSidebar = ["modern", "software-engineer", "academic", "creative", "web-developer", "ux-designer", "teacher", "product-manager", "business-analyst"].includes(preset.base);
+  const isSidebar = preset.layout === "leftSidebar" || preset.layout === "rightSidebar";
+  const isTwoCol = preset.layout === "twoCol" || preset.layout === "headerTwoCol" || preset.layout === "threeCol" || preset.layout === "headerThreeCol";
   if (isSidebar) {
     return (
-      <div className="flex h-full gap-px" style={{ fontFamily: preset.font === "serif" ? "Georgia" : preset.font === "mono" ? "monospace" : "sans-serif" }}>
+      <div className="flex h-full gap-px">
         <div className="w-1/3 p-1" style={{ background: accent }}>
           <div className="mb-1 size-3 rounded-full bg-white/30" />
           <div className="mb-0.5 h-0.5 w-3/4 rounded bg-white/40" />
@@ -1729,8 +1649,20 @@ function TemplateMiniPreview({ preset }: { preset: TemplatePreset }) {
       </div>
     );
   }
+  if (isTwoCol) {
+    return (
+      <div className="h-full p-1">
+        <div className="mb-1 flex flex-col items-center"><div className="h-1 w-1/2 rounded" style={{ background: accent }} /><div className="mt-0.5 h-0.5 w-1/3 rounded bg-gray-300" /></div>
+        <div className="mb-1 h-px w-full" style={{ background: accent }} />
+        <div className="flex gap-1">
+          <div className="flex-1 space-y-0.5"><div className="h-0.5 w-1/4 rounded" style={{ background: accent }} /><div className="h-0.5 w-full rounded bg-gray-200" /><div className="h-0.5 w-5/6 rounded bg-gray-200" /></div>
+          <div className="w-1/3 space-y-0.5"><div className="h-0.5 w-1/2 rounded" style={{ background: accent }} /><div className="h-0.5 w-full rounded bg-gray-200" /></div>
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className="h-full p-1" style={{ fontFamily: preset.font === "serif" ? "Georgia" : preset.font === "mono" ? "monospace" : "sans-serif" }}>
+    <div className="h-full p-1">
       <div className="mb-1 flex flex-col items-center"><div className="h-1 w-1/2 rounded" style={{ background: accent }} /><div className="mt-0.5 h-0.5 w-1/3 rounded bg-gray-300" /></div>
       <div className="mb-1 h-px w-full" style={{ background: accent }} />
       <div className="mb-1 h-0.5 w-1/4 rounded" style={{ background: accent }} />

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
-import { ResumePreview } from "@/components/modules/resume-templates";
+import { PageBasedPreview } from "@/components/modules/page-based-preview";
 import { useResumeStore } from "@/store/resume-store";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download, FileText } from "lucide-react";
@@ -49,7 +49,7 @@ export default function PortfolioPage() {
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
         <div className="overflow-hidden rounded-xl bg-white shadow-2xl">
-          <ResumePreview data={data} style={style} sections={{ personal: true, summary: true, experience: true, skills: true, projects: true, education: true, certifications: true, languages: true, awards: true, publications: true, interests: true, references: true }} />
+          <PageBasedPreview data={data} style={style} sections={{ personal: true, summary: true, experience: true, skills: true, projects: true, education: true, certifications: true, languages: true, awards: true, publications: true, interests: true, references: true }} zoom={1} />
         </div>
       </main>
     </div>

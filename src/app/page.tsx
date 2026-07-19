@@ -41,7 +41,6 @@ const LearningHubModule = dynamic(() => import("@/components/modules/learning-hu
 const PricingModule = dynamic(() => import("@/components/modules/pricing").then(m => ({ default: m.PricingModule })), { loading: () => <ModuleSkeleton /> });
 const AnalyticsModule = dynamic(() => import("@/components/modules/analytics").then(m => ({ default: m.AnalyticsModule })), { loading: () => <ModuleSkeleton /> });
 const CareerIntelligenceModule = dynamic(() => import("@/components/modules/career-intelligence").then(m => ({ default: m.CareerIntelligenceModule })), { loading: () => <ModuleSkeleton /> });
-const TemplateEditorModule = dynamic(() => import("@/components/modules/template-editor-module").then(m => ({ default: m.TemplateEditorModule })), { loading: () => <ModuleSkeleton /> });
 const AdminModule = dynamic(() => import("@/components/modules/admin").then(m => ({ default: m.AdminModule })), { loading: () => <ModuleSkeleton /> });
 
 function ModuleSkeleton() {
@@ -80,7 +79,6 @@ const MODULE_COMPONENTS: Record<
   pricing: PricingModule,
   analytics: AnalyticsModule,
   "career-intelligence": CareerIntelligenceModule,
-  "template-editor": TemplateEditorModule,
   admin: AdminModule,
 };
 

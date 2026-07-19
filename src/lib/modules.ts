@@ -24,7 +24,6 @@ import {
   CreditCard,
   BarChart3,
   Brain,
-  FileEdit,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,7 +52,6 @@ export type ModuleId =
   | "pricing"
   | "analytics"
   | "career-intelligence"
-  | "template-editor"
   | "admin";
 
 export interface ModuleDef {
@@ -240,14 +238,6 @@ export const MODULES: ModuleDef[] = [
     description: "Unified career health & matching",
     icon: Brain,
     badge: "AI",
-  },
-  {
-    id: "template-editor",
-    label: "Template Editor",
-    short: "Editor",
-    description: "Visual template calibration tool",
-    icon: FileEdit,
-    badge: "Dev",
   },
   {
     id: "admin",

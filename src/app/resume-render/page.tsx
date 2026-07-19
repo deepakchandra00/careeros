@@ -1,159 +1,55 @@
-import * as React from "react";
-import { fontStackFor } from "@/lib/resume/template-options";
-import type { ResumeData, TemplateStyle } from "@/store/resume-store";
+"use client";
 
-export const dynamic = "force-dynamic";
+import * as React from "react";
+import type { ResumeData, TemplateStyle } from "@/store/resume-store";
+import { PageBasedPreview } from "@/components/modules/page-based-preview";
+import { fontStack } from "@/lib/resume/pp";
 
 /**
- * Server Component page that renders a resume template to standalone HTML.
+ * Client Component page that renders a resume template to standalone HTML.
  * The PDF mini-service and thumbnail service fetch this page and convert it.
  *
- * Uses per-template dynamic imports so only the requested template's code
- * is compiled (avoids OOM when dev server has 55+ templates).
+ * Uses the PagePerfect engine (src/lib/resume/pp/) — the same DOM is used for
+ * preview and print, so what you see here is exactly what gets exported.
  */
-
-interface TemplateComponentProps {
-  data: ResumeData;
-  sections: Record<string, boolean>;
-  accent: string;
-}
-
-async function loadTemplate(template: string): Promise<React.ComponentType<TemplateComponentProps> | null> {
-  // Base templates (4 core) — from resume-templates.tsx
-  const CORE_BASE = new Set(["modern", "ats", "executive", "minimal"]);
-  if (CORE_BASE.has(template)) {
-    const mod = await import("@/components/modules/resume-templates");
-    const map: Record<string, React.ComponentType<TemplateComponentProps>> = {
-      "modern": mod.ModernTemplate,
-      "ats": mod.AtsTemplate,
-      "executive": mod.ExecutiveTemplate,
-      "minimal": mod.MinimalTemplate,
-    };
-    return map[template] ?? mod.ModernTemplate;
-  }
-
-  // Extended base templates (9) — from resume-templates-extended.tsx
-  const EXTENDED_BASE = new Set([
-    "software-engineer", "academic", "creative", "web-developer",
-    "ux-designer", "teacher", "product-manager", "finance", "business-analyst",
-  ]);
-  if (EXTENDED_BASE.has(template)) {
-    const mod = await import("@/components/modules/resume-templates-extended");
-    const map: Record<string, React.ComponentType<TemplateComponentProps>> = {
-      "software-engineer": mod.SoftwareEngineerTemplate,
-      "academic": mod.AcademicTemplate,
-      "creative": mod.CreativeTemplate,
-      "web-developer": mod.WebDeveloperTemplate,
-      "ux-designer": mod.UxDesignerTemplate,
-      "teacher": mod.TeacherTemplate,
-      "product-manager": mod.ProductManagerTemplate,
-      "finance": mod.FinanceTemplate,
-      "business-analyst": mod.BusinessAnalystTemplate,
-    };
-    return map[template] ?? null;
-  }
-
-  // Premium templates v2
-  const PREMIUM_MAP: Record<string, string> = {
-    "premium-purple-executive": "PurpleExecutiveTemplate",
-    "premium-brown-classic": "BrownClassicTemplate",
-    "premium-peach-modern": "PeachModernTemplate",
-    "premium-warm-professional": "WarmProfessionalTemplate",
-    "premium-earth-premium": "EarthPremiumTemplate",
-    "premium-pink-geometric": "PinkGeometricTemplate",
-    "premium-rose-elegant": "RoseElegantTemplate",
-    "premium-foundation-purple": "FoundationPurpleTemplate",
-    "premium-blue-sidebar": "BlueSidebarProTemplate",
-    "premium-aspire-teal": "AspireTealTemplate",
-    "premium-canva-pink-blue": "CanvaPinkBlueTemplate",
-    "premium-college-teal": "CollegeCVTealTemplate",
-    "premium-combined-blue": "CombinedBlueTemplate",
-    "premium-navy-yellow": "NavyYellowProTemplate",
-  };
-  if (PREMIUM_MAP[template]) {
-    const mod = await import("@/components/modules/premium-templates-v2");
-    const componentName = PREMIUM_MAP[template];
-    return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[componentName];
-  }
-
-  // Pro templates
-  const PRO_MAP: Record<string, string> = {
-    "stanford": "StanfordTemplate",
-    "harvard": "HarvardTemplate",
-    "silicon-valley": "SiliconValleyTemplate",
-    "manhattan": "ManhattanTemplate",
-    "prague": "PragueTemplate",
-    "tokyo": "TokyoTemplate",
-    "oxford": "OxfordTemplate",
-    "berlin": "BerlinTemplate",
-    "miami": "MiamiTemplate",
-    "seoul": "SeoulTemplate",
-    "dubai": "DubaiTemplate",
-    "singapore": "SingaporeTemplate",
-    "stockholm": "StockholmTemplate",
-    "mumbai": "MumbaiTemplate",
-    "toronto": "TorontoTemplate",
-    "sydney": "SydneyTemplate",
-  };
-  if (PRO_MAP[template]) {
-    const mod = await import("@/components/modules/pro-templates");
-    const componentName = PRO_MAP[template];
-    return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[componentName];
-  }
-
-  // Tech templates
-  const TECH_MAP: Record<string, string> = {
-    "quantum": "QuantumTemplate",
-    "nebula": "NebulaTemplate",
-    "cyber": "CyberTemplate",
-    "voltage": "VoltageTemplate",
-    "synthwave": "SynthwaveTemplate",
-    "hologram": "HologramTemplate",
-  };
-  if (TECH_MAP[template]) {
-    const mod = await import("@/components/modules/tech-templates");
-    const componentName = TECH_MAP[template];
-    return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[componentName];
-  }
-
-  // Luxury templates
-  const LUXURY_MAP: Record<string, string> = {
-    "vogue": "VogueTemplate",
-    "maison": "MaisonTemplate",
-    "atelier": "AtelierTemplate",
-    "riviera": "RivieraTemplate",
-    "noir": "NoirTemplate",
-    "heritage": "HeritageTemplate",
-  };
-  if (LUXURY_MAP[template]) {
-    const mod = await import("@/components/modules/luxury-templates");
-    const componentName = LUXURY_MAP[template];
-    return (mod as unknown as Record<string, React.ComponentType<TemplateComponentProps>>)[componentName];
-  }
-
-  return null;
-}
-
-export default async function ResumeRenderPage({
+export default function ResumeRenderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ d?: string; s?: string; data?: string; style?: string }>;
+  searchParams: { d?: string; s?: string; data?: string; style?: string };
 }) {
-  const params = await searchParams;
-  let data: ResumeData;
-  let style: TemplateStyle;
+  let data: ResumeData | null = null;
+  let style: TemplateStyle | null = null;
+  let error: string | null = null;
 
   try {
-    const dataRaw = params.d ? Buffer.from(params.d, "base64").toString("utf-8") : params.data;
-    const styleRaw = params.s ? Buffer.from(params.s, "base64").toString("utf-8") : params.style;
-    if (!dataRaw || !styleRaw) return React.createElement("div", null, "Missing data/style");
-    data = JSON.parse(dataRaw);
-    style = JSON.parse(styleRaw);
+    const dataRaw = searchParams.d
+      ? typeof window !== "undefined"
+        ? atob(searchParams.d)
+        : Buffer.from(searchParams.d, "base64").toString("utf-8")
+      : searchParams.data;
+    const styleRaw = searchParams.s
+      ? typeof window !== "undefined"
+        ? atob(searchParams.s)
+        : Buffer.from(searchParams.s, "base64").toString("utf-8")
+      : searchParams.style;
+    if (!dataRaw || !styleRaw) {
+      error = "Missing data/style";
+    } else {
+      data = JSON.parse(dataRaw);
+      style = JSON.parse(styleRaw);
+    }
   } catch {
-    return React.createElement("div", null, "Invalid data/style params");
+    error = "Invalid data/style params";
   }
 
-  const fontStack = fontStackFor(style.font);
+  if (error) {
+    return React.createElement("div", null, error);
+  }
+  if (!data || !style) {
+    return React.createElement("div", null, "Missing data/style");
+  }
+
+  const fontCss = fontStack(style.font);
 
   const allSections: Record<string, boolean> = {
     personal: true,
@@ -170,17 +66,6 @@ export default async function ResumeRenderPage({
     references: true,
   };
 
-  const templateId = style.template || "modern";
-  const accent = style.accent || "#10b981";
-  const TemplateComponent = await loadTemplate(templateId);
-
-  let inner: React.ReactNode;
-  if (TemplateComponent) {
-    inner = React.createElement(TemplateComponent, { data, sections: allSections, accent });
-  } else {
-    inner = React.createElement("div", null, `Unknown template: ${templateId}`);
-  }
-
   return (
     <html lang="en">
       <head>
@@ -190,7 +75,7 @@ export default async function ResumeRenderPage({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Georgia&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
         <style>{`
@@ -199,13 +84,11 @@ export default async function ResumeRenderPage({
             margin: 0;
             padding: 0;
             background: #ffffff;
-            font-family: ${fontStack};
+            font-family: ${fontCss};
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-          .resume-paper {
-            width: 794px !important;
-            max-width: 100% !important;
+          .resume-page {
             box-shadow: none !important;
             margin: 0 !important;
           }
@@ -213,7 +96,14 @@ export default async function ResumeRenderPage({
         `}</style>
       </head>
       <body>
-        <div id="root">{inner}</div>
+        <div id="root">
+          <PageBasedPreview
+            data={data}
+            style={style}
+            sections={allSections}
+            zoom={1}
+          />
+        </div>
       </body>
     </html>
   );

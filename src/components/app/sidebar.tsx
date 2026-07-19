@@ -57,7 +57,7 @@ const GROUPS: { label: string; ids: ModuleId[] }[] = [
   },
   {
     label: "Account",
-    ids: ["pricing", "analytics", "career-intelligence", "template-editor"],
+    ids: ["pricing", "analytics", "career-intelligence"],
   },
 ];
 
