@@ -592,15 +592,18 @@ export function ResumeDocument({
         available -= sectionCount * 4; // 4px per section as safety margin
       }
       // In card mode, each card adds padding (top + bottom) that isn't in the
-      // measured heights. Only count sections (groups with a sectionTitle block),
-      // not individual entry groups.
-      if (template.theme.sectionStyle === "card" && rm.region.key === "main") {
-        const sectionCount = rm.groups.filter(
-          (g) => g.group.blocks.some((b) => b.kind === "sectionTitle"),
-        ).length;
-        available -= sectionCount * template.theme.cardPadding * 2;
-      }
-      out[rm.region.key] = paginateRegion(rm, available, template.spacing);
+      // measured heights. Instead of deducting ALL sections' padding from every
+      // page (which leaves huge empty footer areas), we fold the card padding
+      // into an effective sectionGap. This way, each section transition on a
+      // given page naturally accounts for that card's padding — no over-deduction.
+      const effectiveSpacing =
+        template.theme.sectionStyle === "card" && rm.region.key === "main"
+          ? {
+              ...template.spacing,
+              sectionGap: template.spacing.sectionGap + template.theme.cardPadding * 2,
+            }
+          : template.spacing;
+      out[rm.region.key] = paginateRegion(rm, available, effectiveSpacing);
     });
     return out;
   }, [allMeasured, bodyRMs, headerHeight, footerHeight, template.spacing, template.theme.sectionStyle]);

@@ -299,28 +299,28 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
             }}
           >
             {p.email && (
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Mail size={11} /> {p.email}
+              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                <Mail size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.email}</span>
               </span>
             )}
             {p.phone && (
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Phone size={11} /> {p.phone}
+              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word" }}>
+                <Phone size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.phone}</span>
               </span>
             )}
             {p.location && (
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <MapPin size={11} /> {p.location}
+              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word" }}>
+                <MapPin size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.location}</span>
               </span>
             )}
             {p.website && (
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Globe size={11} /> {p.website}
+              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                <Globe size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.website}</span>
               </span>
             )}
             {p.links.map((l, i) => (
-              <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <LinkIcon size={11} /> {l.label}: {l.url}
+              <span key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                <LinkIcon size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{l.label}: {l.url}</span>
               </span>
             ))}
           </div>
@@ -842,7 +842,7 @@ function ProfileHeader({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "55% 15% 30%",
+          gridTemplateColumns: "45% 13% 42%",
           alignItems: "center",
           gap: 16,
           paddingBottom: 20,
@@ -899,13 +899,14 @@ function ProfileHeader({
           <PhotoOrAvatar profile={p} theme={theme} size={theme.avatarSize} />
         </div>
 
-        {/* Right: contact rows */}
+        {/* Right: contact rows — left-aligned to prevent text from being
+            clipped at the right edge of the narrow 30% column. */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             gap: 8,
-            alignItems: "flex-end",
+            alignItems: "flex-start",
           }}
         >
           {contactItems.map((it, i) => (
@@ -913,16 +914,18 @@ function ProfileHeader({
               key={i}
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: 8,
                 fontSize: 13,
                 color: theme.text,
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
-              <span style={{ color: theme.accent, display: "inline-flex" }}>
+              <span style={{ color: theme.accent, display: "inline-flex", flexShrink: 0, marginTop: 2 }}>
                 <it.icon size={14} strokeWidth={1.6} />
               </span>
-              <span style={{ wordBreak: "break-word" }}>{it.text}</span>
+              <span>{it.text}</span>
             </span>
           ))}
         </div>
