@@ -23,6 +23,8 @@ const TEMPLATE_MAP: Record<string, string> = {
   // ATS Pro templates — now native in the upstream repo
   "professional-one-column": "professionalOneColumn",
   "professional-timeline": "professionalTimeline",
+  "professionalOneColumn": "professionalOneColumn",
+  "professionalTimeline": "professionalTimeline",
   "modern-executive": "nunitoDarkCard",
   // Legacy aliases (kept so old localStorage values don't break)
   "software-engineer": "leftSidebar",
