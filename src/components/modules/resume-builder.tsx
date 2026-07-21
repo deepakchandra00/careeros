@@ -99,6 +99,7 @@ const FONT_OPTIONS: { id: string; name: string; stack: string }[] = [
   { id: "sans", name: "Sans", stack: "Inter, system-ui, sans-serif" },
   { id: "serif", name: "Serif", stack: "Georgia, serif" },
   { id: "mono", name: "Mono", stack: "Courier New, monospace" },
+  { id: "nunito", name: "Nunito", stack: "Nunito Sans, sans-serif" },
 ];
 
 const ACCENT_OPTIONS = [

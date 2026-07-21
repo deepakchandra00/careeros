@@ -1,59 +1,55 @@
 // Template bridge: map our CareerOS templateId + user style overrides → a
-// PagePerfect Template instance. The PagePerfect engine only knows about
-// Template objects; this bridge produces one with the user's accent/font applied
-// on top of the base template config.
+// PagePerfect Template instance.
+//
+// IMPORTANT: We do NOT blindly override font/accent from the user's style.
+// Each of the 67 upstream templates has its own carefully-designed font and
+// accent color. We only override:
+//   - accent: when the user has explicitly picked a different color
+//   - font: NEVER — each template's font is part of its visual identity
 
 import type { TemplateStyle } from "@/store/resume-store";
-import { fontStack, getTemplate, type Template } from "./templates";
+import { getTemplate, templateById, type Template } from "./templates";
 
-// Map our CareerOS template IDs to PagePerfect base template IDs.
-// The upstream repo now has 67 templates. We map our canonical IDs to the
-// closest upstream template. Unknown IDs fall back to "modern".
-const TEMPLATE_MAP: Record<string, string> = {
-  // Base layouts
-  modern: "modern",
-  ats: "ats",
-  executive: "classic",
-  minimal: "minimal",
-  leftSidebar: "leftSidebar",
-  rightSidebar: "rightSidebar",
-  twoColumn: "twoColumn",
-  threeColumn: "threeColumn",
-  headerTwoCol: "headerTwoCol",
-  // ATS Pro templates — now native in the upstream repo
+// Legacy aliases — old CareerOS kebab-case IDs that map to upstream camelCase IDs.
+const LEGACY_ALIASES: Record<string, string> = {
   "professional-one-column": "professionalOneColumn",
   "professional-timeline": "professionalTimeline",
-  "professionalOneColumn": "professionalOneColumn",
-  "professionalTimeline": "professionalTimeline",
   "modern-executive": "nunitoDarkCard",
-  // Legacy aliases (kept so old localStorage values don't break)
-  "software-engineer": "leftSidebar",
-  academic: "leftSidebar",
-  creative: "creative",
-  "web-developer": "leftSidebar",
-  "ux-designer": "leftSidebar",
-  teacher: "leftSidebar",
-  "product-manager": "leftSidebar",
-  finance: "headerTwoCol",
-  "business-analyst": "leftSidebar",
+  "software-engineer": "techEngineer",
+  academic: "minimalSwiss",
+  creative: "creativeAgency",
+  "web-developer": "developer",
+  "ux-designer": "designerPortfolio",
+  teacher: "fresher",
+  "product-manager": "productManager",
+  "business-analyst": "consultant",
+  executive: "classic",
+  minimal: "minimalSwiss",
 };
 
 export function resolveTemplate(style: TemplateStyle): Template {
-  const baseId = TEMPLATE_MAP[style.template] ?? "modern";
+  // 1. Try the template ID directly — the upstream repo has 67 templates
+  //    with camelCase IDs that match exactly what our store uses.
+  let baseId = style.template;
+  if (!templateById.has(baseId)) {
+    // 2. Try legacy aliases
+    baseId = LEGACY_ALIASES[style.template] ?? "modern";
+  }
   const base = getTemplate(baseId);
 
-  // Apply accent override.
-  const accent = style.accent || base.theme.accent;
+  // Only override accent if the user has explicitly set one that differs
+  // from the template's default accent. This preserves each template's
+  // carefully-designed color scheme.
+  const userAccent = style.accent;
+  const templateAccent = base.theme.accent;
+  const shouldOverrideAccent =
+    userAccent &&
+    userAccent !== templateAccent &&
+    userAccent !== "#10b981"; // don't override with the store default
 
-  // Apply font override.
-  const fontStackCss = fontStack(style.font);
-
-  const theme = {
-    ...base.theme,
-    accent,
-    headingFont: fontStackCss,
-    bodyFont: fontStackCss,
-  };
+  const theme = shouldOverrideAccent
+    ? { ...base.theme, accent: userAccent }
+    : base.theme;
 
   return { ...base, theme };
 }
