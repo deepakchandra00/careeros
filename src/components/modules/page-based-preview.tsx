@@ -70,8 +70,12 @@ export function PageBasedPreview({
   // Build the PagePerfect Resume from our store data, filtered by `sections`.
   const resume: Resume = React.useMemo(() => {
     const full = toPagePerfectResume(data);
+    // When showPhoto is false, strip the photo so the engine doesn't render it
+    if (style.showPhoto === false) {
+      full.profile = { ...full.profile, photo: "" };
+    }
     return filterSections(full, sections);
-  }, [data, sections]);
+  }, [data, sections, style.showPhoto]);
 
   // Resolve the PagePerfect Template with the user's accent/font.
   const template: Template = React.useMemo(
@@ -102,6 +106,7 @@ export function PageBasedPreview({
               resume={resume}
               template={template}
               onPageCount={onPageCount}
+              repeatSidebar={style.repeatSidebar !== false}
             />
           </div>
         </div>

@@ -95,7 +95,11 @@ export type SectionId =
 export interface TemplateStyle {
   template: string;
   accent: string;
-  font: string; // "sans" | "serif" | "mono"
+  font: string; // "sans" | "serif" | "mono" | "nunito"
+  /** When true, show the profile photo in the header. When false, hide it. */
+  showPhoto: boolean;
+  /** When true, repeat the sidebar on every page for sidebar layouts. */
+  repeatSidebar: boolean;
 }
 
 export interface PageLayout {
@@ -267,15 +271,19 @@ function loadStored(): ResumeData {
   }
 }
 
+function defaultStyle(): TemplateStyle {
+  return { template: "modern", accent: "#10b981", font: "sans", showPhoto: true, repeatSidebar: false };
+}
+
 function loadStyle(): TemplateStyle {
-  if (typeof window === "undefined")
-    return { template: "modern", accent: "#10b981", font: "sans" };
+  if (typeof window === "undefined") return defaultStyle();
   try {
     const raw = localStorage.getItem(STYLE_KEY);
-    if (!raw) return { template: "modern", accent: "#10b981", font: "sans" };
-    return JSON.parse(raw) as TemplateStyle;
+    if (!raw) return defaultStyle();
+    const parsed = JSON.parse(raw) as Partial<TemplateStyle>;
+    return { ...defaultStyle(), ...parsed };
   } catch {
-    return { template: "modern", accent: "#10b981", font: "sans" };
+    return defaultStyle();
   }
 }
 
@@ -430,7 +438,7 @@ function persistSectionSettings(settings: Record<string, SectionSettings>) {
 
 export const useResumeStore = create<ResumeStore>((set, get) => ({
   data: DEFAULT_RESUME,
-  style: { template: "modern", accent: "#10b981", font: "sans" },
+  style: defaultStyle(),
   pageLayout: DEFAULT_PAGE_LAYOUT,
   pageBreaks: [],
   sectionSettings: {},

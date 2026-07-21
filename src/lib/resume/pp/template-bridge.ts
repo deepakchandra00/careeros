@@ -7,27 +7,27 @@ import type { TemplateStyle } from "@/store/resume-store";
 import { fontStack, getTemplate, type Template } from "./templates";
 
 // Map our CareerOS template IDs to PagePerfect base template IDs.
-// After the template cleanup, we only have a handful of canonical layout IDs.
-// Unknown IDs fall back to "modern" (leftSidebar).
+// The upstream repo now has 67 templates. We map our canonical IDs to the
+// closest upstream template. Unknown IDs fall back to "modern".
 const TEMPLATE_MAP: Record<string, string> = {
+  // Base layouts
   modern: "modern",
   ats: "ats",
-  executive: "executive",
+  executive: "classic",
   minimal: "minimal",
   leftSidebar: "leftSidebar",
   rightSidebar: "rightSidebar",
   twoColumn: "twoColumn",
   threeColumn: "threeColumn",
   headerTwoCol: "headerTwoCol",
-  // ATS Pro templates (from dummy/ folder in careeros repo)
-  "professional-one-column": "professional-one-column",
-  "professional-timeline": "professional-timeline",
-  "modern-executive": "modern-executive",
-  // Legacy aliases (kept so old localStorage values don't break) — all map to
-  // a PagePerfect base layout.
+  // ATS Pro templates — now native in the upstream repo
+  "professional-one-column": "professionalOneColumn",
+  "professional-timeline": "professionalTimeline",
+  "modern-executive": "nunitoDarkCard",
+  // Legacy aliases (kept so old localStorage values don't break)
   "software-engineer": "leftSidebar",
   academic: "leftSidebar",
-  creative: "leftSidebar",
+  creative: "creative",
   "web-developer": "leftSidebar",
   "ux-designer": "leftSidebar",
   teacher: "leftSidebar",

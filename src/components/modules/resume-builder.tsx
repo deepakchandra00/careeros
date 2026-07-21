@@ -1047,6 +1047,26 @@ export function ResumeBuilderModule() {
 
           <div className="h-5 w-px bg-border" />
 
+          {/* Show photo checkbox */}
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+            <Checkbox
+              checked={style.showPhoto !== false}
+              onCheckedChange={(checked) => setStyle({ showPhoto: checked === true })}
+            />
+            <span className="hidden sm:inline">Photo</span>
+          </label>
+
+          {/* Repeat sidebar checkbox */}
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+            <Checkbox
+              checked={style.repeatSidebar === true}
+              onCheckedChange={(checked) => setStyle({ repeatSidebar: checked === true })}
+            />
+            <span className="hidden sm:inline">Repeat sidebar</span>
+          </label>
+
+          <div className="h-5 w-px bg-border" />
+
           {/* Zoom — dropdown with presets + Fit Width / Fit Page (Phase 3 #7) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

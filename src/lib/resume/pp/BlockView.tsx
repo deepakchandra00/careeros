@@ -6,7 +6,6 @@ import type { CSSProperties } from "react";
 import { Mail, Phone, MapPin, Globe, Link as LinkIcon } from "lucide-react";
 import type { Block } from "./model";
 import type { Theme, Spacing } from "./templates";
-import type { Resume } from "./schema";
 
 type Ctx = {
   theme: Theme;
@@ -52,145 +51,7 @@ function sectionTitleStyle(theme: Theme, variant: Ctx["variant"]): CSSProperties
 function bulletChar(theme: Theme): string {
   if (theme.bulletStyle === "dash") return "–";
   if (theme.bulletStyle === "square") return "▪";
-  if (theme.bulletStyle === "arrow") return "▶";
   return "•";
-}
-
-/** Render a section icon (circle with letter) when theme.sectionIcon is set. */
-function SectionIcon({ theme, text }: { theme: Theme; text: string }) {
-  if (theme.sectionIcon === "none") return null;
-  const letter = (text[0] || "?").toUpperCase();
-  const bg = theme.sectionIcon === "circle-dark" ? theme.headerBg : theme.accent;
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 34,
-        height: 34,
-        minWidth: 34,
-        borderRadius: "50%",
-        background: bg,
-        color: "#ffffff",
-        fontSize: 15,
-        fontWeight: 700,
-        flexShrink: 0,
-      }}
-    >
-      {letter}
-    </span>
-  );
-}
-
-// Photo element (CareerOS extension). Renders only when the profile has a photo
-// data URL and the theme's photoShape is not "none".
-function Photo({
-  profile,
-  theme,
-  size,
-}: {
-  profile: Resume["profile"];
-  theme: Theme;
-  size: number;
-}) {
-  if (theme.photoShape === "none" || !profile.photo) return null;
-  return (
-    <img
-      src={profile.photo}
-      alt={profile.fullName || "Profile photo"}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: theme.photoShape === "circle" ? "50%" : theme.radius,
-        objectFit: "cover",
-        flexShrink: 0,
-        border: `2px solid ${theme.accent}33`,
-      }}
-    />
-  );
-}
-
-// Avatar element — shows the person's initial in a circle or square when no
-// photo is available and theme.avatarInitial is true.
-function Avatar({
-  profile,
-  theme,
-  size,
-}: {
-  profile: Resume["profile"];
-  theme: Theme;
-  size?: number;
-}) {
-  const s = size ?? theme.avatarSize;
-  const initial = (profile.fullName || "?").trim().charAt(0).toUpperCase();
-  return (
-    <div
-      aria-hidden
-      style={{
-        width: s,
-        height: s,
-        borderRadius: theme.avatarShape === "circle" ? "50%" : theme.radius,
-        background: theme.chipBg,
-        color: theme.primary,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: s * 0.38,
-        fontWeight: 700,
-        lineHeight: 1,
-        flexShrink: 0,
-        border: `1px solid ${theme.divider}`,
-      }}
-    >
-      {initial}
-    </div>
-  );
-}
-
-// PhotoOrAvatar — shows a photo if available, else an initial avatar (if enabled).
-function PhotoOrAvatar({
-  profile,
-  theme,
-  size,
-}: {
-  profile: Resume["profile"];
-  theme: Theme;
-  size: number;
-}) {
-  if (profile.photo && theme.photoShape !== "none") {
-    return <Photo profile={profile} theme={theme} size={size} />;
-  }
-  if (theme.avatarInitial) {
-    return <Avatar profile={profile} theme={theme} size={size} />;
-  }
-  return null;
-}
-
-// Chip element — for skills / tech tags.
-function Chip({
-  children,
-  theme,
-}: {
-  children: React.ReactNode;
-  theme: Theme;
-}) {
-  if (theme.chipStyle === "none") return <>{children}</>;
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "8px 12px",
-        borderRadius: theme.chipStyle === "pill" ? 999 : 6,
-        background: theme.chipBg,
-        color: theme.chipText,
-        fontSize: 13,
-        lineHeight: 1,
-      }}
-    >
-      {children}
-    </span>
-  );
 }
 
 export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
@@ -200,69 +61,231 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
   const mutedColor = isSidebarTinted ? theme.sidebarText : theme.muted;
 
   switch (block.kind) {
-    case "sectionTitle": {
-      // When sectionIcon or sectionDivider is set, render as a flex row:
-      // [icon] [title] [divider line filling remaining width]
-      if (theme.sectionIcon !== "none" || theme.sectionDivider) {
+    case "sectionTitle":
+      return <h2 style={sectionTitleStyle(theme, variant)}>{block.text}</h2>;
+
+    case "profileHeader": {
+      const p = block.profile;
+      const items = [
+        p.email && { icon: Mail, text: p.email },
+        p.phone && { icon: Phone, text: p.phone },
+        p.location && { icon: MapPin, text: p.location },
+        p.website && { icon: Globe, text: p.website },
+        ...p.links.map((l) => ({ icon: LinkIcon, text: `${l.label}: ${l.url}` })),
+      ].filter(Boolean) as { icon: typeof Mail; text: string }[];
+
+      const hasHeaderBg = !!theme.headerBg;
+      const nameColor = hasHeaderBg ? theme.headerText || "#fff" : theme.primary;
+      const subColor = hasHeaderBg ? theme.headerText || "#fff" : theme.accent;
+      const itemColor = hasHeaderBg ? theme.headerText || "#fff" : mutedColor;
+      const placement = theme.avatarPlacement ?? "left";
+      const showAvatar = theme.avatar === "initials";
+      const avatarSize = theme.avatarSize ?? 68;
+      const initials = (p.fullName || "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s) => s[0]?.toUpperCase() ?? "")
+        .join("");
+
+      const avatarNode = p.photo ? (
+        <img
+          src={p.photo}
+          alt={p.fullName || "Profile"}
+          style={{
+            width: avatarSize,
+            height: avatarSize,
+            borderRadius: "50%",
+            objectFit: "cover",
+            flexShrink: 0,
+            border: `2px solid ${theme.accent}33`,
+          }}
+        />
+      ) : showAvatar ? (
+        <div
+          style={{
+            width: avatarSize,
+            height: avatarSize,
+            borderRadius: "50%",
+            background: theme.avatarBg || theme.accent,
+            color: theme.avatarText || "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "var(--r-heading-font)",
+            fontWeight: theme.headingWeight,
+            fontSize: Math.round(avatarSize * 0.38),
+            flexShrink: 0,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {initials}
+        </div>
+      ) : null;
+
+      const textCol = (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            minWidth: 0,
+            flex: 1,
+            textAlign: placement === "center" ? "center" : "left",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--r-heading-font)",
+              fontSize: `${theme.baseSize + 12}px`,
+              fontWeight: theme.headingWeight,
+              color: nameColor,
+              lineHeight: 1.1,
+              letterSpacing: "-0.01em",
+              wordBreak: "break-word",
+            }}
+          >
+            {p.fullName || "Your Name"}
+          </div>
+          {p.headline && (
+            <div
+              style={{
+                fontFamily: "var(--r-body-font)",
+                fontSize: `${theme.baseSize + 1}px`,
+                color: subColor,
+                fontWeight: 500,
+              }}
+            >
+              {p.headline}
+            </div>
+          )}
+          {items.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "4px 14px",
+                color: itemColor,
+                fontSize: `${theme.baseSize - 0.5}px`,
+                marginTop: 2,
+                justifyContent: placement === "center" ? "center" : "flex-start",
+              }}
+            >
+              {items.map((it, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    maxWidth: "100%",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  <it.icon size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
+                  <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{it.text}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+
+      const inner = (showAvatar || p.photo) ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection:
+              placement === "center" ? "column" : placement === "right" ? "row-reverse" : "row",
+            alignItems: "center",
+            gap: 16,
+            minWidth: 0,
+          }}
+        >
+          {avatarNode}
+          {textCol}
+        </div>
+      ) : (
+        textCol
+      );
+
+      if (hasHeaderBg) {
         return (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 14,
+              background: theme.headerBg,
+              color: theme.headerText || "#fff",
+              padding: "20px 22px",
+              borderRadius: theme.headerRadius ?? theme.radius,
+              width: "100%",
+              boxSizing: "border-box",
             }}
           >
-            {theme.sectionIcon !== "none" && (
-              <SectionIcon theme={theme} text={block.text} />
-            )}
-            <h2
-              style={{
-                ...sectionTitleStyle(theme, variant),
-                margin: 0,
-                paddingBottom: 0,
-                borderBottom: "none",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {block.text}
-            </h2>
-            {theme.sectionDivider && (
-              <div
-                style={{
-                  flex: 1,
-                  height: 1,
-                  background: theme.divider,
-                  marginLeft: 4,
-                }}
-              />
-            )}
+            {inner}
           </div>
         );
       }
-      return <h2 style={sectionTitleStyle(theme, variant)}>{block.text}</h2>;
-    }
-
-    case "profileHeader": {
-      return (
-        <ProfileHeader
-          profile={block.profile}
-          summary={block.summary}
-          theme={theme}
-          mutedColor={mutedColor}
-        />
-      );
+      return inner;
     }
 
     case "contactStack": {
       const p = block.profile;
-      const hasPhoto = theme.photoShape !== "none" && Boolean(p.photo);
+      const showAvatar = theme.avatar === "initials";
+      const avatarSize = theme.avatarSize ?? 68;
+      const initials = (p.fullName || "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s) => s[0]?.toUpperCase() ?? "")
+        .join("");
+      const rowStyle = {
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 6,
+        minWidth: 0,
+      } as const;
+      const textStyle = {
+        overflowWrap: "anywhere" as const,
+        minWidth: 0,
+        flex: 1,
+      };
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {hasPhoto && (
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
-              <Photo profile={p} theme={theme} size={64} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+          {(showAvatar || p.photo) && (
+            p.photo ? (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                <img
+                  src={p.photo}
+                  alt={p.fullName || "Profile"}
+                  style={{
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: `2px solid ${theme.accent}33`,
+                  }}
+                />
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: "50%",
+                  background: theme.avatarBg || theme.accent,
+                  color: theme.avatarText || "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--r-heading-font)",
+                  fontWeight: theme.headingWeight,
+                  fontSize: Math.round(avatarSize * 0.38),
+                marginBottom: 4,
+              }}
+            >
+              {initials}
             </div>
+            )
           )}
           <div
             style={{
@@ -271,7 +294,7 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
               fontWeight: theme.headingWeight,
               color: isSidebarTinted ? theme.sidebarText : theme.primary,
               lineHeight: 1.15,
-              textAlign: hasPhoto ? "center" : "left",
+              wordBreak: "break-word",
             }}
           >
             {p.fullName || "Your Name"}
@@ -282,7 +305,6 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                 fontSize: `${theme.baseSize}px`,
                 color: isSidebarTinted ? theme.sidebarText : theme.accent,
                 fontWeight: 500,
-                textAlign: hasPhoto ? "center" : "left",
               }}
             >
               {p.headline}
@@ -296,31 +318,39 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
               color: mutedColor,
               fontSize: `${theme.baseSize - 0.5}px`,
               marginTop: 4,
+              minWidth: 0,
             }}
           >
             {p.email && (
-              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                <Mail size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.email}</span>
+              <span style={rowStyle}>
+                <Mail size={11} style={{ flexShrink: 0, marginTop: 3 }} />
+                <span style={textStyle}>{p.email}</span>
               </span>
             )}
             {p.phone && (
-              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word" }}>
-                <Phone size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.phone}</span>
+              <span style={rowStyle}>
+                <Phone size={11} style={{ flexShrink: 0, marginTop: 3 }} />
+                <span style={textStyle}>{p.phone}</span>
               </span>
             )}
             {p.location && (
-              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word" }}>
-                <MapPin size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.location}</span>
+              <span style={rowStyle}>
+                <MapPin size={11} style={{ flexShrink: 0, marginTop: 3 }} />
+                <span style={textStyle}>{p.location}</span>
               </span>
             )}
             {p.website && (
-              <span style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                <Globe size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{p.website}</span>
+              <span style={rowStyle}>
+                <Globe size={11} style={{ flexShrink: 0, marginTop: 3 }} />
+                <span style={textStyle}>{p.website}</span>
               </span>
             )}
             {p.links.map((l, i) => (
-              <span key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                <LinkIcon size={11} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{l.label}: {l.url}</span>
+              <span key={i} style={rowStyle}>
+                <LinkIcon size={11} style={{ flexShrink: 0, marginTop: 3 }} />
+                <span style={textStyle}>
+                  {l.label}: {l.url}
+                </span>
               </span>
             ))}
           </div>
@@ -366,6 +396,9 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                     fontSize: `${theme.baseSize + 0.5}px`,
                     fontWeight: 600,
                     color: textColor,
+                    minWidth: 0,
+                    flex: 1,
+                    overflowWrap: "anywhere",
                   }}
                 >
                   {entry.title}
@@ -379,6 +412,7 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                       fontSize: `${theme.baseSize - 0.5}px`,
                       color: mutedColor,
                       whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
                     {entry.meta}
@@ -395,8 +429,12 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                     color: mutedColor,
                   }}
                 >
-                  <span>{entry.subtitle}</span>
-                  {entry.metaSub && <span>{entry.metaSub}</span>}
+                  <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{entry.subtitle}</span>
+                  {entry.metaSub && (
+                    <span style={{ flexShrink: 0, textAlign: "right", overflowWrap: "anywhere" }}>
+                      {entry.metaSub}
+                    </span>
+                  )}
                 </div>
               )}
             </>
@@ -414,31 +452,16 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
             </p>
           )}
           {bullets.length > 0 && (
-            <>
-              {theme.entryBulletHeading && showHeader && (
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: theme.accent,
-                    fontSize: 13,
-                    marginBottom: 8,
-                    letterSpacing: 0.2,
-                    marginTop: 6,
-                  }}
-                >
-                  {theme.entryBulletHeading}
-                </div>
-              )}
-              <ul
-                style={{
-                  margin: "4px 0 0",
-                  padding: 0,
-                  listStyle: "none",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.bulletGap,
-                }}
-              >
+            <ul
+              style={{
+                margin: "4px 0 0",
+                padding: 0,
+                listStyle: "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: spacing.bulletGap,
+              }}
+            >
               {bullets.map((b, i) => (
                 <li
                   key={i}
@@ -454,11 +477,10 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                   <span style={{ color: theme.accent, lineHeight: 1.45 }}>
                     {bulletChar(theme)}
                   </span>
-                  <span>{b}</span>
+                  <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{b}</span>
                 </li>
               ))}
-              </ul>
-            </>
+            </ul>
           )}
           {entry.tech.length > 0 && showHeader && (
             <div
@@ -509,6 +531,7 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
               fontSize: `${theme.baseSize}px`,
               color: textColor,
               lineHeight: 1.45,
+              overflowWrap: "anywhere",
             }}
           >
             {block.items.join(", ")}
@@ -517,41 +540,14 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
       );
 
     case "skillGrid":
-      // When chipStyle is enabled, render each skill as a chip (matching the
-      // Professional One Column / Timeline templates from the dummy/ folder).
-      if (theme.chipStyle !== "none") {
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {block.groups.map((g, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: theme.muted,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.6,
-                  }}
-                >
-                  {g.category}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {g.items.map((s, j) => (
-                    <Chip key={j} theme={theme}>{s}</Chip>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      }
       return (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "auto 1fr",
+            gridTemplateColumns: "minmax(0, auto) minmax(0, 1fr)",
             columnGap: 14,
             rowGap: 4,
+            minWidth: 0,
           }}
         >
           {block.groups.map((g, i) => (
@@ -561,7 +557,7 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                   fontSize: `${theme.baseSize - 0.5}px`,
                   fontWeight: 600,
                   color: theme.primary,
-                  whiteSpace: "nowrap",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {g.category}
@@ -571,6 +567,8 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                   fontSize: `${theme.baseSize}px`,
                   color: textColor,
                   lineHeight: 1.45,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
                 }}
               >
                 {g.items.join(", ")}
@@ -613,11 +611,12 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
                 fontSize: `${theme.baseSize}px`,
                 color: textColor,
                 lineHeight: 1.4,
+                minWidth: 0,
               }}
             >
-              <span style={{ fontWeight: 500 }}>{r.key}</span>
+              <span style={{ fontWeight: 500, minWidth: 0, overflowWrap: "anywhere" }}>{r.key}</span>
               {r.value && (
-                <span style={{ color: mutedColor, textAlign: "right" }}>
+                <span style={{ color: mutedColor, textAlign: "right", minWidth: 0, overflowWrap: "anywhere" }}>
                   {r.value}
                 </span>
               )}
@@ -644,419 +643,4 @@ export function BlockView({ block, ctx }: { block: Block; ctx: Ctx }) {
         <div style={{ height: 1, background: theme.divider, width: "100%" }} />
       );
   }
-}
-
-// ── Profile header renderer (with ATS Pro profileStyle branches) ───────────
-
-function ProfileHeader({
-  profile,
-  summary,
-  theme,
-  mutedColor,
-}: {
-  profile: Resume["profile"];
-  summary?: string;
-  theme: Theme;
-  mutedColor: string;
-}) {
-  const p = profile;
-  const contactItems = [
-    p.email && { icon: Mail, text: p.email },
-    p.phone && { icon: Phone, text: p.phone },
-    p.location && { icon: MapPin, text: p.location },
-    p.website && { icon: Globe, text: p.website },
-    ...p.links.map((l) => ({ icon: LinkIcon, text: `${l.label}: ${l.url}` })),
-  ].filter(Boolean) as { icon: typeof Mail; text: string }[];
-
-  // ── Executive: dark split header with overlapping photo + timeline diamond ──
-  if (theme.profileStyle === "executive") {
-    const hasPhoto = theme.photoShape !== "none" && Boolean(p.photo);
-    return (
-      <div style={{ position: "relative", paddingBottom: 46 }}>
-        {/* Dark header row: left (name+summary) | right (contacts) */}
-        <div style={{ display: "flex", alignItems: "stretch", position: "relative" }}>
-          {/* Left: name + title + summary */}
-          <div
-            style={{
-              width: "58%",
-              background: theme.headerBg,
-              borderRadius: theme.radius,
-              padding: "22px 90px 26px 26px",
-              color: theme.headerText,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "var(--r-heading-font)",
-                fontSize: 22,
-                fontWeight: 800,
-                color: theme.headerText,
-                marginBottom: 4,
-              }}
-            >
-              {p.fullName || "Your Name"}
-            </div>
-            {p.headline && (
-              <div
-                style={{
-                  fontSize: 16,
-                  fontWeight: 400,
-                  color: theme.headerText,
-                  marginBottom: 12,
-                  lineHeight: 1.4,
-                }}
-              >
-                {p.headline}
-              </div>
-            )}
-            {summary && (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 400,
-                  lineHeight: 1.5,
-                  color: "#E4E6EA",
-                }}
-              >
-                {summary}
-              </div>
-            )}
-          </div>
-
-          {/* Right: contacts */}
-          <div
-            style={{
-              width: "42%",
-              background: theme.headerBg,
-              borderRadius: theme.radius,
-              marginLeft: 12,
-              padding: 20,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              gap: 14,
-            }}
-          >
-            {contactItems.map((it, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    minWidth: 24,
-                    background: "#ffffff",
-                    borderRadius: theme.radius,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: theme.accent,
-                  }}
-                >
-                  <it.icon size={12} strokeWidth={2} />
-                </div>
-                <span
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: 400,
-                    color: theme.headerText,
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {it.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Overlapping circular photo (center, above the header) */}
-        {(hasPhoto || theme.avatarInitial) && (
-          <div
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: -8,
-              transform: "translateX(-50%)",
-              width: theme.avatarSize,
-              height: theme.avatarSize,
-              borderRadius: "50%",
-              background: "#ffffff",
-              border: "4px solid #ffffff",
-              boxShadow: "0 0 0 3px #cfd3d8",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 5,
-              overflow: "hidden",
-            }}
-          >
-            {hasPhoto ? (
-              <Photo profile={p} theme={theme} size={theme.avatarSize} />
-            ) : (
-              <Avatar profile={p} theme={theme} size={theme.avatarSize} />
-            )}
-          </div>
-        )}
-
-        {/* Timeline line + diamond below the photo */}
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: 88,
-            transform: "translateX(-50%)",
-            width: 2,
-            height: 78,
-            background: "#C7CCD3",
-            zIndex: 4,
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: 165,
-            transform: "translateX(-50%) rotate(45deg)",
-            width: 12,
-            height: 12,
-            background: theme.accent,
-            zIndex: 4,
-          }}
-        />
-      </div>
-    );
-  }
-
-  // ── Pro 3-column: name+summary | avatar | contacts ──
-  if (theme.profileStyle === "pro-3col") {
-    return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "45% 13% 42%",
-          alignItems: "center",
-          gap: 16,
-          paddingBottom: 20,
-          borderBottom: `1px solid ${theme.divider}`,
-          marginBottom: 20,
-        }}
-      >
-        {/* Left: name + title + summary */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div
-            style={{
-              fontFamily: "var(--r-heading-font)",
-              fontSize: `${theme.baseSize + 18}px`,
-              fontWeight: theme.headingWeight,
-              color: theme.primary,
-              lineHeight: 1.15,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {p.fullName || "Your Name"}
-          </div>
-          {p.headline && (
-            <div
-              style={{
-                fontSize: `${theme.baseSize + 6}px`,
-                fontWeight: 500,
-                color: theme.accent,
-              }}
-            >
-              {p.headline}
-            </div>
-          )}
-          {summary && (
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: `${theme.baseSize}px`,
-                lineHeight: 1.55,
-                color: theme.text,
-                width: "95%",
-                display: "-webkit-box",
-                WebkitLineClamp: 7,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {summary}
-            </p>
-          )}
-        </div>
-
-        {/* Center: avatar (photo or initial) */}
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <PhotoOrAvatar profile={p} theme={theme} size={theme.avatarSize} />
-        </div>
-
-        {/* Right: contact rows — left-aligned to prevent text from being
-            clipped at the right edge of the narrow 30% column. */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            alignItems: "flex-start",
-          }}
-        >
-          {contactItems.map((it, i) => (
-            <span
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-                fontSize: 13,
-                color: theme.text,
-                wordBreak: "break-word",
-                overflowWrap: "anywhere",
-              }}
-            >
-              <span style={{ color: theme.accent, display: "inline-flex", flexShrink: 0, marginTop: 2 }}>
-                <it.icon size={14} strokeWidth={1.6} />
-              </span>
-              <span>{it.text}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Timeline header: centered avatar + name + email ──
-  if (theme.profileStyle === "timeline-header") {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 8,
-          paddingBottom: 20,
-          borderBottom: `1px solid ${theme.divider}`,
-          marginBottom: 24,
-        }}
-      >
-        <PhotoOrAvatar profile={p} theme={theme} size={theme.avatarSize} />
-        <div
-          style={{
-            fontFamily: "var(--r-heading-font)",
-            fontSize: `${theme.baseSize + 28}px`,
-            fontWeight: theme.headingWeight,
-            color: theme.primary,
-            lineHeight: 1.1,
-            letterSpacing: "-0.5px",
-            textAlign: "center",
-          }}
-        >
-          {p.fullName || "Your Name"}
-        </div>
-        {p.headline && (
-          <div
-            style={{
-              fontSize: `${theme.baseSize + 3}px`,
-              fontWeight: 500,
-              color: theme.accent,
-              textAlign: "center",
-            }}
-          >
-            {p.headline}
-          </div>
-        )}
-        {contactItems.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "4px 14px",
-              justifyContent: "center",
-              color: mutedColor,
-              fontSize: `${theme.baseSize + 1}px`,
-              marginTop: 4,
-            }}
-          >
-            {contactItems.map((it, i) => (
-              <span
-                key={i}
-                style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-              >
-                <it.icon size={13} strokeWidth={1.6} />
-                <span>{it.text}</span>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ── Plain profile header (default) ──
-  const hasPhoto = theme.photoShape !== "none" && Boolean(p.photo);
-  const hasAvatar = theme.avatarInitial;
-  const showLeftVisual = hasPhoto || hasAvatar;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: showLeftVisual ? 14 : 0 }}>
-        {showLeftVisual && <PhotoOrAvatar profile={p} theme={theme} size={56} />}
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div
-            style={{
-              fontFamily: "var(--r-heading-font)",
-              fontSize: `${theme.baseSize + 12}px`,
-              fontWeight: theme.headingWeight,
-              color: theme.primary,
-              lineHeight: 1.1,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {p.fullName || "Your Name"}
-          </div>
-          {p.headline && (
-            <div
-              style={{
-                fontFamily: "var(--r-body-font)",
-                fontSize: `${theme.baseSize + 1}px`,
-                color: theme.accent,
-                fontWeight: 500,
-              }}
-            >
-              {p.headline}
-            </div>
-          )}
-        </div>
-      </div>
-      {contactItems.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "4px 14px",
-            color: mutedColor,
-            fontSize: `${theme.baseSize - 0.5}px`,
-            marginTop: 2,
-          }}
-        >
-          {contactItems.map((it, i) => (
-            <span
-              key={i}
-              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-            >
-              <it.icon size={11} strokeWidth={2} />
-              <span>{it.text}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }

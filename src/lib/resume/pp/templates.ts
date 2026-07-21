@@ -14,7 +14,7 @@ export type SectionId =
   | "awards"
   | "publications"
   | "references"
-  | "interests";
+  | "interests"; // CareerOS extension
 
 export type LayoutKind =
   | "single"
@@ -40,56 +40,18 @@ export type Theme = {
   headingWeight: number;
   sectionTitleTransform: "uppercase" | "none";
   sectionTitleStyle: "underline" | "bar" | "plain" | "chip";
-  bulletStyle: "dot" | "dash" | "square" | "arrow";
+  bulletStyle: "dot" | "dash" | "square";
   radius: number; // px
   accentBar: boolean;
-  // CareerOS extension: photo shape for the profile header
-  photoShape: "none" | "circle" | "square";
-  // ── ATS Pro template extensions ──
-  /** Profile header visual style. */
-  profileStyle: "plain" | "pro-3col" | "timeline-header" | "executive";
-  /** Section rendering style — "timeline" wraps each section in a 2-col row,
-   * "card" wraps content blocks in a background card. */
-  sectionStyle: "plain" | "timeline" | "card";
-  /** Section title icon treatment. */
-  sectionIcon: "none" | "circle" | "circle-dark";
-  /** When true, a horizontal divider line fills the remaining width after the
-   * section title. */
-  sectionDivider: boolean;
-  /** When true, the summary is rendered inside the profile header (not as a
-   * standalone section). The engine skips the "summary" section. */
-  showSummaryInHeader: boolean;
-  /** When true and no photo is set, show the person's initial in the avatar. */
-  avatarInitial: boolean;
-  /** Avatar shape for the initial (when avatarInitial is true). */
-  avatarShape: "circle" | "square";
-  /** Avatar size in px. */
-  avatarSize: number;
-  /** Chip style for skills / tech tags. */
-  chipStyle: "none" | "rounded" | "pill";
-  /** Chip background color. */
-  chipBg: string;
-  /** Chip text color. */
-  chipText: string;
-  /** Left column width for the timeline section style. */
-  timelineWidth: number; // px
-  /** Timeline dot color. */
-  timelineDotColor: string;
-  /** Timeline vertical line color. */
-  timelineLineColor: string;
-  /** Dark header background color (for executive profileStyle). */
-  headerBg: string;
-  /** Text color on dark header (for executive profileStyle). */
-  headerText: string;
-  /** Background color for card-style sections (e.g. education box). */
-  cardBg: string;
-  /** Padding inside card-style sections. */
-  cardPadding: number;
-  /** Border radius for card-style sections. */
-  cardRadius: number;
-  /** Heading text shown before bullets in entries (e.g. "Tasks / Achievements").
-   * Empty string = no heading. */
-  entryBulletHeading: string;
+  // Optional header/avatar treatments (used by profileHeader block)
+  headerBg?: string;
+  headerText?: string;
+  headerRadius?: number;
+  avatar?: "none" | "initials";
+  avatarPlacement?: "left" | "center" | "right";
+  avatarSize?: number;
+  avatarBg?: string;
+  avatarText?: string;
 };
 
 export type Spacing = {
@@ -142,43 +104,7 @@ const baseTheme: Theme = {
   bulletStyle: "dot",
   radius: 4,
   accentBar: true,
-  photoShape: "none",
-  // ATS Pro defaults (no-op for base templates)
-  profileStyle: "plain",
-  sectionStyle: "plain",
-  sectionIcon: "none",
-  sectionDivider: false,
-  showSummaryInHeader: false,
-  avatarInitial: false,
-  avatarShape: "circle",
-  avatarSize: 48,
-  chipStyle: "none",
-  chipBg: "#f1f5f9",
-  chipText: "#0f172a",
-  timelineWidth: 170,
-  timelineDotColor: "#f4b400",
-  timelineLineColor: "#d8d8d8",
-  headerBg: "#0f172a",
-  headerText: "#ffffff",
-  cardBg: "#f7f7f7",
-  cardPadding: 20,
-  cardRadius: 8,
-  entryBulletHeading: "",
 };
-
-// ATS-safe font stacks (CareerOS extension).
-const SANS = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-const SERIF = 'Georgia, "Times New Roman", Times, serif';
-const MONO = '"Courier New", Courier, monospace';
-const NUNITO = '"Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-
-// Map our CareerOS font shorthand to actual CSS font stacks.
-export function fontStack(font: "sans" | "serif" | "mono" | string): string {
-  if (font === "serif") return SERIF;
-  if (font === "mono") return MONO;
-  if (font === "nunito") return NUNITO;
-  return SANS;
-}
 
 const baseSpacing: Spacing = {
   pageMarginTop: 44,
@@ -195,6 +121,20 @@ const baseSpacing: Spacing = {
   headerPadding: 20,
   sidebarPadding: 22,
 };
+
+// ATS-safe font stacks (CareerOS extension).
+const SANS = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+const SERIF = 'Georgia, "Times New Roman", Times, serif';
+const MONO = '"Courier New", Courier, monospace';
+const NUNITO = '"Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+
+// Map our CareerOS font shorthand to actual CSS font stacks.
+export function fontStack(font: "sans" | "serif" | "mono" | "nunito" | string): string {
+  if (font === "serif") return SERIF;
+  if (font === "mono") return MONO;
+  if (font === "nunito") return NUNITO;
+  return SANS;
+}
 
 const allMain: SectionId[] = [
   "summary",
@@ -477,158 +417,761 @@ export const templates: Template[] = [
     spacing: { ...baseSpacing, footerHeight: 90 },
   }),
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ATS Pro templates — from dummy/ folder in careeros repo
-  // ════════════════════════════════════════════════════════════════════════
-
+  // --- Professional Timeline (left labels, right content) ---------------
   tpl({
-    id: "professional-one-column",
-    name: "Professional One Column",
-    description: "3-column header · avatar · summary in header",
-    layout: "single",
-    headerSections: ["profile"],
-    mainSections: ["experience", "projects", "education", "skills", "certifications", "languages", "interests"],
+    id: "professionalTimeline",
+    name: "Professional Timeline",
+    description: "Left-column section labels with a timeline feel; purple header accent.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile"],
+    mainSections: ["summary", "experience", "education", "projects", "skills", "certifications", "languages"],
     theme: {
       ...baseTheme,
+      accent: "#7B2CBF",
+      primary: "#111111",
+      text: "#222222",
+      muted: "#666666",
+      divider: "#D8D8D8",
+      sidebarBg: "transparent",
+      sidebarText: "#222222",
+      headingFont: 'Roboto, Arial, sans-serif',
+      bodyFont: 'Roboto, Arial, sans-serif',
+      sectionTitleStyle: "plain",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      bulletStyle: "dot",
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 170, columnGap: 24, sectionGap: 22, pageMarginTop: 30, pageMarginBottom: 30, pageMarginLeft: 28, pageMarginRight: 28 },
+  }),
+
+  // --- Professional One Column (ATS-friendly single column, Inter) ------
+  tpl({
+    id: "professionalOneColumn",
+    name: "Professional One Column",
+    description: "ATS-friendly single column with slate headings and generous spacing.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications", "languages"],
+    theme: {
+      ...baseTheme,
+      accent: "#24364B",
       primary: "#24364B",
-      accent: "#3C7A89",
       text: "#222222",
       muted: "#6B7280",
       divider: "#D9D9D9",
-      bodyFont: SANS,
-      headingFont: SANS,
+      headingFont: 'Inter, Helvetica, Arial, sans-serif',
+      bodyFont: 'Inter, Helvetica, Arial, sans-serif',
       sectionTitleStyle: "underline",
       sectionTitleTransform: "uppercase",
       accentBar: false,
-      photoShape: "none",
-      profileStyle: "pro-3col",
-      sectionStyle: "plain",
-      showSummaryInHeader: true,
-      avatarInitial: true,
-      avatarShape: "circle",
-      avatarSize: 90,
-      chipStyle: "rounded",
-      chipBg: "#F1F3F5",
-      chipText: "#222222",
-      baseSize: 14,
     },
-    spacing: {
-      ...baseSpacing,
-      pageMarginTop: 28,
-      pageMarginRight: 32,
-      pageMarginBottom: 28,
-      pageMarginLeft: 32,
-      sectionGap: 24,
-      entryGap: 20,
-      bulletGap: 6,
-    },
+    spacing: { ...baseSpacing, sectionGap: 24, pageMarginTop: 28, pageMarginBottom: 28, pageMarginLeft: 32, pageMarginRight: 32 },
   }),
 
+  // --- Nunito Dark Card (dark sidebar + teal accents) -------------------
   tpl({
-    id: "professional-timeline",
-    name: "Professional Timeline",
-    description: "Centered header · timeline labels · gold dots",
-    layout: "single",
-    headerSections: ["profile"],
-    mainSections: ["experience", "education", "projects", "skills", "certifications", "languages", "interests"],
+    id: "nunitoDarkCard",
+    name: "Nunito Dark Card",
+    description: "Dark rounded card sidebar with teal accents and Nunito Sans type.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "summary"],
+    mainSections: ["experience", "projects", "education", "skills", "certifications"],
     theme: {
       ...baseTheme,
-      primary: "#222222",
-      accent: "#7B2CBF",
-      text: "#222222",
-      muted: "#666666",
-      divider: "#E5E5E5",
-      bodyFont: SANS,
-      headingFont: SANS,
-      sectionTitleStyle: "plain",
-      sectionTitleTransform: "uppercase",
-      accentBar: false,
-      photoShape: "none",
-      profileStyle: "timeline-header",
-      sectionStyle: "timeline",
-      showSummaryInHeader: false,
-      avatarInitial: true,
-      avatarShape: "square",
-      avatarSize: 48,
-      chipStyle: "pill",
-      chipBg: "#F1F1F3",
-      chipText: "#333333",
-      timelineWidth: 170,
-      timelineDotColor: "#F4B400",
-      timelineLineColor: "#D8D8D8",
-      baseSize: 14,
-    },
-    spacing: {
-      ...baseSpacing,
-      pageMarginTop: 30,
-      pageMarginRight: 28,
-      pageMarginBottom: 30,
-      pageMarginLeft: 28,
-      sectionGap: 22,
-      entryGap: 22,
-      bulletGap: 6,
-    },
-  }),
-
-  // ── Modern Executive ──
-  // Dark split header with overlapping circular photo + timeline diamond.
-  // Section titles with dark circular icons + divider line.
-  // Education in a light gray card. Arrow bullet points.
-  tpl({
-    id: "modern-executive",
-    name: "Modern Executive",
-    description: "Dark header · photo · timeline diamond · arrow bullets",
-    layout: "single",
-    headerSections: ["profile"],
-    mainSections: ["experience", "projects", "education", "skills", "certifications", "languages", "interests"],
-    theme: {
-      ...baseTheme,
-      primary: "#374151",
       accent: "#2F8A94",
+      primary: "#374151",
       text: "#222222",
       muted: "#6B7280",
       divider: "#D7DCE2",
-      bodyFont: NUNITO,
-      headingFont: NUNITO,
-      sectionTitleStyle: "plain",
-      sectionTitleTransform: "uppercase",
+      sidebarBg: "#374151",
+      sidebarText: "#ffffff",
+      headingFont: '"Nunito Sans", Arial, sans-serif',
+      bodyFont: '"Nunito Sans", Arial, sans-serif',
+      sectionTitleStyle: "underline",
+      sectionTitleTransform: "none",
       accentBar: false,
-      bulletStyle: "arrow",
       radius: 6,
-      photoShape: "none",
-      profileStyle: "executive",
-      sectionStyle: "card",
-      sectionIcon: "circle-dark",
-      sectionDivider: true,
-      showSummaryInHeader: true,
-      avatarInitial: true,
-      avatarShape: "circle",
-      avatarSize: 96,
-      chipStyle: "rounded",
-      chipBg: "#F1F3F5",
-      chipText: "#222222",
-      headerBg: "#374151",
-      headerText: "#ffffff",
-      cardBg: "#F7F7F7",
-      cardPadding: 20,
-      cardRadius: 8,
-      entryBulletHeading: "Tasks / Achievements",
-      baseSize: 13,
     },
-    spacing: {
-      ...baseSpacing,
-      pageMarginTop: 32,
-      pageMarginRight: 40,
-      pageMarginBottom: 30,
-      pageMarginLeft: 40,
-      sectionGap: 20,
-      entryGap: 16,
-      bulletGap: 5,
-    },
+    spacing: { ...baseSpacing, sidebarWidth: 280, sidebarPadding: 24, sectionGap: 16 },
+  }),
+
+  // --- Role-based unique templates --------------------------------------
+  tpl({
+    id: "atsBlackWhite",
+    name: "ATS Black & White",
+    description: "Pure grayscale, maximum parseability, no accents.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills", "certifications"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#000", primary: "#000", text: "#000", muted: "#333", divider: "#000", sectionTitleStyle: "underline", sectionTitleTransform: "uppercase", accentBar: false, headingFont: 'Arial, Helvetica, sans-serif', bodyFont: 'Arial, Helvetica, sans-serif' },
+  }),
+
+  tpl({
+    id: "executivePlus",
+    name: "Executive Plus",
+    description: "Premium serif executive layout with deep navy accents.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "awards", "languages"],
+    theme: { ...baseTheme, accent: "#0b1f3a", primary: "#0b1f3a", headingFont: '"Playfair Display", Georgia, serif', sectionTitleStyle: "underline", sectionTitleTransform: "uppercase", accentBar: false, divider: "#c9a86a" },
+    spacing: { ...baseSpacing, sidebarWidth: 230 },
+  }),
+
+  tpl({
+    id: "startup",
+    name: "Startup",
+    description: "Bold, punchy layout with lime accent for high-growth teams.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications"],
+    theme: { ...baseTheme, accent: "#84cc16", primary: "#0a0a0a", sectionTitleStyle: "bar", accentBar: true, headingFont: '"Space Grotesk", Inter, sans-serif', bodyFont: 'Inter, sans-serif' },
+  }),
+
+  tpl({
+    id: "techEngineer",
+    name: "Tech Engineer",
+    description: "Monospace touches, cyan accent, developer-friendly.",
+    layout: "twoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#06b6d4", primary: "#0f172a", headingFont: '"JetBrains Mono", ui-monospace, monospace', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "chip", bulletStyle: "square", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 240 },
+  }),
+
+  tpl({
+    id: "productManager",
+    name: "Product Manager",
+    description: "Structured two-column with confident indigo accent.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "awards"],
+    theme: { ...baseTheme, accent: "#4338ca", primary: "#1e1b4b", sectionTitleStyle: "bar", accentBar: true, headingFont: 'Inter, sans-serif', bodyFont: 'Inter, sans-serif' },
+  }),
+
+  tpl({
+    id: "designerPortfolio",
+    name: "Designer Portfolio",
+    description: "Editorial serif display + soft coral accent for creatives.",
+    layout: "rightSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages"],
+    mainSections: ["summary", "projects", "experience", "education", "awards"],
+    theme: { ...baseTheme, accent: "#f43f5e", primary: "#111827", sidebarBg: "#fff1f2", sidebarText: "#111827", headingFont: '"Fraunces", Georgia, serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "none", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 240 },
+  }),
+
+  tpl({
+    id: "medical",
+    name: "Medical",
+    description: "Calming teal, clean serif headings for healthcare professionals.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "education", "certifications", "publications", "skills"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#0f766e", primary: "#134e4a", headingFont: 'Georgia, serif', sectionTitleStyle: "underline", accentBar: false, divider: "#99f6e4" },
+  }),
+
+  tpl({
+    id: "legal",
+    name: "Legal",
+    description: "Traditional serif, burgundy accent, formal single column.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "education", "certifications", "publications", "awards"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#7f1d1d", primary: "#450a0a", headingFont: '"Libre Baskerville", Georgia, serif', bodyFont: 'Georgia, serif', sectionTitleStyle: "underline", sectionTitleTransform: "uppercase", accentBar: false },
+  }),
+
+  tpl({
+    id: "finance",
+    name: "Finance",
+    description: "Conservative navy with gold divider for finance & banking.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "education", "certifications"],
+    sidebarSections: ["skills", "awards", "languages"],
+    theme: { ...baseTheme, accent: "#1e3a8a", primary: "#0b1f3a", divider: "#ca8a04", headingFont: 'Georgia, serif', sectionTitleStyle: "underline", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 220 },
+  }),
+
+  tpl({
+    id: "sales",
+    name: "Sales",
+    description: "Energetic orange accent, metrics-forward two-column layout.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "awards"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#ea580c", primary: "#7c2d12", sectionTitleStyle: "bar", accentBar: true, headingFont: 'Inter, sans-serif' },
+  }),
+
+  tpl({
+    id: "marketing",
+    name: "Marketing",
+    description: "Vibrant magenta accent with modern sans display.",
+    layout: "twoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "awards"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#db2777", primary: "#4a044e", headingFont: '"Space Grotesk", Inter, sans-serif', sectionTitleStyle: "chip", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 230 },
+  }),
+
+  tpl({
+    id: "dataScience",
+    name: "Data Science",
+    description: "Analytical layout with emerald accent and monospace headings.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "certifications", "languages"],
+    mainSections: ["summary", "experience", "projects", "publications", "education"],
+    theme: { ...baseTheme, accent: "#059669", primary: "#064e3b", sidebarBg: "#ecfdf5", sidebarText: "#064e3b", headingFont: '"JetBrains Mono", monospace', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "bar", accentBar: true, bulletStyle: "square" },
+    spacing: { ...baseSpacing, sidebarWidth: 230 },
+  }),
+
+  tpl({
+    id: "developer",
+    name: "Developer",
+    description: "Terminal-inspired dark sidebar with green accent.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages"],
+    mainSections: ["summary", "experience", "projects", "education", "certifications"],
+    theme: { ...baseTheme, accent: "#22c55e", primary: "#0f172a", sidebarBg: "#0f172a", sidebarText: "#e2e8f0", headingFont: '"JetBrains Mono", monospace', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "uppercase", accentBar: false, bulletStyle: "square" },
+    spacing: { ...baseSpacing, sidebarWidth: 260, sidebarPadding: 24 },
+  }),
+
+  tpl({
+    id: "student",
+    name: "Student",
+    description: "Friendly sky-blue accent with education-first ordering.",
+    layout: "single",
+    mainSections: ["profile", "summary", "education", "projects", "experience", "skills", "certifications", "awards"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#0284c7", primary: "#0c4a6e", sectionTitleStyle: "bar", accentBar: true, headingFont: 'Inter, sans-serif' },
+  }),
+
+  tpl({
+    id: "fresher",
+    name: "Fresher",
+    description: "Clean, education-forward layout ideal for first-time job seekers.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "education", "projects", "experience"],
+    sidebarSections: ["skills", "certifications", "languages", "awards"],
+    theme: { ...baseTheme, accent: "#2563eb", primary: "#1e3a8a", sectionTitleStyle: "underline", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 220 },
+  }),
+
+  tpl({
+    id: "freelancer",
+    name: "Freelancer",
+    description: "Projects-first layout with warm amber accent.",
+    layout: "twoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "projects", "experience", "awards"],
+    sidebarSections: ["skills", "certifications", "languages", "education"],
+    theme: { ...baseTheme, accent: "#f59e0b", primary: "#78350f", sectionTitleStyle: "chip", accentBar: false, bulletStyle: "dash" },
+    spacing: { ...baseSpacing, sidebarWidth: 230 },
+  }),
+
+  tpl({
+    id: "consultant",
+    name: "Consultant",
+    description: "Refined charcoal palette with case-study emphasis.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "publications"],
+    sidebarSections: ["skills", "education", "certifications", "languages", "awards"],
+    theme: { ...baseTheme, accent: "#111827", primary: "#111827", headingFont: '"Playfair Display", Georgia, serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "underline", accentBar: false, divider: "#9ca3af" },
+    spacing: { ...baseSpacing, sidebarWidth: 220 },
+  }),
+
+  tpl({
+    id: "government",
+    name: "Government",
+    description: "Formal single column, deep green accent, serif type.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "education", "certifications", "awards", "publications"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#166534", primary: "#14532d", headingFont: 'Georgia, serif', bodyFont: 'Georgia, serif', sectionTitleStyle: "underline", sectionTitleTransform: "uppercase", accentBar: false },
+  }),
+
+  tpl({
+    id: "creativeAgency",
+    name: "Creative Agency",
+    description: "Bold display type, violet accent, asymmetric two-column.",
+    layout: "rightSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages", "awards"],
+    mainSections: ["summary", "projects", "experience", "education"],
+    theme: { ...baseTheme, accent: "#7c3aed", primary: "#2e1065", sidebarBg: "#f5f3ff", sidebarText: "#2e1065", headingFont: '"Fraunces", Georgia, serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "uppercase", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 240 },
+  }),
+
+  tpl({
+    id: "internationalCV",
+    name: "International CV",
+    description: "Europass-inspired long-form CV with header + comprehensive sections.",
+    layout: "headerThreeCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "publications"],
+    sidebarSections: ["projects", "education"],
+    secondSidebarSections: ["skills", "languages", "certifications", "awards", "references"],
+    theme: { ...baseTheme, accent: "#0369a1", primary: "#0c4a6e", sectionTitleStyle: "underline", accentBar: false, headingFont: 'Inter, sans-serif' },
+    spacing: { ...baseSpacing, sidebarWidth: 180, columnGap: 18 },
+  }),
+
+  // --- Premium design-system inspired templates -------------------------
+  tpl({
+    id: "minimalSwiss",
+    name: "Minimal Swiss",
+    description: "Swiss typographic grid, huge whitespace, thin gray dividers.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#111", primary: "#111", text: "#111", muted: "#555", divider: "#e5e5e5", headingFont: '"Inter", "Helvetica Neue", Arial, sans-serif', bodyFont: '"Inter", "Helvetica Neue", Arial, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "uppercase", accentBar: false },
+    spacing: { ...baseSpacing, sectionGap: 26, pageMarginTop: 56, pageMarginBottom: 56, pageMarginLeft: 56, pageMarginRight: 56 },
+  }),
+
+  tpl({
+    id: "appleClean",
+    name: "Apple Clean",
+    description: "Rounded cards, generous whitespace, Apple-blue accent.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#0071e3", primary: "#1d1d1f", muted: "#6e6e73", divider: "#d2d2d7", sidebarBg: "#f5f5f7", headingFont: '"SF Pro Display", Inter, sans-serif', bodyFont: '"SF Pro Text", Inter, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "none", accentBar: false, radius: 12 },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sectionGap: 18 },
+  }),
+
+  tpl({
+    id: "googleMaterial",
+    name: "Google Material",
+    description: "Material 3 cards, 8px system, Roboto, blue accent.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills", "certifications"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#1a73e8", primary: "#202124", muted: "#5f6368", divider: "#dadce0", headingFont: 'Roboto, Inter, sans-serif', bodyFont: 'Roboto, Inter, sans-serif', sectionTitleStyle: "chip", sectionTitleTransform: "none", accentBar: false, radius: 8 },
+    spacing: { ...baseSpacing, sectionGap: 16 },
+  }),
+
+  tpl({
+    id: "notionResume",
+    name: "Notion",
+    description: "Editorial workspace look, small uppercase headings, soft gray.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#37352f", primary: "#37352f", muted: "#787774", divider: "#e9e9e7", headingFont: 'Inter, sans-serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "uppercase", accentBar: false },
+    spacing: { ...baseSpacing, sectionGap: 20 },
+  }),
+
+  tpl({
+    id: "linearStyle",
+    name: "Linear",
+    description: "Linear.app inspired — purple accent, soft borders, tight type.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#5e6ad2", primary: "#0e0e10", muted: "#6b7280", divider: "#e4e4e7", headingFont: '"Inter", sans-serif', bodyFont: '"Inter", sans-serif', sectionTitleStyle: "chip", sectionTitleTransform: "none", accentBar: false, radius: 8 },
+    spacing: { ...baseSpacing, sidebarWidth: 220, sectionGap: 16 },
+  }),
+
+  tpl({
+    id: "vercelStyle",
+    name: "Vercel",
+    description: "Monochrome developer-first, Geist typography, minimal accents.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#000", primary: "#000", muted: "#666", divider: "#eaeaea", headingFont: '"Geist", Inter, sans-serif', bodyFont: '"Geist", Inter, sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "uppercase", accentBar: false },
+    spacing: { ...baseSpacing, sectionGap: 22, pageMarginTop: 48, pageMarginBottom: 48 },
+  }),
+
+  tpl({
+    id: "githubReadme",
+    name: "GitHub README",
+    description: "README-flavored resume with monospace accents and tag chips.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "skills", "education", "certifications"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#0969da", primary: "#1f2328", muted: "#656d76", divider: "#d0d7de", headingFont: 'Inter, sans-serif', bodyFont: '"JetBrains Mono", ui-monospace, monospace', baseSize: 10, sectionTitleStyle: "underline", sectionTitleTransform: "none", accentBar: false, bulletStyle: "square" },
+  }),
+
+  tpl({
+    id: "stripeStyle",
+    name: "Stripe",
+    description: "Editorial premium look with indigo/purple accents.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "awards"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#635bff", primary: "#0a2540", muted: "#425466", divider: "#e6e6ef", headingFont: '"Inter", sans-serif', bodyFont: '"Inter", sans-serif', sectionTitleStyle: "bar", accentBar: true, radius: 10 },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sectionGap: 18 },
+  }),
+
+  tpl({
+    id: "openaiStyle",
+    name: "OpenAI",
+    description: "Calm AI aesthetic — green accent, rounded, generous spacing.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "publications", "skills", "education"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#10a37f", primary: "#202123", muted: "#6e6e80", divider: "#ececf1", headingFont: '"Inter", sans-serif', bodyFont: '"Inter", sans-serif', sectionTitleStyle: "plain", sectionTitleTransform: "none", accentBar: false, radius: 10 },
+    spacing: { ...baseSpacing, sectionGap: 22 },
+  }),
+
+  tpl({
+    id: "canvaPremium",
+    name: "Canva Premium",
+    description: "Colorful yet ATS-safe, coral accent, rounded blocks.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "awards"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#00c4cc", primary: "#2d3436", divider: "#dfe6e9", headingFont: '"Poppins", Inter, sans-serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "chip", accentBar: false, radius: 10 },
+    spacing: { ...baseSpacing, sidebarWidth: 230 },
+  }),
+
+  tpl({
+    id: "enhancvInspired",
+    name: "Enhancv",
+    description: "Achievement-forward with tinted skill cards and timeline.",
+    layout: "rightSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages", "certifications"],
+    mainSections: ["summary", "experience", "projects", "education", "awards"],
+    theme: { ...baseTheme, accent: "#2b6cb0", primary: "#1a202c", sidebarBg: "#edf2f7", sidebarText: "#1a202c", headingFont: 'Inter, sans-serif', sectionTitleStyle: "bar", accentBar: true },
+    spacing: { ...baseSpacing, sidebarWidth: 240 },
+  }),
+
+  tpl({
+    id: "novoresumeInspired",
+    name: "Novoresume",
+    description: "Corporate two-column with elegant hierarchy and blue accent.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages", "certifications"],
+    mainSections: ["summary", "experience", "education", "projects", "awards"],
+    theme: { ...baseTheme, accent: "#2c5282", primary: "#1a365d", sidebarBg: "#2c5282", sidebarText: "#f7fafc", headingFont: 'Inter, sans-serif', sectionTitleStyle: "underline", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 240, sidebarPadding: 24 },
+  }),
+
+  tpl({
+    id: "glassmorphism",
+    name: "Glassmorphism",
+    description: "Soft translucent card feel with pastel divider tones.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#8b5cf6", primary: "#1e1b4b", sidebarBg: "#f5f3ff", divider: "#ddd6fe", headingFont: 'Inter, sans-serif', sectionTitleStyle: "chip", accentBar: false, radius: 14 },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sectionGap: 18 },
+  }),
+
+  tpl({
+    id: "neoBrutalism",
+    name: "Neo Brutalism",
+    description: "Bold borders, high contrast, punchy yellow accent.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills"],
+    headerSections: [],
+    theme: { ...baseTheme, accent: "#facc15", primary: "#000", text: "#000", divider: "#000", headingFont: '"Space Grotesk", Inter, sans-serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "chip", sectionTitleTransform: "uppercase", accentBar: true, bulletStyle: "square", radius: 0 },
+    spacing: { ...baseSpacing, sectionGap: 18 },
+  }),
+
+  tpl({
+    id: "bentoGrid",
+    name: "Bento Grid",
+    description: "Modular three-column bento card layout.",
+    layout: "headerThreeCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience"],
+    sidebarSections: ["projects", "education"],
+    secondSidebarSections: ["skills", "certifications", "languages", "awards"],
+    theme: { ...baseTheme, accent: "#0ea5e9", primary: "#0f172a", sidebarBg: "#f8fafc", headingFont: 'Inter, sans-serif', sectionTitleStyle: "chip", accentBar: false, radius: 12 },
+    spacing: { ...baseSpacing, sidebarWidth: 190, columnGap: 16, sectionGap: 14 },
+  }),
+
+  tpl({
+    id: "timelineProfessional",
+    name: "Timeline Professional",
+    description: "Premium vertical timeline with large company names.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications"],
+    theme: { ...baseTheme, accent: "#1e40af", primary: "#0f172a", sidebarBg: "transparent", headingFont: 'Inter, sans-serif', sectionTitleStyle: "bar", accentBar: true, bulletStyle: "dot" },
+    spacing: { ...baseSpacing, sidebarWidth: 180, sectionGap: 20 },
+  }),
+
+  tpl({
+    id: "magazineStyle",
+    name: "Magazine",
+    description: "Editorial magazine layout with big serif headlines.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "publications"],
+    sidebarSections: ["skills", "education", "awards", "languages"],
+    theme: { ...baseTheme, accent: "#111", primary: "#111", divider: "#111", headingFont: '"Fraunces", "Playfair Display", Georgia, serif', bodyFont: 'Georgia, serif', sectionTitleStyle: "underline", sectionTitleTransform: "uppercase", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 210, sectionGap: 20 },
+  }),
+
+  tpl({
+    id: "corporatePremium",
+    name: "Corporate Premium",
+    description: "Fortune-500 corporate with executive summary emphasis.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "awards"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#1f2937", primary: "#111827", divider: "#9ca3af", headingFont: '"IBM Plex Serif", Georgia, serif', bodyFont: 'Inter, sans-serif', sectionTitleStyle: "underline", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 220, sectionGap: 18 },
+  }),
+
+  tpl({
+    id: "darkMode",
+    name: "Dark Mode",
+    description: "Charcoal background with blue accents; light print fallback.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages", "certifications"],
+    mainSections: ["summary", "experience", "projects", "education"],
+    theme: { ...baseTheme, accent: "#60a5fa", primary: "#0b1220", sidebarBg: "#111827", sidebarText: "#e5e7eb", headingFont: 'Inter, sans-serif', sectionTitleStyle: "bar", accentBar: true, radius: 10 },
+    spacing: { ...baseSpacing, sidebarWidth: 250, sidebarPadding: 24 },
+  }),
+
+  tpl({
+    id: "luxuryExecutive",
+    name: "Luxury Executive",
+    description: "Board-level layout, IBM Plex Serif headings, gold divider.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "awards", "publications"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: { ...baseTheme, accent: "#000", primary: "#000", divider: "#c9a86a", headingFont: '"IBM Plex Serif", Georgia, serif', bodyFont: '"Inter", sans-serif', sectionTitleStyle: "underline", sectionTitleTransform: "uppercase", accentBar: false },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sectionGap: 22, pageMarginTop: 48, pageMarginBottom: 48 },
   }),
 ];
 
+
+// --- Templates with header background & avatar treatments ----------------
+templates.push(
+  tpl({
+    id: "navyHeaderBanner",
+    name: "Navy Header Banner",
+    description: "Full-width navy header banner with initials avatar on the left.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: {
+      ...baseTheme,
+      accent: "#38bdf8",
+      primary: "#0f172a",
+      headerBg: "#0b1f3a",
+      headerText: "#f8fafc",
+      headerRadius: 12,
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#38bdf8",
+      avatarText: "#0b1f3a",
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      headingFont: 'Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sectionGap: 18 },
+  }),
+  tpl({
+    id: "centeredAvatarClean",
+    name: "Centered Avatar",
+    description: "Centered avatar & name over a clean single column.",
+    layout: "single",
+    mainSections: ["profile", "summary", "experience", "projects", "education", "skills"],
+    headerSections: [],
+    theme: {
+      ...baseTheme,
+      accent: "#7c3aed",
+      primary: "#111827",
+      avatar: "initials",
+      avatarPlacement: "center",
+      avatarBg: "#7c3aed",
+      avatarText: "#fff",
+      avatarSize: 84,
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      headingFont: '"Space Grotesk", Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sectionGap: 20 },
+  }),
+  tpl({
+    id: "emeraldHeaderCard",
+    name: "Emerald Header Card",
+    description: "Rounded emerald header card with right-aligned avatar.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "awards"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: {
+      ...baseTheme,
+      accent: "#059669",
+      primary: "#064e3b",
+      headerBg: "#065f46",
+      headerText: "#ecfdf5",
+      headerRadius: 16,
+      avatar: "initials",
+      avatarPlacement: "right",
+      avatarBg: "#ecfdf5",
+      avatarText: "#065f46",
+      sectionTitleStyle: "chip",
+      accentBar: false,
+      radius: 10,
+      headingFont: 'Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sectionGap: 18 },
+  }),
+  tpl({
+    id: "splitContactMain",
+    name: "Split Contact & Main",
+    description: "Dark left sidebar with avatar + all contact details, main content on the right.",
+    layout: "leftSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages", "certifications"],
+    mainSections: ["summary", "experience", "projects", "education", "awards"],
+    theme: {
+      ...baseTheme,
+      accent: "#f59e0b",
+      primary: "#0f172a",
+      sidebarBg: "#111827",
+      sidebarText: "#f9fafb",
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#f59e0b",
+      avatarText: "#111827",
+      avatarSize: 76,
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      headingFont: 'Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 260, sidebarPadding: 24, sectionGap: 16 },
+  }),
+  tpl({
+    id: "rightContactCard",
+    name: "Right Contact Card",
+    description: "Name & summary on the left, tinted contact card on the right.",
+    layout: "rightSidebar",
+    headerSections: [],
+    sidebarSections: ["profile", "skills", "languages"],
+    mainSections: ["summary", "experience", "projects", "education", "certifications", "awards"],
+    theme: {
+      ...baseTheme,
+      accent: "#0ea5e9",
+      primary: "#0c4a6e",
+      sidebarBg: "#f0f9ff",
+      sidebarText: "#0c4a6e",
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#0ea5e9",
+      avatarText: "#fff",
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      headingFont: 'Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 250, sidebarPadding: 22 },
+  }),
+  tpl({
+    id: "gradientHeader",
+    name: "Gradient Header",
+    description: "Warm gradient-style header banner with centered avatar.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: {
+      ...baseTheme,
+      accent: "#f43f5e",
+      primary: "#4c0519",
+      headerBg: "linear-gradient(135deg, #f43f5e 0%, #f97316 100%)",
+      headerText: "#fff",
+      headerRadius: 14,
+      avatar: "initials",
+      avatarPlacement: "center",
+      avatarBg: "#fff",
+      avatarText: "#be123c",
+      avatarSize: 80,
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      headingFont: '"Poppins", Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 220, sectionGap: 18 },
+  }),
+  tpl({
+    id: "monoBlackHeader",
+    name: "Mono Black Header",
+    description: "Bold black banner header with square avatar-initials and Space Grotesk type.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects"],
+    sidebarSections: ["skills", "education", "certifications", "languages"],
+    theme: {
+      ...baseTheme,
+      accent: "#facc15",
+      primary: "#000",
+      headerBg: "#0a0a0a",
+      headerText: "#fafafa",
+      headerRadius: 4,
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#facc15",
+      avatarText: "#000",
+      sectionTitleStyle: "plain",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      bulletStyle: "square",
+      headingFont: '"Space Grotesk", Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 220 },
+  }),
+  tpl({
+    id: "creamAvatarBook",
+    name: "Cream Avatar Book",
+    description: "Warm cream palette, editorial serif, purple initials avatar left of a two-column body.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "publications"],
+    sidebarSections: ["skills", "education", "certifications", "languages", "awards"],
+    theme: {
+      ...baseTheme,
+      accent: "#7c3aed",
+      primary: "#1f1147",
+      headerBg: "#fdf6ec",
+      headerText: "#1f1147",
+      headerRadius: 12,
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#7c3aed",
+      avatarText: "#fff",
+      avatarSize: 74,
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      headingFont: '"Fraunces", Georgia, serif',
+      bodyFont: 'Inter, sans-serif',
+      divider: "#e5d5c0",
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 220, sectionGap: 20 },
+  }),
+);
+
 export const templateById = new Map(templates.map((t) => [t.id, t]));
+
+
 
 export function getTemplate(id: string): Template {
   return templateById.get(id) ?? templates[0];

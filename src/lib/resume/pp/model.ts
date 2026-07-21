@@ -8,7 +8,7 @@ import type { SectionId, Template, Theme } from "./templates";
 
 export type Block =
   | { kind: "sectionTitle"; text: string }
-  | { kind: "profileHeader"; profile: Resume["profile"]; summary?: string }
+  | { kind: "profileHeader"; profile: Resume["profile"] }
   | { kind: "contactStack"; profile: Resume["profile"] }
   | { kind: "summary"; text: string }
   | { kind: "entry"; entry: EntryData }

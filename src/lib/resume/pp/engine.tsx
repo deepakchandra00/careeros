@@ -52,6 +52,11 @@ type PlacedBlock = {
   height: number;
 };
 
+// Browser layout can land on fractional pixels because fonts use fractional
+// line metrics. Keep a small reserve so a block that is mathematically flush
+// with the boundary is never clipped by sub-pixel rounding in preview/print.
+const LAYOUT_SAFETY_PX = 8;
+
 type PageColumn = {
   region: RegionKey;
   placed: PlacedBlock[];
@@ -75,29 +80,11 @@ export function resolveRegions(resume: Resume, template: Template) {
   const contentW = pageW - s.pageMarginLeft - s.pageMarginRight;
   const contentH = pageH - s.pageMarginTop - s.pageMarginBottom;
 
-  // When showSummaryInHeader is true, the summary is rendered inside the
-  // profile header (not as a standalone section). Skip it from mainSections.
-  const mainSections = template.theme.showSummaryInHeader
-    ? template.mainSections.filter((id) => id !== "summary")
-    : template.mainSections;
-
   const headerGroups = buildGroupsFor(resume, template.headerSections, "header");
-  const mainGroups = buildGroupsFor(resume, mainSections, "main");
+  const mainGroups = buildGroupsFor(resume, template.mainSections, "main");
   const sidebarGroups = buildGroupsFor(resume, template.sidebarSections, "sidebar");
   const secondGroups = buildGroupsFor(resume, template.secondSidebarSections, "sidebar");
   const footerGroups = buildGroupsFor(resume, template.footerSections, "main");
-
-  // When showSummaryInHeader is true, inject the summary text into the
-  // profileHeader block so it renders inside the header.
-  if (template.theme.showSummaryInHeader && resume.summary.trim()) {
-    for (const g of [...headerGroups, ...mainGroups]) {
-      for (const b of g.blocks) {
-        if (b.kind === "profileHeader") {
-          b.summary = resume.summary;
-        }
-      }
-    }
-  }
 
   const regions: Region[] = [];
   const layout: LayoutKind = template.layout;
@@ -251,6 +238,11 @@ type GroupMeasure = {
   perBulletHeight?: number;
 };
 
+type MeasuredLayout = {
+  signature: string;
+  heights: Record<string, number>;
+};
+
 type RegionMeasure = {
   region: Region;
   groups: GroupMeasure[];
@@ -269,13 +261,31 @@ function MeasurementLayer({
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
-    const heights: Record<string, number> = {};
-    const nodes = containerRef.current.querySelectorAll<HTMLElement>("[data-measure-key]");
-    nodes.forEach((el) => {
-      const k = el.getAttribute("data-measure-key");
-      if (k) heights[k] = el.getBoundingClientRect().height;
-    });
-    onMeasured(heights);
+    let cancelled = false;
+
+    const measure = () => {
+      if (cancelled || !containerRef.current) return;
+      const heights: Record<string, number> = {};
+      const nodes = containerRef.current.querySelectorAll<HTMLElement>("[data-measure-key]");
+      nodes.forEach((el) => {
+        const k = el.getAttribute("data-measure-key");
+        if (k) heights[k] = el.getBoundingClientRect().height;
+      });
+      onMeasured(heights);
+    };
+
+    const fonts = document.fonts;
+    if (fonts?.status === "loading") {
+      void fonts.ready.then(measure);
+    } else {
+      measure();
+    }
+
+    fonts?.addEventListener("loadingdone", measure);
+    return () => {
+      cancelled = true;
+      fonts?.removeEventListener("loadingdone", measure);
+    };
   }, [measurements, onMeasured, theme]);
 
   if (typeof document === "undefined") return null;
@@ -322,53 +332,26 @@ function buildMeasureRequests(
   }[] = [];
 
   regions.forEach((r) => {
-    const fullWidth = r.width - r.padding * 2;
-    // In timeline mode, content blocks are rendered inside a 2-column grid
-    // (timelineWidth | 1fr) with a columnGap. The content column is narrower
-    // than the full region width, so we must measure at the narrower width
-    // to get correct heights. If we measure at the full width, the measured
-    // heights are too short (less wrapping), and the rendered content
-    // overflows the page (content hiding in footer area).
-    const timelineContentWidth =
-      fullWidth - theme.timelineWidth - spacing.columnGap;
-    const isTimeline = theme.sectionStyle === "timeline" && r.variant === "main";
-    // In card mode, content blocks are rendered inside a card div with padding.
-    // Measure at the narrower width (fullWidth - 2 * cardPadding) to get correct
-    // heights.
-    const isCard = theme.sectionStyle === "card" && r.variant === "main";
-    const cardContentWidth = fullWidth - theme.cardPadding * 2;
+    const innerWidth = r.width - r.padding * 2;
     const ctx = { theme, spacing, variant: r.variant };
     r.groups.forEach((group, gi) => {
       group.blocks.forEach((block, bi) => {
-        // In timeline mode, sectionTitle blocks are rendered as labels in the
-        // left column (at timelineWidth). Content blocks are rendered in the
-        // right column (at timelineContentWidth).
-        // In card mode, sectionTitle blocks render at fullWidth. Content blocks
-        // render at cardContentWidth (inside the card padding).
-        const measureWidth =
-          isTimeline && block.kind !== "sectionTitle"
-            ? timelineContentWidth
-            : isTimeline && block.kind === "sectionTitle"
-              ? theme.timelineWidth
-              : isCard && block.kind !== "sectionTitle"
-                ? cardContentWidth
-                : fullWidth;
         requests.push({
           key: `${r.key}:${gi}:${bi}`,
-          width: measureWidth,
+          width: innerWidth,
           variant: r.variant,
           node: <BlockView block={block} ctx={ctx} />,
         });
         if (block.kind === "entry" && block.entry.bullets.length > 1) {
           requests.push({
             key: `${r.key}:${gi}:${bi}:h0`,
-            width: measureWidth,
+            width: innerWidth,
             variant: r.variant,
             node: <BlockView block={{ kind: "entry", entry: { ...block.entry, bullets: [] } }} ctx={ctx} />,
           });
           requests.push({
             key: `${r.key}:${gi}:${bi}:h1`,
-            width: measureWidth,
+            width: innerWidth,
             variant: r.variant,
             node: <BlockView block={{ kind: "entry", entry: { ...block.entry, bullets: block.entry.bullets.slice(0, 1) } }} ctx={ctx} />,
           });
@@ -425,7 +408,7 @@ function paginateRegion(
     }
 
     // Try split
-    const split = trySplitEntry(gm, used + sectionGap, available, spacing);
+    const split = trySplitEntry(gm, used + sectionGap, available);
     if (split) {
       currentPage().push({
         block: split.first,
@@ -464,7 +447,6 @@ function trySplitEntry(
   gm: GroupMeasure,
   usedBefore: number,
   available: number,
-  spacing: Spacing,
 ): { first: Block; firstHeight: number; rest: Block; restHeight: number } | null {
   const group = gm.group;
   if (!group.splittable) return null;
@@ -478,8 +460,7 @@ function trySplitEntry(
   if (headerH === undefined || perBullet === undefined) return null;
 
   const spaceLeft = available - usedBefore;
-  const perRow = perBullet + spacing.bulletGap;
-  const maxK = Math.floor((spaceLeft - headerH) / perRow);
+  const maxK = Math.floor((spaceLeft - headerH - LAYOUT_SAFETY_PX) / perBullet);
   if (maxK < 1 || maxK >= bullets.length) return null;
 
   const first: Block = { kind: "entry", entry: { ...entryBlock.entry, bullets: bullets.slice(0, maxK) } };
@@ -489,8 +470,8 @@ function trySplitEntry(
     bullets: bullets.slice(maxK),
     showTitle: true,
   };
-  const firstHeight = headerH + maxK * perRow;
-  const restHeight = headerH + (bullets.length - maxK) * perRow;
+  const firstHeight = headerH + maxK * perBullet;
+  const restHeight = headerH + (bullets.length - maxK) * perBullet;
   return { first, firstHeight, rest, restHeight };
 }
 
@@ -500,10 +481,14 @@ export function ResumeDocument({
   resume,
   template,
   onPageCount,
+  repeatSidebar = true,
 }: {
   resume: Resume;
   template: Template;
   onPageCount?: (n: number) => void;
+  /** When false, the sidebar only appears on page 1. Pages 2+ use the full
+   * page width for main content. Default: true (sidebar repeats on every page). */
+  repeatSidebar?: boolean;
 }) {
   const { regions } = useMemo(() => resolveRegions(resume, template), [resume, template]);
   const measureRequests = useMemo(
@@ -511,13 +496,24 @@ export function ResumeDocument({
     [regions, template],
   );
 
-  const [heights, setHeights] = useState<Record<string, number>>({});
-  const measureKey = useMemo(() => measureRequests.map((r) => r.key).join("|"), [measureRequests]);
-  useEffect(() => {
-    setHeights({});
-  }, [measureKey]);
+  const measurementSignature = useMemo(
+    () =>
+      JSON.stringify({
+        template: template.id,
+        theme: template.theme,
+        spacing: template.spacing,
+        requests: measureRequests.map((r) => [r.key, r.width]),
+      }),
+    [measureRequests, template],
+  );
+  const [measuredLayout, setMeasuredLayout] = useState<MeasuredLayout>({
+    signature: "",
+    heights: {},
+  });
+  const heights = measuredLayout.heights;
 
   const allMeasured =
+    measuredLayout.signature === measurementSignature &&
     measureRequests.length > 0 &&
     measureRequests.every((r) => heights[r.key] !== undefined);
 
@@ -572,41 +568,20 @@ export function ResumeDocument({
       let available: number;
       if (rm.region.fullPageHeight) {
         available = PAGE_HEIGHT_PX - rm.region.padding * 2;
-      } else if (rm.region.key === "main") {
+      } else {
         available =
           rm.region.height -
           (headerHeight > 0 ? headerHeight + template.spacing.sectionGap : 0) -
           (footerHeight > 0 ? footerHeight + template.spacing.sectionGap : 0);
-      } else {
-        available =
-          rm.region.height -
-          (footerHeight > 0 ? footerHeight + template.spacing.sectionGap : 0);
       }
-      // In timeline mode, the 2-column grid can introduce minor alignment
-      // overhead (row height = max(label, content)). Subtract a small safety
-      // margin per section to prevent content from overflowing into the footer.
-      if (template.theme.sectionStyle === "timeline" && rm.region.key === "main") {
-        const sectionCount = rm.groups.filter(
-          (g) => g.group.blocks.some((b) => b.kind === "sectionTitle"),
-        ).length;
-        available -= sectionCount * 4; // 4px per section as safety margin
-      }
-      // In card mode, each card adds padding (top + bottom) that isn't in the
-      // measured heights. Instead of deducting ALL sections' padding from every
-      // page (which leaves huge empty footer areas), we fold the card padding
-      // into an effective sectionGap. This way, each section transition on a
-      // given page naturally accounts for that card's padding — no over-deduction.
-      const effectiveSpacing =
-        template.theme.sectionStyle === "card" && rm.region.key === "main"
-          ? {
-              ...template.spacing,
-              sectionGap: template.spacing.sectionGap + template.theme.cardPadding * 2,
-            }
-          : template.spacing;
-      out[rm.region.key] = paginateRegion(rm, available, effectiveSpacing);
+      out[rm.region.key] = paginateRegion(
+        rm,
+        Math.max(0, available - LAYOUT_SAFETY_PX),
+        template.spacing,
+      );
     });
     return out;
-  }, [allMeasured, bodyRMs, headerHeight, footerHeight, template.spacing, template.theme.sectionStyle]);
+  }, [allMeasured, bodyRMs, headerHeight, footerHeight, template.spacing]);
 
   const totalPages = useMemo(() => {
     if (!allMeasured) return 1;
@@ -640,10 +615,13 @@ export function ResumeDocument({
         measurements={measureRequests}
         theme={template.theme}
         onMeasured={(h) => {
-          setHeights((prev) => {
-            const merged = { ...prev, ...h };
-            const changed = Object.keys(merged).some((k) => prev[k] !== merged[k]);
-            return changed ? merged : prev;
+          setMeasuredLayout((prev) => {
+            if (prev.signature !== measurementSignature) {
+              return { signature: measurementSignature, heights: h };
+            }
+            const merged = { ...prev.heights, ...h };
+            const changed = Object.keys(merged).some((k) => prev.heights[k] !== merged[k]);
+            return changed ? { signature: measurementSignature, heights: merged } : prev;
           });
         }}
       />
@@ -660,6 +638,7 @@ export function ResumeDocument({
             footerHeight={footerHeight}
             showHeader={i === 0}
             showFooter={true}
+            showSidebar={repeatSidebar || i === 0}
           />
         ))}
       {!allMeasured && <PagePlaceholder />}
@@ -692,6 +671,7 @@ function PageView({
   footerHeight,
   showHeader,
   showFooter,
+  showSidebar = true,
 }: {
   page: PageModel;
   regions: Region[];
@@ -702,6 +682,7 @@ function PageView({
   footerHeight: number;
   showHeader: boolean;
   showFooter: boolean;
+  showSidebar?: boolean;
 }) {
   const s = template.spacing;
   const t = template.theme;
@@ -719,132 +700,15 @@ function PageView({
     boxSizing: "border-box",
   };
 
-  const renderPlacedBlocks = (placed: PlacedBlock[], variant: Variant) => {
-    // Timeline section style: group blocks by section and render each section
-    // as a 2-column row (label on left, content on right) with a vertical line.
-    if (t.sectionStyle === "timeline" && variant === "main") {
-      return renderTimelineBlocks(placed);
-    }
-    // Card section style: group blocks by section, render the section title
-    // normally, then wrap all content blocks in a card (background + padding).
-    if (t.sectionStyle === "card" && variant === "main") {
-      return renderCardBlocks(placed);
-    }
-    return (
-      <>
-        {placed.map((pb, i) => (
-          <div key={i} style={{ marginTop: pb.topGap }}>
-            <BlockView block={pb.block} ctx={{ theme: t, spacing: s, variant }} />
-          </div>
-        ))}
-      </>
-    );
-  };
-
-  // Card renderer: groups blocks by section (sectionTitle starts a new group).
-  // The section title renders normally. Content blocks are wrapped in a div
-  // with the card background, padding, and border-radius.
-  const renderCardBlocks = (placed: PlacedBlock[]) => {
-    const groups: { title: PlacedBlock | null; content: PlacedBlock[] }[] = [];
-    let current: { title: PlacedBlock | null; content: PlacedBlock[] } = {
-      title: null,
-      content: [],
-    };
-    for (const pb of placed) {
-      if (pb.block.kind === "sectionTitle") {
-        if (current.title || current.content.length) groups.push(current);
-        current = { title: pb, content: [] };
-      } else {
-        current.content.push(pb);
-      }
-    }
-    if (current.title || current.content.length) groups.push(current);
-
-    return (
-      <>
-        {groups.map((g, i) => {
-          const ctx = { theme: t, spacing: s, variant: "main" as Variant };
-          return (
-            <div key={i}>
-              {g.title && (
-                <div style={{ marginTop: g.title.topGap }}>
-                  <BlockView block={g.title.block} ctx={ctx} />
-                </div>
-              )}
-              {g.content.length > 0 && (
-                <div
-                  style={{
-                    background: t.cardBg,
-                    borderRadius: t.cardRadius,
-                    padding: t.cardPadding,
-                    marginTop: 0,
-                  }}
-                >
-                  {g.content.map((pb, j) => (
-                    <div
-                      key={j}
-                      style={{ marginTop: j === 0 ? 0 : pb.topGap }}
-                    >
-                      <BlockView block={pb.block} ctx={ctx} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </>
-    );
-  };
-
-  // Timeline renderer: wraps each section (sectionTitle + its content blocks)
-  // in a 2-column grid row. A single absolutely-positioned vertical line spans
-  // the entire region. Section titles render as labels on the left with a dot.
-  const renderTimelineBlocks = (placed: PlacedBlock[]) => {
-    // Group blocks by section — a sectionTitle block starts a new group.
-    const groups: { title: PlacedBlock | null; content: PlacedBlock[] }[] = [];
-    let current: { title: PlacedBlock | null; content: PlacedBlock[] } = {
-      title: null,
-      content: [],
-    };
-    for (const pb of placed) {
-      if (pb.block.kind === "sectionTitle") {
-        if (current.title || current.content.length) groups.push(current);
-        current = { title: pb, content: [] };
-      } else {
-        current.content.push(pb);
-      }
-    }
-    if (current.title || current.content.length) groups.push(current);
-
-    return (
-      <div
-        style={{
-          position: "relative",
-          display: "grid",
-          gridTemplateColumns: `${t.timelineWidth}px 1fr`,
-          columnGap: s.columnGap,
-          alignItems: "start",
-        }}
-      >
-        {/* The ONLY absolutely-positioned element — the vertical timeline line */}
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            left: t.timelineWidth - 6,
-            width: 2,
-            background: t.timelineLineColor,
-          }}
-        />
-        {groups.map((g, i) => (
-          <TimelineRow key={i} group={g} theme={t} spacing={s} />
-        ))}
-      </div>
-    );
-  };
+  const renderPlacedBlocks = (placed: PlacedBlock[], variant: Variant) => (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      {placed.map((pb, i) => (
+        <div key={i} style={{ marginTop: pb.topGap, flex: "0 0 auto", minWidth: 0 }}>
+          <BlockView block={pb.block} ctx={{ theme: t, spacing: s, variant }} />
+        </div>
+      ))}
+    </div>
+  );
 
   // Render header/footer inline: they aren't paginated (single-page slots).
   const renderStaticRegion = (rm: RegionMeasure, variant: Variant) => {
@@ -875,15 +739,17 @@ function PageView({
       {regions.map((r) => {
         const isHeader = r.key === "header";
         const isFooter = r.key === "footer";
+        const isSidebar = r.key === "sidebar" || r.key === "second";
         const isBody = !isHeader && !isFooter;
 
         if (isHeader && !showHeader) return null;
         if (isFooter && !showFooter) return null;
+        if (isSidebar && !showSidebar) return null;
 
         let y = r.y;
         let height = r.height;
 
-        if (r.key === "main" && showHeader && headerHeight > 0) {
+        if (isBody && !r.fullPageHeight && showHeader && headerHeight > 0) {
           y = r.y + headerHeight + s.sectionGap;
           height = r.height - headerHeight - s.sectionGap;
         }
@@ -930,84 +796,5 @@ function PageView({
         );
       })}
     </div>
-  );
-}
-
-// ── Timeline row renderer ───────────────────────────────────────────────────
-//
-// A single timeline row: section label on the left column (with a dot on the
-// timeline), content on the right. CSS Grid keeps label + content aligned to
-// the same baseline; the dot is placed at the label baseline.
-
-function TimelineRow({
-  group,
-  theme,
-  spacing,
-}: {
-  group: { title: PlacedBlock | null; content: PlacedBlock[] };
-  theme: Theme;
-  spacing: Spacing;
-}) {
-  const ctx = { theme, spacing, variant: "main" as const };
-  const dotSize = 12;
-  // Use the title block's topGap as the row's top margin. This preserves the
-  // section gap that the pagination engine already computed, so the total
-  // height matches the measurement (no extra paddingBottom that causes overflow).
-  const rowTopGap = group.title?.topGap ?? 0;
-
-  return (
-    <>
-      {/* Left column: section label + timeline dot */}
-      <div
-        style={{
-          position: "relative",
-          paddingRight: dotSize + 6,
-          marginTop: rowTopGap,
-          textAlign: "right",
-        }}
-      >
-        {/* Timeline dot */}
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            right: -dotSize / 2,
-            top: 4,
-            width: dotSize,
-            height: dotSize,
-            borderRadius: "50%",
-            background: theme.timelineDotColor,
-            boxShadow: "0 0 0 3px white",
-          }}
-        />
-        {group.title && (
-          <div
-            style={{
-              fontSize: 17,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 0.4,
-              color: "#222222",
-              lineHeight: 1.2,
-            }}
-          >
-            {group.title.block.kind === "sectionTitle" && group.title.block.text}
-          </div>
-        )}
-      </div>
-
-      {/* Right column: content blocks.
-          Content blocks already have their topGap from pagination, which
-          includes inter-block gaps. The first content block's topGap is 0
-          (since the sectionGap was on the title block, which we used as
-          rowTopGap above). */}
-      <div>
-        {group.content.map((pb, i) => (
-          <div key={i} style={{ marginTop: i === 0 ? 0 : pb.topGap }}>
-            <BlockView block={pb.block} ctx={ctx} />
-          </div>
-        ))}
-      </div>
-    </>
   );
 }
