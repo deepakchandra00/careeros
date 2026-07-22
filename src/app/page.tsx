@@ -116,6 +116,7 @@ export default function Home() {
 
 function AppShell({ Active }: { Active: React.ComponentType }) {
   const setModule = useAppStore((s) => s.setModule);
+  const active = useAppStore((s) => s.activeModule);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -128,6 +129,20 @@ function AppShell({ Active }: { Active: React.ComponentType }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [setModule]);
+
+  // Full-screen modules that hide the app chrome (sidebar, topbar, footer)
+  const isFullScreen = active === "resume-builder";
+
+  if (isFullScreen) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="w-full">
+          <Active />
+        </main>
+        <CommandPalette />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

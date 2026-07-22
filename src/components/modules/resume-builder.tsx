@@ -20,6 +20,7 @@ import {
   ArrowUpDown,
   GripVertical,
   LayoutTemplate,
+  ArrowLeft,
   Wand2,
   AlertTriangle,
   Keyboard,
@@ -59,7 +60,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
-import { ModuleHeader, AIButton } from "@/components/shared/blocks";
+import { AIButton } from "@/components/shared/blocks";
 import { useResumeStore, type SectionId, type PageLayout } from "@/store/resume-store";
 import { ResumeEditor } from "@/components/modules/resume-editor";
 import { PageBasedPreview } from "@/components/modules/page-based-preview";
@@ -504,6 +505,7 @@ export function ResumeBuilderModule() {
   >([]);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
   const [templateSearch, setTemplateSearch] = React.useState("");
+  const [templateSliderOpen, setTemplateSliderOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const previewScrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -861,12 +863,24 @@ export function ResumeBuilderModule() {
   };
 
   return (
-    <div className="space-y-4">
-      <ModuleHeader
-        icon={FileText}
-        title="Resume Builder"
-        description="Real templates, AI editing, PDF & Word export, and resume import."
-      >
+    <div className="flex h-screen flex-col overflow-hidden p-4">
+      {/* Top bar with back button + module header + action buttons */}
+      <div className="flex items-center justify-between gap-4 pb-2">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => window.history.back()}
+          >
+            <ArrowLeft className="size-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold leading-tight">Resume Builder</h1>
+            <p className="text-xs text-muted-foreground">Real templates, AI editing, PDF & Word export</p>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
             ref={fileInputRef}
@@ -967,11 +981,25 @@ export function ResumeBuilderModule() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </ModuleHeader>
+      </div>
 
       {/* Toolbar: template + font + accent + zoom + sections */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 p-3">
+          {/* Template slider toggle — shows/hides the vertical template panel on the left */}
+          <Button
+            variant={templateSliderOpen ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setTemplateSliderOpen((v) => !v)}
+            title="Toggle template slider panel"
+          >
+            <LayoutTemplate className="size-3.5" />
+            <span className="hidden sm:inline">Templates</span>
+          </Button>
+
+          <div className="h-5 w-px bg-border" />
+
           {/* Template selector — opens searchable picker with 100+ templates */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Template</span>
@@ -1344,32 +1372,66 @@ export function ResumeBuilderModule() {
         </CardContent>
       </Card>
 
-      {/* Template thumbnail slider — horizontal scrollable strip (like upstream) */}
-      <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-thin">
-        {PP_TEMPLATES.map((t) => (
-          <div key={t.id} className="flex flex-col items-center gap-1 flex-shrink-0">
-            <TemplateThumb
-              template={t}
-              selected={style.template === t.id}
-              onClick={() => setStyle({ template: t.id, accent: "", font: style.font })}
-            />
-            <div
-              className={cn(
-                "text-[10px] leading-tight max-w-[120px] truncate",
-                style.template === t.id ? "text-foreground font-medium" : "text-muted-foreground"
-              )}
-            >
-              {t.name}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Editor + Preview — Resizable Split Layout */}
-      <div className="h-[calc(100vh-12rem)] min-h-[500px] overflow-hidden rounded-xl border">
+      {/* Editor + Template Slider + Preview — Resizable Split Layout */}
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
         <ResizablePanelGroup direction="horizontal" className="h-full">
+          {/* Template Slider Panel (left side, vertical, max-width ~200px) */}
+          {templateSliderOpen && (
+            <>
+              <ResizablePanel
+                defaultSize={15}
+                minSize={8}
+                maxSize={20}
+                className="overflow-hidden border-r bg-card/50"
+              >
+                <div className="flex h-full flex-col">
+                  {/* Slider header */}
+                  <div className="flex items-center justify-between border-b px-3 py-2">
+                    <span className="text-xs font-medium">Templates</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6"
+                      onClick={() => setTemplateSliderOpen(false)}
+                    >
+                      <ChevronDown className="size-3.5 rotate-90" />
+                    </Button>
+                  </div>
+                  {/* Vertical scrollable template thumbnails */}
+                  <div className="flex-1 overflow-y-auto scroll-thin p-2">
+                    <div className="flex flex-col items-center gap-2">
+                      {PP_TEMPLATES.map((t) => (
+                        <div key={t.id} className="flex flex-col items-center gap-1 w-full">
+                          <TemplateThumb
+                            template={t}
+                            selected={style.template === t.id}
+                            onClick={() => setStyle({ template: t.id, accent: "", font: style.font })}
+                          />
+                          <div
+                            className={cn(
+                              "text-[10px] leading-tight max-w-[120px] truncate text-center",
+                              style.template === t.id ? "text-foreground font-medium" : "text-muted-foreground"
+                            )}
+                          >
+                            {t.name}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+            </>
+          )}
+
           {/* Left: Editor Panel */}
-          <ResizablePanel defaultSize={38} minSize={25} maxSize={60} className="overflow-hidden">
+          <ResizablePanel
+            defaultSize={templateSliderOpen ? 32 : 38}
+            minSize={20}
+            maxSize={60}
+            className="overflow-hidden"
+          >
             <div className="h-full overflow-y-auto scroll-thin p-4">
               <ResumeEditor />
             </div>
@@ -1378,7 +1440,11 @@ export function ResumeBuilderModule() {
           <ResizableHandle withHandle />
 
           {/* Right: Canvas Preview (the hero) */}
-          <ResizablePanel defaultSize={62} minSize={40} className="overflow-hidden">
+          <ResizablePanel
+            defaultSize={templateSliderOpen ? 53 : 62}
+            minSize={35}
+            className="overflow-hidden"
+          >
             <div className="flex h-full flex-col">
               {/* Canvas area */}
               <div
