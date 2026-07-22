@@ -85,21 +85,70 @@ import { fetchWithFallback } from "@/components/shared/utils";
 import { cn } from "@/lib/utils";
 import { MODULES, type ModuleId } from "@/lib/modules";
 import {
-  adminGetAllUsers,
-  adminGetUserDetail,
-  adminUpdateUserRole,
-  adminUpdateUserPlan,
-  adminGetAllAuditLogs,
-  adminGetAllFeatureFlags,
-  adminUpdateFeatureFlag,
-  adminCreateFeatureFlag,
-  adminGetNavConfig,
-  adminSetNavVisibility,
   type SupabaseUser,
   type AuditLog,
   type FeatureFlag,
   type ResumeData,
 } from "@/lib/supabase-client";
+
+// ── Server-side API wrappers ──────────────────────────────────────────────
+// The supabase-client.ts functions use SUPABASE_SERVICE_ROLE_KEY which must
+// never be exposed to the browser. These wrappers call our server-side API
+// routes instead, which proxy the Supabase calls securely.
+
+async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(path, { cache: "no-store" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${path}: ${res.status} ${text.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+async function apiPost(path: string, body: unknown): Promise<void> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${path}: ${res.status} ${text.slice(0, 200)}`);
+  }
+}
+
+async function apiPatch(path: string, body: unknown): Promise<void> {
+  const res = await fetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${path}: ${res.status} ${text.slice(0, 200)}`);
+  }
+}
+
+// Admin API functions (proxied through server routes)
+const adminGetAllUsersApi = () => apiGet<SupabaseUser[]>("/api/admin/users");
+const adminGetUserDetailApi = (id: string) =>
+  apiGet<{ user: SupabaseUser | null; resumeData: ResumeData | null; auditLogs: AuditLog[] }>(`/api/admin/users/${id}`);
+const adminUpdateUserRoleApi = (userId: string, role: string) =>
+  apiPatch(`/api/admin/users/${userId}`, { role });
+const adminUpdateUserPlanApi = (userId: string, plan: string) =>
+  apiPatch(`/api/admin/users/${userId}`, { plan });
+const adminGetAllAuditLogsApi = (limit = 200) =>
+  apiGet<AuditLog[]>(`/api/admin/audit-logs?limit=${limit}`);
+const adminGetAllFeatureFlagsApi = () =>
+  apiGet<FeatureFlag[]>("/api/admin/feature-flags");
+const adminUpdateFeatureFlagApi = (key: string, enabled: boolean, rollout?: number) =>
+  apiPost("/api/admin/feature-flags", { action: "update", key, enabled, rollout });
+const adminCreateFeatureFlagApi = (key: string, enabled: boolean, rollout = 100) =>
+  apiPost("/api/admin/feature-flags", { action: "create", key, enabled, rollout });
+const adminGetNavConfigApi = () =>
+  apiGet<Record<string, boolean>>("/api/admin/nav-config");
+const adminSetNavVisibilityApi = (key: string, visible: boolean) =>
+  apiPatch("/api/admin/nav-config", { key, visible });
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -502,7 +551,7 @@ function UsersTab({
 
   const handleRoleChange = async (userId: string, role: string) => {
     try {
-      await adminUpdateUserRole(userId, role);
+      await adminUpdateUserRoleApi(userId, role);
       toast.success(`User role updated to ${role}`);
       onMutated();
     } catch (e) {
@@ -512,7 +561,7 @@ function UsersTab({
 
   const handlePlanChange = async (userId: string, plan: string) => {
     try {
-      await adminUpdateUserPlan(userId, plan);
+      await adminUpdateUserPlanApi(userId, plan);
       toast.success(`User plan updated to ${plan}`);
       onMutated();
     } catch (e) {
@@ -523,7 +572,7 @@ function UsersTab({
   const handleSuspend = async (userId: string) => {
     // Suspend = mark plan as SUSPENDED (we don't delete the account)
     try {
-      await adminUpdateUserPlan(userId, "SUSPENDED");
+      await adminUpdateUserPlanApi(userId, "SUSPENDED");
       toast.success("User suspended");
       onMutated();
     } catch (e) {
@@ -713,7 +762,7 @@ function UserDetailDialog({
   const loadDetail = React.useCallback(async (userId: string) => {
     setData({ resume: null, logs: [], loading: true, error: null });
     try {
-      const res = await adminGetUserDetail(userId);
+      const res = await adminGetUserDetailApi(userId);
       setData({
         resume: res.resumeData,
         logs: res.auditLogs,
@@ -858,7 +907,7 @@ function UserDetailDialog({
                 size="sm"
                 onClick={() =>
                   act(
-                    () => adminUpdateUserPlan(user.id, "PRO"),
+                    () => adminUpdateUserPlanApi(user.id, "PRO"),
                     "Upgraded to PRO",
                   )
                 }
@@ -870,7 +919,7 @@ function UserDetailDialog({
                 variant="outline"
                 onClick={() =>
                   act(
-                    () => adminUpdateUserPlan(user.id, "FREE"),
+                    () => adminUpdateUserPlanApi(user.id, "FREE"),
                     "Downgraded to FREE",
                   )
                 }
@@ -882,7 +931,7 @@ function UserDetailDialog({
                 variant="outline"
                 onClick={() =>
                   act(
-                    () => adminUpdateUserRole(user.id, "ADMIN"),
+                    () => adminUpdateUserRoleApi(user.id, "ADMIN"),
                     "Promoted to Admin",
                   )
                 }
@@ -894,7 +943,7 @@ function UserDetailDialog({
                 variant="destructive"
                 onClick={() =>
                   act(
-                    () => adminUpdateUserPlan(user.id, "SUSPENDED"),
+                    () => adminUpdateUserPlanApi(user.id, "SUSPENDED"),
                     "User suspended",
                   )
                 }
@@ -953,7 +1002,7 @@ function NavigationTab({
     }
     setSearching(true);
     try {
-      const all = await adminGetAllUsers();
+      const all = await adminGetAllUsersApi();
       const lc = q.trim().toLowerCase();
       setUserResults(
         all
@@ -1358,7 +1407,7 @@ function FeatureFlagsTab({
     }
     setCreating(true);
     try {
-      await adminCreateFeatureFlag(key, newEnabled, Number(newRollout) || 0);
+      await adminCreateFeatureFlagApi(key, newEnabled, Number(newRollout) || 0);
       toast.success(`Created flag: ${key}`);
       setNewKey("");
       setNewEnabled(true);
@@ -1552,7 +1601,7 @@ function SystemHealthTab() {
     {
       const start = performance.now();
       try {
-        await adminGetAllUsers();
+        await adminGetAllUsersApi();
         const ms = Math.round(performance.now() - start);
         checks.push({
           key: "db",
@@ -1786,7 +1835,7 @@ export function AdminModule() {
     setLoadingUsers(true);
     setErrorUsers(null);
     try {
-      const rows = await adminGetAllUsers();
+      const rows = await adminGetAllUsersApi();
       setUsers(rows);
     } catch (e) {
       setErrorUsers((e as Error).message);
@@ -1799,7 +1848,7 @@ export function AdminModule() {
     setLoadingLogs(true);
     setErrorLogs(null);
     try {
-      const rows = await adminGetAllAuditLogs(200);
+      const rows = await adminGetAllAuditLogsApi(200);
       setAuditLogs(rows);
     } catch (e) {
       setErrorLogs((e as Error).message);
@@ -1812,7 +1861,7 @@ export function AdminModule() {
     setLoadingFlags(true);
     setErrorFlags(null);
     try {
-      const rows = await adminGetAllFeatureFlags();
+      const rows = await adminGetAllFeatureFlagsApi();
       setFeatureFlags(rows.filter((f) => !f.key.startsWith("nav.")));
     } catch (e) {
       setErrorFlags((e as Error).message);
@@ -1825,7 +1874,7 @@ export function AdminModule() {
     setLoadingNav(true);
     setErrorNav(null);
     try {
-      const cfg = await adminGetNavConfig();
+      const cfg = await adminGetNavConfigApi();
       setNavConfig(cfg);
     } catch (e) {
       setErrorNav((e as Error).message);
@@ -1846,7 +1895,7 @@ export function AdminModule() {
     // Optimistic update
     setNavConfig((prev) => ({ ...prev, [moduleId]: visible }));
     try {
-      await adminSetNavVisibility(moduleId, visible);
+      await adminSetNavVisibilityApi(moduleId, visible);
       toast.success(`Module "${moduleId}" ${visible ? "shown" : "hidden"}`);
     } catch (e) {
       // Revert
@@ -1860,7 +1909,7 @@ export function AdminModule() {
       prev.map((f) => (f.key === key ? { ...f, enabled } : f)),
     );
     try {
-      await adminUpdateFeatureFlag(key, enabled);
+      await adminUpdateFeatureFlagApi(key, enabled);
       toast.success(`Flag "${key}" ${enabled ? "enabled" : "disabled"}`);
     } catch (e) {
       setFeatureFlags((prev) =>
