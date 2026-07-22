@@ -75,10 +75,15 @@ export function resolveRegions(resume: Resume, template: Template) {
   const pageW = PAGE_WIDTH_PX;
   const pageH = PAGE_HEIGHT_PX;
 
+  // Enforce a minimum top margin so content on subsequent pages never sits
+  // flush against the top edge of the sheet.
+  const MIN_PAGE_MARGIN_TOP = 40;
+  const effectiveTop = Math.max(s.pageMarginTop, MIN_PAGE_MARGIN_TOP);
+
   const contentX = s.pageMarginLeft;
-  const contentY = s.pageMarginTop;
+  const contentY = effectiveTop;
   const contentW = pageW - s.pageMarginLeft - s.pageMarginRight;
-  const contentH = pageH - s.pageMarginTop - s.pageMarginBottom;
+  const contentH = pageH - effectiveTop - s.pageMarginBottom;
 
   const headerGroups = buildGroupsFor(resume, template.headerSections, "header");
   const mainGroups = buildGroupsFor(resume, template.mainSections, "main");
@@ -367,7 +372,8 @@ function buildMeasureRequests(
 
 function paginateRegion(
   rm: RegionMeasure,
-  available: number,
+  firstAvailable: number,
+  laterAvailable: number,
   spacing: Spacing,
 ): PageColumn[] {
   if (!rm.groups.length) return [];
@@ -377,6 +383,8 @@ function paginateRegion(
   let prevSection: string | null = null;
 
   const currentPage = () => pages[pages.length - 1];
+  const availableNow = () =>
+    pages.length === 1 ? firstAvailable : laterAvailable;
 
   const placeGroupOnCurrent = (gm: GroupMeasure, sectionGap: number) => {
     gm.group.blocks.forEach((b, i) => {
@@ -393,7 +401,24 @@ function paginateRegion(
     prevSection = null;
   };
 
-  rm.groups.forEach((gm) => {
+  const isTitleOnly = (gm: GroupMeasure) =>
+    gm.group.blocks.length === 1 && gm.group.blocks[0].kind === "sectionTitle";
+
+  // Minimum height to place a meaningful chunk of the next group.
+  // Splittable entries: header + 1 bullet. Otherwise the first block.
+  const minPlaceable = (gm: GroupMeasure) => {
+    if (
+      gm.group.splittable &&
+      gm.headerHeightIfSplit !== undefined &&
+      gm.perBulletHeight !== undefined
+    ) {
+      return gm.headerHeightIfSplit + gm.perBulletHeight;
+    }
+    return gm.blockHeights[0] ?? gm.totalHeight;
+  };
+
+  for (let gi = 0; gi < rm.groups.length; gi++) {
+    const gm = rm.groups[gi];
     const sectionGap =
       prevSection === null
         ? 0
@@ -401,13 +426,27 @@ function paginateRegion(
         ? spacing.entryGap
         : spacing.sectionGap;
     const total = gm.totalHeight + sectionGap;
+    const available = availableNow();
 
     if (used + total <= available) {
+      // Orphan section-title guard: if this group is only a title, verify
+      // that the next group can also start on this page. If not, defer the
+      // title to the next page so it stays with its content.
+      if (isTitleOnly(gm) && gi + 1 < rm.groups.length) {
+        const next = rm.groups[gi + 1];
+        const nextGap = spacing.entryGap; // same section as its title
+        const need = used + total + nextGap + minPlaceable(next);
+        if (need > available && currentPage().length > 0) {
+          newPage();
+          gi--; // re-process this title on the fresh page
+          continue;
+        }
+      }
       placeGroupOnCurrent(gm, sectionGap);
-      return;
+      continue;
     }
 
-    // Try split
+    // Try to split a long entry across pages.
     const split = trySplitEntry(gm, used + sectionGap, available);
     if (split) {
       currentPage().push({
@@ -424,19 +463,34 @@ function paginateRegion(
       });
       used = split.restHeight;
       prevSection = gm.group.section;
-      return;
+      continue;
     }
 
-    // Move to next page
+    // Doesn't fit and can't split.
     if (currentPage().length === 0) {
-      // Empty page and still doesn't fit -> place anyway (overflow hidden)
+      // Fresh page and still doesn't fit — place anyway.
       placeGroupOnCurrent(gm, 0);
       newPage();
-      return;
+      continue;
     }
+
+    // If the previous placed block on this page is an (orphan) section title,
+    // carry it to the next page together with this group.
+    const prev = currentPage()[currentPage().length - 1];
+    if (prev && prev.block.kind === "sectionTitle") {
+      currentPage().pop();
+      used -= prev.topGap + prev.height;
+      newPage();
+      currentPage().push({ block: prev.block, topGap: 0, height: prev.height });
+      used = prev.height;
+      prevSection = gm.group.section;
+      placeGroupOnCurrent(gm, spacing.entryGap);
+      continue;
+    }
+
     newPage();
     placeGroupOnCurrent(gm, 0);
-  });
+  }
 
   if (currentPage().length === 0) pages.pop();
 
@@ -486,8 +540,7 @@ export function ResumeDocument({
   resume: Resume;
   template: Template;
   onPageCount?: (n: number) => void;
-  /** When false, the sidebar only appears on page 1. Pages 2+ use the full
-   * page width for main content. Default: true (sidebar repeats on every page). */
+  /** When false, the sidebar only appears on page 1. Default: true. */
   repeatSidebar?: boolean;
 }) {
   const { regions } = useMemo(() => resolveRegions(resume, template), [resume, template]);
@@ -565,18 +618,24 @@ export function ResumeDocument({
     const out: Record<string, PageColumn[]> = {};
     if (!allMeasured) return out;
     bodyRMs.forEach((rm) => {
-      let available: number;
+      let firstAvailable: number;
+      let laterAvailable: number;
       if (rm.region.fullPageHeight) {
-        available = PAGE_HEIGHT_PX - rm.region.padding * 2;
+        firstAvailable = PAGE_HEIGHT_PX - rm.region.padding * 2;
+        laterAvailable = firstAvailable;
       } else {
-        available =
-          rm.region.height -
-          (headerHeight > 0 ? headerHeight + template.spacing.sectionGap : 0) -
-          (footerHeight > 0 ? footerHeight + template.spacing.sectionGap : 0);
+        // Header renders on page 1 only; later pages regain that space.
+        const footerDeduction =
+          footerHeight > 0 ? footerHeight + template.spacing.sectionGap : 0;
+        const headerDeduction =
+          headerHeight > 0 ? headerHeight + template.spacing.sectionGap : 0;
+        firstAvailable = rm.region.height - headerDeduction - footerDeduction;
+        laterAvailable = rm.region.height - footerDeduction;
       }
       out[rm.region.key] = paginateRegion(
         rm,
-        Math.max(0, available - LAYOUT_SAFETY_PX),
+        Math.max(0, firstAvailable - LAYOUT_SAFETY_PX),
+        Math.max(0, laterAvailable - LAYOUT_SAFETY_PX),
         template.spacing,
       );
     });
@@ -736,6 +795,49 @@ function PageView({
 
   return (
     <div className="resume-page" style={pageStyle}>
+      {/* Page-level decorations (vertical timeline bar, bookmark ribbon) */}
+      {t.timelineBar && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: t.timelineBar.x,
+            top: 0,
+            bottom: 0,
+            width: t.timelineBar.width ?? 2,
+            background: t.timelineBar.color ?? t.accent,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+      {t.bookmark && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 0,
+            [t.bookmark.position === "topLeft" ? "left" : "right"]: 20,
+            width: t.bookmark.width,
+            height: t.bookmark.height,
+            background: t.bookmark.color,
+            clipPath: `polygon(0 0, 100% 0, 100% 100%, 50% 85%, 0 100%)`,
+            pointerEvents: "none",
+          } as CSSProperties}
+        >
+          {t.bookmark.accent && (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 14,
+                height: 4,
+                background: t.bookmark.accent,
+              }}
+            />
+          )}
+        </div>
+      )}
       {regions.map((r) => {
         const isHeader = r.key === "header";
         const isFooter = r.key === "footer";
@@ -762,6 +864,10 @@ function PageView({
             ? r.backgroundColor
             : undefined;
 
+        // When a page-level timeline bar is present, allow section-title
+        // labels to protrude into the left gutter without being clipped.
+        const overflow = t.timelineBar && r.variant !== "sidebar" ? "visible" : "hidden";
+
         return (
           <div
             key={r.key}
@@ -779,7 +885,7 @@ function PageView({
               boxSizing: "border-box",
               background: bg,
               color: r.variant === "sidebar" && bg ? t.sidebarText : undefined,
-              overflow: "hidden",
+              overflow,
             }}
           >
             {isBody

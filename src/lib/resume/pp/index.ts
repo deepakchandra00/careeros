@@ -45,6 +45,7 @@ export {
 export type { Block, BlockGroup, EntryData } from "./model";
 
 export { BlockView } from "./BlockView";
+export { TemplateThumb } from "./TemplateThumb";
 
 export {
   ResumeDocument,

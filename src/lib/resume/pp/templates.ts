@@ -39,7 +39,7 @@ export type Theme = {
   baseSize: number; // px
   headingWeight: number;
   sectionTitleTransform: "uppercase" | "none";
-  sectionTitleStyle: "underline" | "bar" | "plain" | "chip";
+  sectionTitleStyle: "underline" | "bar" | "plain" | "chip" | "timeline";
   bulletStyle: "dot" | "dash" | "square";
   radius: number; // px
   accentBar: boolean;
@@ -52,6 +52,21 @@ export type Theme = {
   avatarSize?: number;
   avatarBg?: string;
   avatarText?: string;
+  // Optional page-level decorations
+  timelineBar?: {
+    x: number; // distance from page left edge (px)
+    color?: string; // defaults to accent
+    width?: number; // defaults to 2
+    labelWidth?: number; // reserved space for the label to the left of the bar
+    labelGap?: number; // gap between label and bar
+  };
+  bookmark?: {
+    position: "topLeft" | "topRight";
+    color: string;
+    width: number;
+    height: number;
+    accent?: string; // small stripe color
+  };
 };
 
 export type Spacing = {
@@ -122,14 +137,12 @@ const baseSpacing: Spacing = {
   sidebarPadding: 22,
 };
 
-// ATS-safe font stacks (CareerOS extension).
+// CareerOS extension: font stacks for the font picker.
 const SANS = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
 const SERIF = 'Georgia, "Times New Roman", Times, serif';
 const MONO = '"Courier New", Courier, monospace';
 const NUNITO = '"Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-
-// Map our CareerOS font shorthand to actual CSS font stacks.
-export function fontStack(font: "sans" | "serif" | "mono" | "nunito" | string): string {
+export function fontStack(font: string): string {
   if (font === "serif") return SERIF;
   if (font === "mono") return MONO;
   if (font === "nunito") return NUNITO;
@@ -1166,6 +1179,328 @@ templates.push(
       divider: "#e5d5c0",
     },
     spacing: { ...baseSpacing, sidebarWidth: 220, sectionGap: 20 },
+  }),
+  tpl({
+    id: "timelineLeftAvatar",
+    name: "Timeline Left Avatar",
+    description: "Left profile avatar in a dark navy sidebar, timeline dot section titles on the main column.",
+    layout: "leftSidebar",
+    headerSections: [],
+    mainSections: ["summary", "experience", "projects", "education", "certifications"],
+    sidebarSections: ["profile", "skills", "languages", "awards"],
+    theme: {
+      ...baseTheme,
+      primary: "#0b1220",
+      accent: "#38bdf8",
+      sidebarBg: "#0b1220",
+      sidebarText: "#e2e8f0",
+      divider: "#1e293b",
+      avatar: "initials",
+      avatarPlacement: "center",
+      avatarBg: "#38bdf8",
+      avatarText: "#0b1220",
+      avatarSize: 84,
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      headingFont: '"Space Grotesk", Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 230, sidebarPadding: 26 },
+  }),
+  tpl({
+    id: "folderTabRight",
+    name: "Folder Tab Right",
+    description: "Emerald right sidebar acts as a folder tab holding contact, skills, and languages.",
+    layout: "rightSidebar",
+    headerSections: [],
+    mainSections: ["summary", "experience", "projects", "education", "publications"],
+    sidebarSections: ["profile", "skills", "languages", "certifications", "awards"],
+    theme: {
+      ...baseTheme,
+      primary: "#064e3b",
+      accent: "#10b981",
+      sidebarBg: "#064e3b",
+      sidebarText: "#ecfdf5",
+      divider: "#a7f3d0",
+      avatar: "initials",
+      avatarPlacement: "center",
+      avatarBg: "#10b981",
+      avatarText: "#052e2b",
+      avatarSize: 72,
+      sectionTitleStyle: "chip",
+      accentBar: false,
+      headingFont: '"Manrope", Inter, sans-serif',
+      radius: 6,
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 220, sidebarPadding: 24 },
+  }),
+  tpl({
+    id: "verticalTimeline",
+    name: "Vertical Timeline",
+    description: "Left accent bar section titles create a vertical timeline down the page.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications"],
+    theme: {
+      ...baseTheme,
+      primary: "#1e1b4b",
+      accent: "#6366f1",
+      divider: "#c7d2fe",
+      headerBg: "#eef2ff",
+      headerText: "#1e1b4b",
+      headerRadius: 10,
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#6366f1",
+      avatarText: "#fff",
+      avatarSize: 70,
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      headingFont: '"Sora", Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sectionGap: 18 },
+  }),
+  tpl({
+    id: "amberFolderCorner",
+    name: "Amber Folder Corner",
+    description: "Warm amber header band with a left profile avatar and rounded folder-corner accents.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "publications"],
+    sidebarSections: ["skills", "education", "certifications", "languages", "awards"],
+    theme: {
+      ...baseTheme,
+      primary: "#78350f",
+      accent: "#d97706",
+      divider: "#fde68a",
+      headerBg: "#fef3c7",
+      headerText: "#78350f",
+      headerRadius: 14,
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#d97706",
+      avatarText: "#fff",
+      avatarSize: 78,
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      headingFont: '"Fraunces", Georgia, serif',
+      bodyFont: 'Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 220, sectionGap: 18 },
+  }),
+  tpl({
+    id: "monoTimelineDev",
+    name: "Mono Timeline Dev",
+    description: "Monospace developer resume with a lime timeline bar and left avatar block.",
+    layout: "headerTwoCol",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education"],
+    sidebarSections: ["skills", "certifications", "awards", "languages"],
+    theme: {
+      ...baseTheme,
+      primary: "#0f172a",
+      accent: "#84cc16",
+      divider: "#e2e8f0",
+      headerBg: "#0f172a",
+      headerText: "#f8fafc",
+      headerRadius: 6,
+      avatar: "initials",
+      avatarPlacement: "left",
+      avatarBg: "#84cc16",
+      avatarText: "#0f172a",
+      avatarSize: 72,
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      headingFont: '"JetBrains Mono", ui-monospace, monospace',
+      bodyFont: 'Inter, sans-serif',
+      radius: 3,
+    },
+    spacing: { ...baseSpacing, sidebarWidth: 210, sectionGap: 16 },
+  }),
+  tpl({
+    id: "roseFolderStripe",
+    name: "Rose Folder Stripe",
+    description: "Full-width rose header ribbon with a centered avatar and clean single-column body.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "awards"],
+    theme: {
+      ...baseTheme,
+      primary: "#881337",
+      accent: "#e11d48",
+      divider: "#fecdd3",
+      headerBg: "linear-gradient(135deg, #fb7185, #e11d48)",
+      headerText: "#fff",
+      headerRadius: 0,
+      avatar: "initials",
+      avatarPlacement: "center",
+      avatarBg: "#fff",
+      avatarText: "#e11d48",
+      avatarSize: 88,
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      headingFont: '"Playfair Display", Georgia, serif',
+      bodyFont: 'Inter, sans-serif',
+    },
+    spacing: { ...baseSpacing, sectionGap: 18, pageMarginTop: 0 },
+  }),
+
+  // --- Timeline (vertical bar + bullet at each section title) -----------
+  tpl({
+    id: "timelineIndigo",
+    name: "Timeline Indigo",
+    description: "Vertical accent line with a bullet at each section title; labels to the left.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications", "awards"],
+    theme: {
+      ...baseTheme,
+      accent: "#4f46e5",
+      primary: "#1e1b4b",
+      divider: "#e0e7ff",
+      sectionTitleStyle: "timeline",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      timelineBar: { x: 130, color: "#4f46e5", width: 2, labelWidth: 96, labelGap: 20 },
+    },
+    spacing: { ...baseSpacing, pageMarginLeft: 176, pageMarginRight: 44, pageMarginTop: 44, pageMarginBottom: 44, sectionGap: 20 },
+  }),
+  tpl({
+    id: "timelineEmerald",
+    name: "Timeline Emerald",
+    description: "Editorial timeline with serif headings and emerald bullets on a thin rule.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications"],
+    theme: {
+      ...baseTheme,
+      accent: "#059669",
+      primary: "#064e3b",
+      divider: "#d1fae5",
+      headingFont: '"Playfair Display", Georgia, serif',
+      bodyFont: 'Inter, sans-serif',
+      sectionTitleStyle: "timeline",
+      sectionTitleTransform: "none",
+      accentBar: false,
+      timelineBar: { x: 140, color: "#059669", width: 2, labelWidth: 104, labelGap: 22 },
+    },
+    spacing: { ...baseSpacing, pageMarginLeft: 188, pageMarginRight: 48, pageMarginTop: 48, pageMarginBottom: 48, sectionGap: 22 },
+  }),
+  tpl({
+    id: "timelineMono",
+    name: "Timeline Mono",
+    description: "Monochrome dev timeline: monospace section labels on a slate rule.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills"],
+    theme: {
+      ...baseTheme,
+      accent: "#0f172a",
+      primary: "#0f172a",
+      divider: "#e2e8f0",
+      headingFont: '"JetBrains Mono", ui-monospace, monospace',
+      bodyFont: 'Inter, sans-serif',
+      sectionTitleStyle: "timeline",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      timelineBar: { x: 128, color: "#0f172a", width: 2, labelWidth: 92, labelGap: 20 },
+    },
+    spacing: { ...baseSpacing, pageMarginLeft: 172, pageMarginRight: 44, pageMarginTop: 46, pageMarginBottom: 46, sectionGap: 20 },
+  }),
+
+  // --- Bookmark ribbon templates ----------------------------------------
+  tpl({
+    id: "bookmarkCrimson",
+    name: "Bookmark Crimson",
+    description: "Crimson bookmark ribbon at the top-right, clean single column body.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications"],
+    theme: {
+      ...baseTheme,
+      accent: "#dc2626",
+      primary: "#7f1d1d",
+      divider: "#fecaca",
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      bookmark: { position: "topRight", color: "#dc2626", width: 40, height: 120, accent: "#fbbf24" },
+    },
+    spacing: { ...baseSpacing, pageMarginRight: 72 },
+  }),
+  tpl({
+    id: "bookmarkNavy",
+    name: "Bookmark Navy",
+    description: "Navy left-side bookmark tab with gold stripe accent.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "awards"],
+    theme: {
+      ...baseTheme,
+      accent: "#1e3a8a",
+      primary: "#0f172a",
+      divider: "#dbeafe",
+      headingFont: 'Georgia, "Times New Roman", serif',
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      bookmark: { position: "topLeft", color: "#1e3a8a", width: 34, height: 150, accent: "#f59e0b" },
+    },
+    spacing: { ...baseSpacing, pageMarginLeft: 72 },
+  }),
+  tpl({
+    id: "bookmarkEmerald",
+    name: "Bookmark Emerald",
+    description: "Emerald bookmark tab, right side, modern sans-serif.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills"],
+    theme: {
+      ...baseTheme,
+      accent: "#059669",
+      primary: "#064e3b",
+      divider: "#a7f3d0",
+      sectionTitleStyle: "bar",
+      accentBar: true,
+      bookmark: { position: "topRight", color: "#059669", width: 44, height: 100, accent: "#ecfccb" },
+    },
+    spacing: { ...baseSpacing, pageMarginRight: 72 },
+  }),
+  tpl({
+    id: "bookmarkSlate",
+    name: "Bookmark Slate",
+    description: "Slate corporate bookmark tab, left side, minimalist ATS-friendly body.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "certifications"],
+    theme: {
+      ...baseTheme,
+      accent: "#334155",
+      primary: "#0f172a",
+      divider: "#cbd5e1",
+      sectionTitleStyle: "plain",
+      sectionTitleTransform: "uppercase",
+      accentBar: false,
+      bookmark: { position: "topLeft", color: "#334155", width: 30, height: 180, accent: "#0ea5e9" },
+    },
+    spacing: { ...baseSpacing, pageMarginLeft: 68 },
+  }),
+  tpl({
+    id: "bookmarkAmber",
+    name: "Bookmark Amber",
+    description: "Warm amber bookmark ribbon with editorial serif headings.",
+    layout: "single",
+    headerSections: ["profile"],
+    mainSections: ["summary", "experience", "projects", "education", "skills", "awards"],
+    theme: {
+      ...baseTheme,
+      accent: "#d97706",
+      primary: "#78350f",
+      divider: "#fde68a",
+      headingFont: '"Playfair Display", Georgia, serif',
+      bodyFont: 'Inter, sans-serif',
+      sectionTitleStyle: "underline",
+      accentBar: false,
+      bookmark: { position: "topRight", color: "#d97706", width: 38, height: 140, accent: "#78350f" },
+    },
+    spacing: { ...baseSpacing, pageMarginRight: 70 },
   }),
 );
 

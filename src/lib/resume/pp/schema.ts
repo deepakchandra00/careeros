@@ -90,7 +90,7 @@ export const resumeSchema = z.object({
       location: z.string().default(""),
       website: z.string().default(""),
       links: z.array(link).default([]),
-      photo: z.string().default(""), // data URL; empty = no photo (CareerOS extension)
+      photo: z.string().default(""), // CareerOS extension: data URL
     })
     .default({
       fullName: "",
@@ -112,8 +112,7 @@ export const resumeSchema = z.object({
   awards: z.array(award).default([]),
   publications: z.array(publication).default([]),
   references: z.array(reference).default([]),
-  // Free-form interest tags (CareerOS extension).
-  interests: z.array(z.string()).default([]),
+  interests: z.array(z.string()).default([]), // CareerOS extension
 });
 
 export type Resume = z.infer<typeof resumeSchema>;

@@ -65,7 +65,7 @@ import { ResumeEditor } from "@/components/modules/resume-editor";
 import { PageBasedPreview } from "@/components/modules/page-based-preview";
 import { PageNavigator } from "@/components/modules/page-navigator";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { templates as PP_TEMPLATES } from "@/lib/resume/pp";
+import { templates as PP_TEMPLATES, TemplateThumb, type Template as PPTemplate } from "@/lib/resume/pp";
 import { extractTextFromFile } from "@/lib/resume/extract";
 import { exportResumeDocx } from "@/lib/resume/export-docx";
 import { exportResumePdf } from "@/lib/resume/export-pdf";
@@ -1344,6 +1344,27 @@ export function ResumeBuilderModule() {
         </CardContent>
       </Card>
 
+      {/* Template thumbnail slider — horizontal scrollable strip (like upstream) */}
+      <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-thin">
+        {PP_TEMPLATES.map((t) => (
+          <div key={t.id} className="flex flex-col items-center gap-1 flex-shrink-0">
+            <TemplateThumb
+              template={t}
+              selected={style.template === t.id}
+              onClick={() => setStyle({ template: t.id, accent: "", font: style.font })}
+            />
+            <div
+              className={cn(
+                "text-[10px] leading-tight max-w-[120px] truncate",
+                style.template === t.id ? "text-foreground font-medium" : "text-muted-foreground"
+              )}
+            >
+              {t.name}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Editor + Preview — Resizable Split Layout */}
       <div className="h-[calc(100vh-12rem)] min-h-[500px] overflow-hidden rounded-xl border">
         <ResizablePanelGroup direction="horizontal" className="h-full">
@@ -1490,13 +1511,13 @@ export function ResumeBuilderModule() {
         </div>
       )}
 
-      {/* Template picker dialog — 140+ templates with thumbnails + categories */}
+      {/* Template picker dialog — 81 templates with TemplateThumb slider */}
       <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
-        <DialogContent className="max-h-[85vh] max-w-4xl overflow-hidden p-0">
+        <DialogContent className="max-h-[85vh] max-w-5xl overflow-hidden p-0">
           <DialogHeader className="border-b p-4">
             <DialogTitle>Choose a template</DialogTitle>
             <DialogDescription>
-              {TEMPLATE_PRESETS.length} ATS-friendly templates — powered by the PagePerfect engine.
+              {PP_TEMPLATES.length} templates — powered by the PagePerfect engine. Each thumbnail reflects the template's actual palette, layout, and decorations.
             </DialogDescription>
           </DialogHeader>
 
@@ -1510,38 +1531,35 @@ export function ResumeBuilderModule() {
             />
           </div>
 
-          {/* Template grid with CSS mini-previews */}
+          {/* Template grid with TemplateThumb (real visual thumbnails) */}
           <div className="scroll-thin max-h-[58vh] overflow-y-auto p-3">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {TEMPLATE_PRESETS
-                .filter((p) => {
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+              {PP_TEMPLATES
+                .filter((t) => {
                   if (!templateSearch.trim()) return true;
                   const q = templateSearch.toLowerCase();
-                  return p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+                  return t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
                 })
-                .map((preset) => (
-                  <button
-                    key={preset.id}
-                    onClick={() => {
-                      setStyle({ template: preset.id, accent: preset.accent, font: style.font });
-                      setTemplatePickerOpen(false);
-                      setTemplateSearch("");
-                    }}
-                    className={cn(
-                      "group relative overflow-hidden rounded-lg border text-left transition-all hover:border-primary/40 hover:shadow-md",
-                      style.template === preset.id
-                        && "border-primary ring-2 ring-primary"
-                    )}
-                  >
-                    {/* CSS mini-preview */}
-                    <div className="aspect-[3/4] bg-white p-1.5">
-                      <TemplateMiniPreview preset={preset} />
+                .map((t) => (
+                  <div key={t.id} className="flex flex-col items-center gap-1">
+                    <TemplateThumb
+                      template={t}
+                      selected={style.template === t.id}
+                      onClick={() => {
+                        setStyle({ template: t.id, accent: "", font: style.font });
+                        setTemplatePickerOpen(false);
+                        setTemplateSearch("");
+                      }}
+                    />
+                    <div
+                      className={cn(
+                        "text-[10px] leading-tight max-w-[120px] truncate",
+                        style.template === t.id ? "text-foreground font-medium" : "text-muted-foreground"
+                      )}
+                    >
+                      {t.name}
                     </div>
-                    <div className="p-2">
-                      <p className="truncate text-xs font-medium">{preset.name}</p>
-                      <p className="truncate text-[10px] text-muted-foreground">{preset.description}</p>
-                    </div>
-                  </button>
+                  </div>
                 ))}
             </div>
           </div>
@@ -1645,51 +1663,3 @@ export function ResumeBuilderModule() {
   );
 }
 
-function TemplateMiniPreview({ preset }: { preset: TemplatePreset }) {
-  const accent = preset.accent;
-  const isSidebar = preset.layout === "leftSidebar" || preset.layout === "rightSidebar";
-  const isTwoCol = preset.layout === "twoCol" || preset.layout === "headerTwoCol" || preset.layout === "threeCol" || preset.layout === "headerThreeCol";
-  if (isSidebar) {
-    return (
-      <div className="flex h-full gap-px">
-        <div className="w-1/3 p-1" style={{ background: accent }}>
-          <div className="mb-1 size-3 rounded-full bg-white/30" />
-          <div className="mb-0.5 h-0.5 w-3/4 rounded bg-white/40" />
-          <div className="mb-0.5 h-0.5 w-1/2 rounded bg-white/30" />
-          <div className="mb-1 h-1 w-full rounded bg-white/20" />
-          <div className="space-y-0.5"><div className="h-0.5 w-full rounded bg-white/30" /><div className="h-0.5 w-2/3 rounded bg-white/25" /><div className="h-0.5 w-3/4 rounded bg-white/25" /></div>
-        </div>
-        <div className="flex-1 p-1">
-          <div className="mb-0.5 h-1 w-2/3 rounded" style={{ background: accent }} />
-          <div className="mb-1 h-0.5 w-1/2 rounded bg-gray-300" />
-          <div className="mb-1 h-1 w-full rounded bg-gray-100" />
-          <div className="space-y-0.5"><div className="h-0.5 w-full rounded bg-gray-200" /><div className="h-0.5 w-5/6 rounded bg-gray-200" /><div className="h-0.5 w-3/4 rounded bg-gray-200" /></div>
-          <div className="mt-1 mb-0.5 h-0.5 w-1/3 rounded" style={{ background: accent }} />
-          <div className="space-y-0.5"><div className="h-0.5 w-full rounded bg-gray-200" /><div className="h-0.5 w-2/3 rounded bg-gray-200" /></div>
-        </div>
-      </div>
-    );
-  }
-  if (isTwoCol) {
-    return (
-      <div className="h-full p-1">
-        <div className="mb-1 flex flex-col items-center"><div className="h-1 w-1/2 rounded" style={{ background: accent }} /><div className="mt-0.5 h-0.5 w-1/3 rounded bg-gray-300" /></div>
-        <div className="mb-1 h-px w-full" style={{ background: accent }} />
-        <div className="flex gap-1">
-          <div className="flex-1 space-y-0.5"><div className="h-0.5 w-1/4 rounded" style={{ background: accent }} /><div className="h-0.5 w-full rounded bg-gray-200" /><div className="h-0.5 w-5/6 rounded bg-gray-200" /></div>
-          <div className="w-1/3 space-y-0.5"><div className="h-0.5 w-1/2 rounded" style={{ background: accent }} /><div className="h-0.5 w-full rounded bg-gray-200" /></div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="h-full p-1">
-      <div className="mb-1 flex flex-col items-center"><div className="h-1 w-1/2 rounded" style={{ background: accent }} /><div className="mt-0.5 h-0.5 w-1/3 rounded bg-gray-300" /></div>
-      <div className="mb-1 h-px w-full" style={{ background: accent }} />
-      <div className="mb-1 h-0.5 w-1/4 rounded" style={{ background: accent }} />
-      <div className="space-y-0.5"><div className="h-0.5 w-full rounded bg-gray-200" /><div className="h-0.5 w-5/6 rounded bg-gray-200" /><div className="h-0.5 w-3/4 rounded bg-gray-200" /></div>
-      <div className="mt-1 mb-0.5 h-0.5 w-1/4 rounded" style={{ background: accent }} />
-      <div className="space-y-0.5"><div className="h-0.5 w-full rounded bg-gray-200" /><div className="h-0.5 w-2/3 rounded bg-gray-200" /></div>
-    </div>
-  );
-}
